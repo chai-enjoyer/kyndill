@@ -1,0 +1,286 @@
+/*
+ * Kyndill component styles. Plain CSS; tokens from tokens.css carry the brand.
+ * Components: Button (4 variants + sizes), Card, Field (label + input/textarea).
+ */
+
+/* ============================== Button ============================== */
+
+.btn {
+  --btn-bg: var(--color-surface);
+  --btn-fg: var(--color-text);
+  --btn-border: var(--color-border);
+  --btn-bg-hover: var(--color-surface-raised);
+  --btn-bg-active: var(--color-surface-sunken);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target-min);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-2);
+  border: 1px solid var(--btn-border);
+  background-color: var(--btn-bg);
+  color: var(--btn-fg);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.btn:hover:not(:disabled):not([aria-disabled='true']) {
+  background-color: var(--btn-bg-hover);
+}
+
+.btn:active:not(:disabled):not([aria-disabled='true']) {
+  background-color: var(--btn-bg-active);
+  transform: translateY(0.5px);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-accent-glow);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Primary: banked-ember on bg; faint inset highlight evokes warmth without being literal flame */
+.btn--primary {
+  --btn-bg: var(--color-accent);
+  --btn-fg: var(--color-text-on-accent);
+  --btn-border: var(--color-accent);
+  --btn-bg-hover: var(--color-accent-strong);
+  --btn-bg-active: var(--color-accent-strong);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.14);
+}
+
+.btn--primary:hover:not(:disabled):not([aria-disabled='true']) {
+  border-color: var(--color-accent-strong);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.16);
+}
+
+.btn--primary:focus-visible {
+  outline-color: var(--color-accent-strong);
+}
+
+/* Secondary: tinted neutral surface; subtle warm border */
+.btn--secondary {
+  --btn-bg: var(--color-surface);
+  --btn-fg: var(--color-text);
+  --btn-border: var(--color-border);
+  --btn-bg-hover: var(--color-surface-raised);
+}
+
+/* Ghost: no chrome until hover */
+.btn--ghost {
+  --btn-bg: transparent;
+  --btn-fg: var(--color-text);
+  --btn-border: transparent;
+  --btn-bg-hover: var(--color-surface);
+  --btn-bg-active: var(--color-surface-sunken);
+  padding-inline: var(--space-3);
+}
+
+/* Icon: square tap target with circular hover surface */
+.btn--icon {
+  --btn-bg: transparent;
+  --btn-border: transparent;
+  --btn-bg-hover: var(--color-surface);
+  --btn-bg-active: var(--color-surface-sunken);
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  padding: 0;
+  border-radius: var(--radius-full);
+}
+
+.btn--icon > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Sizes */
+.btn--sm {
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.btn--lg {
+  min-height: 52px;
+  padding: var(--space-4) var(--space-6);
+  font-size: var(--text-base);
+}
+
+/* ============================== Card ============================== */
+
+.card {
+  display: block;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-3);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-1);
+  transition:
+    background-color var(--duration-base) var(--ease-out),
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.card--interactive {
+  cursor: pointer;
+}
+
+.card--interactive:hover {
+  background-color: var(--color-surface-raised);
+  box-shadow: var(--shadow-2);
+}
+
+.card--interactive:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--color-accent-glow);
+}
+
+.card--selected {
+  background-color: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+}
+
+.card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+}
+
+.card__meta {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.card__body {
+  color: var(--color-text);
+}
+
+.card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* ============================== Form input ============================== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field__label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.field__label--required::after {
+  content: '*';
+  color: var(--color-accent);
+  margin-left: 0.2em;
+}
+
+.input,
+.textarea {
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-1);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--color-text-faint);
+}
+
+.input:hover:not(:disabled):not(:focus),
+.textarea:hover:not(:disabled):not(:focus) {
+  border-color: var(--color-border-strong);
+}
+
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.input:disabled,
+.textarea:disabled {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: var(--leading-normal);
+}
+
+.field__help {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.field__error {
+  font-size: var(--text-sm);
+  color: var(--color-error);
+}
+
+.field--error .input,
+.field--error .textarea {
+  border-color: var(--color-error);
+}
+
+.field--error .input:focus-visible,
+.field--error .textarea:focus-visible {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px var(--color-error-glow);
+}

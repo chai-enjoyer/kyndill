@@ -1,0 +1,6 @@
+/* Kyndill style system entry point. Imported by src/main.tsx. */
+
+@import './tokens.css';
+@import './reset.css';
+@import './typography.css';
+@import './components.css';
