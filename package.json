@@ -1,0 +1,22 @@
+{
+  "name": "kyndill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Habit tracking web app with a virtual pet companion.",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace shared",
+    "build": "npm run build --workspaces --if-present",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
