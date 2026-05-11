@@ -1,28 +1,4 @@
-import { Pool, type QueryResult, type QueryResultRow } from 'pg'
-import dotenv from 'dotenv'
-
-dotenv.config()
-
-export const pool = new Pool({
-  connectionString: process.env.DATABASE_URL ?? undefined,
-  host:     process.env.DATABASE_URL ? undefined : (process.env.DB_HOST ?? 'localhost'),
-  port:     process.env.DATABASE_URL ? undefined : Number(process.env.DB_PORT ?? 5432),
-  database: process.env.DATABASE_URL ? undefined : (process.env.DB_NAME ?? 'kyndill'),
-  user:     process.env.DATABASE_URL ? undefined : (process.env.DB_USER ?? 'postgres'),
-  password: process.env.DATABASE_URL ? undefined : process.env.DB_PASSWORD,
-  max:                     10,
-  idleTimeoutMillis:       30_000,
-  connectionTimeoutMillis:  2_000,
-})
-
-pool.on('error', (err) => {
-  console.error('Unexpected pg pool error:', err)
-  process.exit(1)
-})
-
-export async function query<T extends QueryResultRow = QueryResultRow>(
-  text: string,
-  values?: unknown[],
-): Promise<QueryResult<T>> {
-  return pool.query<T>(text, values)
-}
+// The runtime pg pool has moved to backend/src/db/pool.ts so it can be imported
+// by the service layer without crossing tsconfig's rootDir boundary.
+// This file is intentionally left empty as a redirect; nothing should import from it.
+export {};

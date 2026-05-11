@@ -1,28 +1,14 @@
-import { Router, type Request, type Response } from 'express'
-import { authenticate } from '../middleware/auth'
+import { Router } from 'express';
+import { requireAuth } from '../middleware/auth';
+import { notImplemented } from '../middleware/errorHandler';
 
-const router = Router()
+const router = Router();
 
-const stub = (_req: Request, res: Response) =>
-  res.status(501).json({ error: 'Not implemented' })
+router.post('/register', notImplemented);
+router.post('/login', notImplemented);
+router.post('/google', notImplemented);
 
-// ─── Public ─────────────────────────────────────────────────────────────────
+router.post('/logout', requireAuth, notImplemented);
+router.get('/me', requireAuth, notImplemented);
 
-// POST /api/auth/register
-router.post('/register', stub)
-
-// POST /api/auth/login
-router.post('/login', stub)
-
-// POST /api/auth/google  (Google ID token exchange)
-router.post('/google', stub)
-
-// ─── Protected ──────────────────────────────────────────────────────────────
-
-// GET /api/auth/me
-router.get('/me', authenticate, stub)
-
-// POST /api/auth/logout
-router.post('/logout', authenticate, stub)
-
-export { router as authRouter }
+export { router as authRouter };

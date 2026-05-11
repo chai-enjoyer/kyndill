@@ -1,28 +1,17 @@
-import { query } from '../lib/db'
-import { AppError } from '../middleware/errorHandler'
+// XP, coins, and item drops awarded for completions and milestones.
 
-export interface GrantResult {
-  xpEarned: number
-  coinsEarned: number
-  leveledUp: boolean
-  newLevel: number
+export async function awardForCompletion(_userId: string, _habitId: string): Promise<never> {
+  throw new Error('rewardService.awardForCompletion not implemented');
 }
 
-// TODO: calculate XP/coins based on habit category/streak multiplier,
-//       UPDATE users SET xp = xp + $1, coins = coins + $2,
-//       call checkLevelUp, return GrantResult
-export async function grant(
+export async function awardForFocusSession(_userId: string, _sessionId: string): Promise<never> {
+  throw new Error('rewardService.awardForFocusSession not implemented');
+}
+
+export async function grantItem(
   _userId: string,
-  _baseXp: number,
-  _baseCoins: number,
-): Promise<GrantResult> {
-  throw new AppError(501, 'Not implemented')
+  _itemId: string,
+  _quantity: number = 1,
+): Promise<never> {
+  throw new Error('rewardService.grantItem not implemented');
 }
-
-// TODO: derive level from XP using a curve (e.g. level = floor(sqrt(xp / 100)) + 1),
-//       UPDATE users SET level = $1 if changed
-export async function checkLevelUp(_userId: string): Promise<{ leveledUp: boolean; newLevel: number }> {
-  throw new AppError(501, 'Not implemented')
-}
-
-export { query }

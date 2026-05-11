@@ -1,18 +1,9 @@
-import { Router, type Request, type Response } from 'express'
-import { authenticate } from '../middleware/auth'
+import { Router } from 'express';
+import { notImplemented } from '../middleware/errorHandler';
 
-const router = Router()
+const router = Router();
 
-router.use(authenticate)
+router.get('/friends', notImplemented);
+router.get('/weekly', notImplemented);
 
-const stub = (_req: Request, res: Response) =>
-  res.status(501).json({ error: 'Not implemented' })
-
-// GET /api/leaderboard           global leaderboard (public users, sorted by streak/xp)
-// Query params: ?sort=streak|xp&limit=25
-router.get('/', stub)
-
-// GET /api/leaderboard/friends   friends-only leaderboard
-router.get('/friends', stub)
-
-export { router as leaderboardRouter }
+export { router as leaderboardRouter };

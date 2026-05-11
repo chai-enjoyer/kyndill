@@ -1,36 +1,15 @@
-import { Router, type Request, type Response } from 'express'
-import { authenticate } from '../middleware/auth'
+import { Router } from 'express';
+import { notImplemented } from '../middleware/errorHandler';
 
-const router = Router()
+const router = Router();
 
-router.use(authenticate)
+router.get('/', notImplemented);
+router.post('/', notImplemented);
+router.get('/:id', notImplemented);
+router.patch('/:id', notImplemented);
+router.delete('/:id', notImplemented);
 
-const stub = (_req: Request, res: Response) =>
-  res.status(501).json({ error: 'Not implemented' })
+router.post('/:id/complete', notImplemented);
+router.get('/:id/completions', notImplemented);
 
-// GET    /api/habits              list active habits
-router.get('/', stub)
-
-// POST   /api/habits              create a habit
-router.post('/', stub)
-
-// PATCH  /api/habits/reorder      update sort_order for multiple habits
-// Must be declared before /:id to avoid treating 'reorder' as an id
-router.patch('/reorder', stub)
-
-// GET    /api/habits/:id          get a single habit
-router.get('/:id', stub)
-
-// PATCH  /api/habits/:id          update a habit
-router.patch('/:id', stub)
-
-// DELETE /api/habits/:id          archive a habit (soft delete)
-router.delete('/:id', stub)
-
-// POST   /api/habits/:id/complete mark habit done for today
-router.post('/:id/complete', stub)
-
-// DELETE /api/habits/:id/complete undo today's completion
-router.delete('/:id/complete', stub)
-
-export { router as habitsRouter }
+export { router as habitsRouter };

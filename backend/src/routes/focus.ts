@@ -1,17 +1,10 @@
-import { Router, type Request, type Response } from 'express'
-import { authenticate } from '../middleware/auth'
+import { Router } from 'express';
+import { notImplemented } from '../middleware/errorHandler';
 
-const router = Router()
+const router = Router();
 
-router.use(authenticate)
+router.post('/sessions', notImplemented);
+router.get('/sessions', notImplemented);
+router.get('/stats', notImplemented);
 
-const stub = (_req: Request, res: Response) =>
-  res.status(501).json({ error: 'Not implemented' })
-
-// GET  /api/focus/sessions    list the user's completed focus sessions
-router.get('/sessions', stub)
-
-// POST /api/focus/sessions    record a completed focus session
-router.post('/sessions', stub)
-
-export { router as focusRouter }
+export { router as focusRouter };

@@ -1,24 +1,46 @@
-import type { Request, Response, NextFunction } from 'express'
-import jwt from 'jsonwebtoken'
-import type { JwtPayload } from '../types'
+import type { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import type { JwtPayload } from '../types';
 
-// Reads the Bearer token from the Authorization header, verifies it,
-// and attaches the decoded userId to req. Returns 401 on any failure.
-export function authenticate(req: Request, res: Response, next: NextFunction): void {
-  const header = req.headers.authorization
+declare module 'express-serve-static-core' {
+  interface Request {
+    userId?: string;
+  }
+}
 
-  if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authorization header missing or malformed' })
-    return
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'Missing or malformed Authorization header' },
+    });
+    return;
   }
 
-  const token = header.slice(7)
+  const token = header.slice('Bearer '.length).trim();
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    res.status(500).json({
+      error: { code: 'SERVER_MISCONFIGURED', message: 'JWT_SECRET is not configured' },
+    });
+    return;
+  }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload
-    req.userId = payload.userId
-    next()
+    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] }) as JwtPayload;
+    req.userId = payload.sub;
+    next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' })
+    res.status(401).json({
+      error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' },
+    });
   }
+}
+
+export function signToken(userId: string): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET is not configured');
+  }
+  return jwt.sign({ sub: userId }, secret, { algorithm: 'HS256', expiresIn: '7d' });
 }

@@ -1,19 +1,24 @@
-import cron from 'node-cron'
-import { applyDailyDecay } from './petService'
+import cron from 'node-cron';
+
+// Scheduled work: daily streak rollover, pet stat decay, scheduled notifications.
+// Jobs are registered on boot; their bodies are placeholders pending the next prompt.
+
+let started = false;
 
 export function startCronJobs(): void {
-  // Daily at midnight UTC: decay all pet stats and check broken streaks.
-  // On the e2-micro this runs alongside PostgreSQL; keep queries efficient.
-  cron.schedule('0 0 * * *', async () => {
-    console.log('[cron] Daily reset starting…')
-    try {
-      await applyDailyDecay()
-      // TODO: checkBrokenStreaks()
-      console.log('[cron] Daily reset complete')
-    } catch (err) {
-      console.error('[cron] Daily reset failed:', err)
-    }
-  })
+  if (started) return;
+  started = true;
 
-  console.log('[cron] Jobs registered')
+  // Daily rollover at 00:05 UTC. Will move to per-user-local windows later.
+  cron.schedule('5 0 * * *', () => {
+    try {
+      runDailyRollover();
+    } catch (err) {
+      console.error('Daily rollover failed:', err);
+    }
+  });
+}
+
+export function runDailyRollover(): void {
+  throw new Error('cronService.runDailyRollover not implemented');
 }
