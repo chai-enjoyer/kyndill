@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth';
 import { habitsRouter } from './routes/habits';
 import { petRouter } from './routes/pet';
 import { shopRouter } from './routes/shop';
+import { inventoryRouter } from './routes/inventory';
 import { socialRouter } from './routes/social';
 import { focusRouter } from './routes/focus';
 import { userRouter } from './routes/user';
@@ -38,6 +39,7 @@ export function createApp(): Express {
   app.use('/api/habits', requireAuth, habitsRouter);
   app.use('/api/pet', requireAuth, petRouter);
   app.use('/api/shop', requireAuth, shopRouter);
+  app.use('/api/inventory', requireAuth, inventoryRouter);
   app.use('/api/social', requireAuth, socialRouter);
   app.use('/api/focus', requireAuth, focusRouter);
   app.use('/api/user', requireAuth, userRouter);

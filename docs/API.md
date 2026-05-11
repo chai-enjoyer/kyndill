@@ -1,6 +1,6 @@
 # API reference
 
-HTTP and WebSocket contract for the Kyndill backend. Routes marked `501` are still stubs; auth and habits are fully implemented.
+HTTP and WebSocket contract for the Kyndill backend. Routes marked `501` are still stubs; auth, habits, pet, shop, and inventory are fully implemented.
 
 ## Base URL
 
@@ -309,21 +309,243 @@ Errors:
 
 ## Pet (`/api/pet`, all auth)
 
-| Method | Path        | Status | Description                                                    |
-| ------ | ----------- | ------ | -------------------------------------------------------------- |
-| GET    | `/`         | 501    | Current pet state for the caller (stats, stage, mood).         |
-| PATCH  | `/`         | 501    | Update the pet's name (or species after unlock).               |
-| POST   | `/consume`  | 501    | Apply a consumable from inventory to the pet.                  |
+### GET `/` (auth)
+
+Returns the caller's pet, all five stats, stage, `total_habits_completed`, `is_fainted`, and currently equipped cosmetics keyed by slot.
+
+`200 OK`:
+
+```json
+{
+  "id": "<uuid>",
+  "user_id": "<uuid>",
+  "species": "blob",
+  "name": "Kyndill",
+  "health": 100,
+  "happiness": 100,
+  "hunger": 80,
+  "energy": 90,
+  "cleanliness": 100,
+  "stage": 1,
+  "total_habits_completed": 3,
+  "is_fainted": false,
+  "created_at": "<timestamptz>",
+  "equipped": {
+    "hat": {
+      "id": "<uuid>",
+      "name": "Beanie Hat",
+      "rarity": "common",
+      "image_url": "/items/beanie-hat.svg"
+    }
+  }
+}
+```
+
+Errors:
+
+- `404 PET_NOT_FOUND`
+
+### POST `/feed` (auth)
+
+Apply a consumable from inventory to the pet. Inside a transaction with `FOR UPDATE` on the inventory row: validates ownership and item type, applies `LEAST(stat + effect_amount, 100)` to the stat named by `effect_stat`, and decrements quantity (or deletes the row when quantity reaches zero).
+
+Body:
+
+```json
+{ "item_id": "<uuid>" }
+```
+
+`200 OK` returns the full pet row (without equipped cosmetics).
+
+Errors:
+
+- `400 NOT_CONSUMABLE` — item is not a consumable.
+- `400 INVALID_ITEM` — consumable's `effect_stat` is not a pet stat or `effect_amount` is null.
+- `404 NOT_IN_INVENTORY` — the caller has no copies of this item.
+
+### POST `/equip` (auth)
+
+Equip a cosmetic to its slot. The slot is read from the item's `category` (`hat` / `accessory` / `background`). UPSERT on `(user_id, slot)` so an existing equip in that slot is replaced. The inventory item is **not** consumed; the user can unequip and re-equip freely.
+
+Body:
+
+```json
+{ "item_id": "<uuid>" }
+```
+
+`200 OK`:
+
+```json
+{
+  "equipped": {
+    "hat": {
+      "id": "<uuid>",
+      "name": "Beanie Hat",
+      "rarity": "common",
+      "image_url": "/items/beanie-hat.svg"
+    }
+  }
+}
+```
+
+Errors:
+
+- `400 NOT_COSMETIC`
+- `400 INVALID_SLOT` — the cosmetic does not specify a valid `hat`/`accessory`/`background` category.
+- `404 NOT_IN_INVENTORY`
+
+### POST `/unequip` (auth)
+
+Body:
+
+```json
+{ "slot": "hat" }
+```
+
+`204 No Content` on success. Idempotent: unequipping an empty slot succeeds silently.
+
+Errors:
+
+- `400 VALIDATION_FAILED` — `slot` not in (`hat`, `accessory`, `background`).
 
 ## Shop (`/api/shop`, all auth)
 
-| Method | Path          | Status | Description                                                |
-| ------ | ------------- | ------ | ---------------------------------------------------------- |
-| GET    | `/items`      | 501    | Full item catalogue (filterable by `?type` and `?rarity`). |
-| POST   | `/purchase`   | 501    | Buy an item with coins; deducts coins and grants inventory.|
-| GET    | `/inventory`  | 501    | Caller's inventory with quantities.                         |
-| POST   | `/equip`      | 501    | Equip a cosmetic to its slot (hat / accessory / background).|
-| POST   | `/unequip`    | 501    | Clear a cosmetic slot.                                     |
+### GET `/` (auth)
+
+Lists every catalogue item grouped by type, with an `owned` flag on cosmetics and the caller's current coin balance.
+
+`200 OK`:
+
+```json
+{
+  "coins": 130,
+  "items": {
+    "consumable": [
+      {
+        "id": "<uuid>",
+        "name": "Apple",
+        "type": "consumable",
+        "rarity": "common",
+        "price": 10,
+        "effect_stat": "hunger",
+        "effect_amount": 15,
+        "image_url": "/items/apple.svg",
+        "category": null
+      }
+    ],
+    "cosmetic": [
+      {
+        "id": "<uuid>",
+        "name": "Beanie Hat",
+        "type": "cosmetic",
+        "rarity": "common",
+        "price": 50,
+        "effect_stat": null,
+        "effect_amount": null,
+        "image_url": "/items/beanie-hat.svg",
+        "category": "hat",
+        "owned": true
+      }
+    ],
+    "streak_freeze": [
+      {
+        "id": "<uuid>",
+        "name": "Spark Shield",
+        "type": "streak_freeze",
+        "rarity": "common",
+        "price": 50,
+        "effect_stat": "streak_freeze_days",
+        "effect_amount": 1,
+        "image_url": "/items/spark-shield.svg",
+        "category": null
+      }
+    ]
+  }
+}
+```
+
+### POST `/purchase` (auth)
+
+Body:
+
+```json
+{ "item_id": "<uuid>" }
+```
+
+Inside a transaction with `FOR UPDATE` on the user row: validates the item exists, checks the balance, deducts coins, and UPSERTs the item into inventory (`quantity + 1`).
+
+`200 OK`:
+
+```json
+{
+  "new_coin_balance": 80,
+  "item": { "id": "<uuid>", "name": "Apple", "type": "consumable", "...": "..." }
+}
+```
+
+Errors:
+
+- `402 INSUFFICIENT_COINS`
+- `404 ITEM_NOT_FOUND`
+
+### POST `/buy-streak-freeze` (auth)
+
+Special purchase: 50 coins, increments `streaks.freeze_count` by 1 (max 3). No body. No inventory row is added; the freeze counter is the in-database mechanism that protects streaks. Catalogue rows for Spark/Ember/Hearth Shield remain purchasable via `/purchase` but have no automatic effect on `freeze_count` (kept available for a future "burn N days from the shield" flow).
+
+`200 OK`:
+
+```json
+{ "new_freeze_count": 2, "new_coin_balance": 80 }
+```
+
+Errors:
+
+- `402 INSUFFICIENT_COINS`
+- `409 FREEZE_LIMIT_REACHED` — caller already has 3 freezes.
+
+## Inventory (`/api/inventory`, all auth)
+
+### GET `/` (auth)
+
+Lists everything the caller owns, grouped by type. Cosmetics carry `equipped_slot` (string when currently equipped, `null` otherwise). `quantity` is meaningful for consumables; cosmetics and streak freezes typically have `quantity = 1`.
+
+`200 OK`:
+
+```json
+{
+  "consumables": [
+    {
+      "id": "<uuid>",
+      "name": "Apple",
+      "type": "consumable",
+      "rarity": "common",
+      "price": 10,
+      "effect_stat": "hunger",
+      "effect_amount": 15,
+      "image_url": "/items/apple.svg",
+      "category": null,
+      "quantity": 3,
+      "equipped_slot": null
+    }
+  ],
+  "cosmetics": [
+    {
+      "id": "<uuid>",
+      "name": "Beanie Hat",
+      "type": "cosmetic",
+      "rarity": "common",
+      "price": 50,
+      "effect_stat": null,
+      "effect_amount": null,
+      "image_url": "/items/beanie-hat.svg",
+      "category": "hat",
+      "quantity": 1,
+      "equipped_slot": "hat"
+    }
+  ],
+  "streak_freezes": []
+}
+```
 
 ## Social (`/api/social`, all auth)
 
