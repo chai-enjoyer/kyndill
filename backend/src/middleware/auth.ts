@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import type { JwtPayload } from '../types';
+import { verifyToken } from '../services/authService';
 
 declare module 'express-serve-static-core' {
   interface Request {
@@ -17,17 +16,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  const token = header.slice('Bearer '.length).trim();
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
+  if (!process.env.JWT_SECRET) {
     res.status(500).json({
       error: { code: 'SERVER_MISCONFIGURED', message: 'JWT_SECRET is not configured' },
     });
     return;
   }
 
+  const token = header.slice('Bearer '.length).trim();
+
   try {
-    const payload = jwt.verify(token, secret, { algorithms: ['HS256'] }) as JwtPayload;
+    const payload = verifyToken(token);
     req.userId = payload.sub;
     next();
   } catch {
@@ -35,12 +34,4 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' },
     });
   }
-}
-
-export function signToken(userId: string): string {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error('JWT_SECRET is not configured');
-  }
-  return jwt.sign({ sub: userId }, secret, { algorithm: 'HS256', expiresIn: '7d' });
 }

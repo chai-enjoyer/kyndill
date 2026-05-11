@@ -1,6 +1,6 @@
 # API reference
 
-HTTP and WebSocket contract for the Kyndill backend. Every route below is currently a stub returning `501 Not Implemented`; the surface is locked first, implementations follow in subsequent prompts.
+HTTP and WebSocket contract for the Kyndill backend. Routes marked `501` are still stubs; the auth surface is fully implemented.
 
 ## Base URL
 
@@ -37,13 +37,111 @@ Every other endpoint under `/api/*` requires a valid bearer token. Missing or ex
 
 ## Auth (`/api/auth`)
 
-| Method | Path        | Auth | Status | Description                                                  |
-| ------ | ----------- | ---- | ------ | ------------------------------------------------------------ |
-| POST   | `/register` | no   | 501    | Create an account (email + password). Returns user + JWT.    |
-| POST   | `/login`    | no   | 501    | Email + password sign-in. Returns user + JWT.                |
-| POST   | `/google`   | no   | 501    | Exchange a Google ID token for a Kyndill JWT.                |
-| POST   | `/logout`   | yes  | 501    | Client-side discard. No-op server-side for stateless JWTs.   |
-| GET    | `/me`       | yes  | 501    | Returns the authenticated user's profile.                    |
+JWT auth uses HS256 with a 7-day expiry. Tokens carry only `sub` (user id) plus standard `iat` / `exp` claims.
+
+### POST `/register` (public)
+
+Create a local-credentials account. The username is generated from the email's local part; collisions append a 6-char random suffix.
+
+Body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "minimum-8-chars",
+  "display_name": "Display Name"
+}
+```
+
+`201 Created`:
+
+```json
+{
+  "token": "<JWT>",
+  "user": {
+    "id": "<uuid>",
+    "email": "user@example.com",
+    "display_name": "Display Name",
+    "level": 1,
+    "xp": 0,
+    "coins": 0
+  }
+}
+```
+
+Errors:
+
+- `400 VALIDATION_FAILED` — invalid email, password under 8 characters, or display_name under 2 characters.
+- `409 EMAIL_TAKEN` — email already registered.
+
+### POST `/login` (public)
+
+Body:
+
+```json
+{
+  "email": "user@example.com",
+  "password": "the-password"
+}
+```
+
+`200 OK` returns the same shape as `/register`.
+
+Errors:
+
+- `400 VALIDATION_FAILED`
+- `401 INVALID_CREDENTIALS` — unknown email, wrong password, or OAuth-only account (combined to prevent account enumeration).
+
+### POST `/google` (public)
+
+Exchange a Google ID token for a Kyndill JWT. Creates an account on first sign-in; subsequent sign-ins return the existing user.
+
+Body:
+
+```json
+{
+  "credential": "<Google ID token from Google Identity Services>"
+}
+```
+
+`200 OK` returns the same shape as `/register`.
+
+Errors:
+
+- `400 VALIDATION_FAILED`
+- `401 INVALID_GOOGLE_TOKEN` — token did not verify against `GOOGLE_CLIENT_ID`, or required claims (`email`, `sub`) were missing.
+- `409 EMAIL_TAKEN` — a local-credentials account already uses the email Google returned. Linking is not yet supported; sign in with the password instead.
+- `500 SERVER_MISCONFIGURED` — `GOOGLE_CLIENT_ID` is unset on the server.
+
+### POST `/logout` (auth)
+
+Returns `204 No Content`. The server is stateless; the client discards its token. Endpoint exists for client-side symmetry.
+
+### GET `/me` (auth)
+
+Returns the authenticated user's profile.
+
+`200 OK`:
+
+```json
+{
+  "id": "<uuid>",
+  "email": "user@example.com",
+  "display_name": "Display Name",
+  "username": "user",
+  "level": 1,
+  "xp": 0,
+  "coins": 0,
+  "streak_current": 0,
+  "streak_longest": 0,
+  "avatar_url": null,
+  "visibility": "private"
+}
+```
+
+Errors:
+
+- `401 UNAUTHORIZED` — missing, malformed, or expired token.
 
 ## Habits (`/api/habits`, all auth)
 
