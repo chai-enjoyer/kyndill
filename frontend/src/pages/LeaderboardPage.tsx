@@ -25,6 +25,8 @@ export function LeaderboardPage() {
 
       {isLoading ? (
         <LoadingSkeleton width="100%" height={420} />
+      ) : entries.length === 0 ? (
+        <div className="friends-empty">No leaderboard entries yet.</div>
       ) : (
         <>
           <div className="podium-grid">

@@ -26,6 +26,7 @@ export function FocusPage() {
   const [complete, setComplete] = useState<{ sessionId: string; coins: number; minutes: number } | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const noiseRef = useRef<AudioScheduledSourceNode | OscillatorNode | null>(null);
+  const completedRef = useRef(false);
   const { mergeUser, user } = useAuthContext();
   const { showToast } = useToastContext();
 
@@ -35,6 +36,7 @@ export function FocusPage() {
   useEffect(() => {
     setRemaining(totalSeconds);
     setRunning(false);
+    completedRef.current = false;
   }, [totalSeconds]);
 
   useEffect(() => {
@@ -58,6 +60,8 @@ export function FocusPage() {
   }, [ambient]);
 
   async function finishSession(rating?: number) {
+    if (completedRef.current) return;
+    completedRef.current = true;
     setRunning(false);
     try {
       const minutes = Math.max(1, Math.round(totalSeconds / 60));
@@ -68,6 +72,7 @@ export function FocusPage() {
       mergeUser({ coins: (user?.coins ?? 0) + data.coins_earned });
       setComplete({ sessionId: data.session_id, coins: data.coins_earned, minutes });
     } catch (err) {
+      completedRef.current = false;
       showToast(extractMessage(err, 'Could not save focus session.'), 'error');
     }
   }
@@ -76,7 +81,7 @@ export function FocusPage() {
     <section className="page focus-page">
       <div className="focus-shell">
         <div className="focus-pet">
-          {/* PLACEHOLDER */}
+          {/* PLACEHOLDER: Replace with final focus companion art when delivered. */}
           <PlaceholderPet species="blob" mood="neutral" size={92} />
         </div>
         <div className="focus-presets">
@@ -128,15 +133,26 @@ export function FocusPage() {
   );
 }
 
-function CompletionModal({ coins, minutes, onClose, onRate }: { coins: number; minutes: number; onClose: () => void; onRate: (rating: number) => void }) {
+function CompletionModal({ coins, minutes, onClose, onRate }: { coins: number; minutes: number; onClose: () => void; onRate: (rating: number) => Promise<void> }) {
   const [rated, setRated] = useState(false);
+  const [ratingPending, setRatingPending] = useState(false);
   return (
     <Modal isOpen onClose={onClose} title="Focus complete">
       <div className="focus-complete">
         <p>{minutes} minutes banked. You earned <strong>{coins}</strong> coins.</p>
         <div className="rating-row" aria-label="Rate focus session">
           {[1, 2, 3, 4, 5].map((rating) => (
-            <button key={rating} type="button" disabled={rated} onClick={() => { setRated(true); onRate(rating); }}>
+            <button
+              key={rating}
+              type="button"
+              disabled={rated || ratingPending}
+              onClick={async () => {
+                setRatingPending(true);
+                await onRate(rating);
+                setRated(true);
+                setRatingPending(false);
+              }}
+            >
               {rating}
             </button>
           ))}

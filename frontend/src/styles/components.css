@@ -390,6 +390,10 @@
     left: var(--space-4);
     max-width: none;
   }
+
+  .btn--sm {
+    min-height: var(--tap-target-min);
+  }
 }
 
 /* ============================== Skeleton ============================== */
@@ -431,7 +435,7 @@
   grid-area: main;
   min-width: 0;
   outline: none;
-  animation: kyndill-fade-in var(--duration-base) var(--ease-out);
+  animation: kyndill-page-enter 200ms var(--ease-out);
 }
 
 .app-shell__loading {
@@ -694,6 +698,7 @@
 }
 
 .dashboard {
+  position: relative;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 320px;
   gap: var(--space-6);
@@ -703,6 +708,26 @@
   background:
     linear-gradient(180deg, var(--color-bg-page-elevated) 0%, var(--color-bg-page) 42%),
     var(--color-bg-page);
+  transform: translateY(var(--pull-distance, 0));
+  transition: transform 180ms var(--ease-out);
+}
+
+.pull-refresh {
+  position: fixed;
+  top: var(--top-nav-height);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: none;
+  justify-content: center;
+  padding-block: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+
+.dashboard--pulling .pull-refresh {
+  display: flex;
 }
 
 .dashboard__sidebar,
@@ -804,6 +829,12 @@
 }
 
 .dashboard__empty p { margin: 0; color: var(--color-text-muted); }
+
+.dashboard__empty--error {
+  border-style: solid;
+  border-color: var(--color-error);
+  background-color: var(--color-error-subtle);
+}
 
 .completion-ring {
   position: relative;
@@ -1264,7 +1295,7 @@
 .level-up__level {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 7rem;
+  font-size: clamp(var(--text-5xl), 14vw, 7rem);
   font-weight: var(--weight-bold);
   line-height: 0.9;
   animation: kyndill-level-up-number 520ms var(--ease-out);
@@ -1372,6 +1403,9 @@
   min-height: calc(100vh - var(--top-nav-height));
   padding: var(--space-6);
   background-color: var(--color-bg-page);
+  width: min(1180px, 100%);
+  margin-inline: auto;
+  animation: kyndill-page-enter 200ms var(--ease-out);
 }
 
 .page__header {
@@ -1384,6 +1418,8 @@
 
 .page__header h1 {
   margin: 0;
+  font-size: var(--text-4xl);
+  line-height: var(--leading-tight);
 }
 
 .page__eyebrow {
@@ -1900,6 +1936,16 @@
   background-color: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-1);
+}
+
+.shop-tabs button:focus-visible,
+.focus-presets button:focus-visible,
+.ambient-controls button:focus-visible,
+.rating-row button:focus-visible,
+.gift-option:focus-within,
+.equip-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .shop-grid {
@@ -2515,7 +2561,7 @@
 .focus-timer {
   position: relative;
   font-family: var(--font-mono);
-  font-size: 72px;
+  font-size: var(--text-5xl);
   font-weight: var(--weight-bold);
   line-height: 1;
 }

@@ -17,6 +17,8 @@ export function ShopPage() {
     cosmetics,
     consumables,
     isLoading,
+    error,
+    refetch,
     purchase,
     buyStreakFreeze,
   } = useShop();
@@ -77,12 +79,19 @@ export function ShopPage() {
         </button>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <div className="friends-empty" role="alert">
+          <p>{error}</p>
+          <Button variant="secondary" onClick={refetch}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="shop-grid" aria-busy="true">
           {[0, 1, 2, 3, 4, 5].map((i) => (
             <LoadingSkeleton key={i} width="100%" height={260} />
           ))}
         </div>
+      ) : items.length === 0 ? (
+        <div className="friends-empty">No {tab} available right now.</div>
       ) : (
         <div className="shop-grid">
           {items.map((item) => (
@@ -145,7 +154,7 @@ function ShopItemCard({
   return (
     <article className="shop-item-card">
       <div className="shop-item-card__image">
-        {/* PLACEHOLDER */}
+        {/* PLACEHOLDER: Replace with final item shop art when delivered. */}
         <span style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }} />
       </div>
       <div className="shop-item-card__body">

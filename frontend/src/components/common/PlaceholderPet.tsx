@@ -1,4 +1,4 @@
-// PLACEHOLDER: Replace with artist assets when delivered.
+// PLACEHOLDER: Replace with final pet sprites when delivered.
 // Geometric stand-ins per species; mood swaps eye/mouth paths only. Colors
 // here are placeholders supplied in the foundation brief; they are not
 // design-token-aligned because the final art will supersede them.

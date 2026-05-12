@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties, type TouchEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { useAuthContext } from '../context/AuthContext';
@@ -17,11 +17,14 @@ export function DashboardPage() {
   const { user, mergeUser } = useAuthContext();
   const { showToast } = useToastContext();
   const { socket } = useSocketContext();
-  const { habits, isLoading: habitsLoading, complete } = useHabits();
+  const { habits, isLoading: habitsLoading, error: habitsError, complete, refetch: refetchHabits } = useHabits();
   const { pet, isLoading: petLoading, applyCompletion, refetch: refetchPet } = usePet();
 
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [pullStart, setPullStart] = useState<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!socket) return;
@@ -67,6 +70,40 @@ export function DashboardPage() {
     }
   }
 
+  async function refreshDashboard() {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchHabits(), refetchPet()]);
+      showToast('Dashboard refreshed.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err), 'error');
+    } finally {
+      setRefreshing(false);
+      setPullDistance(0);
+      setPullStart(null);
+    }
+  }
+
+  function handleTouchStart(event: TouchEvent<HTMLDivElement>) {
+    if (window.scrollY > 0) return;
+    setPullStart(event.touches[0]?.clientY ?? null);
+  }
+
+  function handleTouchMove(event: TouchEvent<HTMLDivElement>) {
+    if (pullStart === null || refreshing) return;
+    const y = event.touches[0]?.clientY ?? pullStart;
+    setPullDistance(Math.min(96, Math.max(0, y - pullStart)));
+  }
+
+  function handleTouchEnd() {
+    if (pullDistance > 70 && !refreshing) {
+      void refreshDashboard();
+      return;
+    }
+    setPullDistance(0);
+    setPullStart(null);
+  }
+
   const completed = habits.filter((h) => h.completed_today).length;
   const total = habits.length;
   const firstName = user?.display_name?.split(' ')[0] ?? '';
@@ -79,7 +116,16 @@ export function DashboardPage() {
   });
 
   return (
-    <div className="dashboard">
+    <div
+      className={`dashboard ${pullDistance > 0 || refreshing ? 'dashboard--pulling' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      style={{ '--pull-distance': `${pullDistance}px` } as CSSProperties}
+    >
+      <div className="pull-refresh" aria-live="polite">
+        {refreshing ? 'Refreshing...' : pullDistance > 70 ? 'Release to refresh' : 'Pull to refresh'}
+      </div>
       <DashboardSidebar
         pet={pet}
         completed={completed}
@@ -97,7 +143,9 @@ export function DashboardPage() {
           </h1>
         </header>
 
-        {habitsLoading ? (
+        {habitsError ? (
+          <ErrorState message={habitsError} onRetry={refreshDashboard} />
+        ) : habitsLoading ? (
           <HabitsSkeleton />
         ) : total === 0 ? (
           <EmptyHabits />
@@ -120,6 +168,17 @@ export function DashboardPage() {
 
       {levelUp !== null && <LevelUpModal newLevel={levelUp} onClose={() => setLevelUp(null)} />}
       {feedOpen && <FeedModal onClose={() => setFeedOpen(false)} onFed={refetchPet} />}
+    </div>
+  );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="dashboard__empty dashboard__empty--error" role="alert">
+      <p>{message}</p>
+      <button type="button" className="btn btn--secondary" onClick={onRetry}>
+        Retry
+      </button>
     </div>
   );
 }

@@ -14,6 +14,7 @@ export function ProfilePage() {
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>('private');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -25,6 +26,7 @@ export function ProfilePage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    setSaving(true);
     try {
       const updated = await save({
         display_name: displayName,
@@ -40,6 +42,8 @@ export function ProfilePage() {
       showToast('Profile saved.', 'success');
     } catch (err) {
       showToast(extractMessage(err, 'Could not save profile.'), 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -69,7 +73,7 @@ export function ProfilePage() {
               <option value="private">Private</option>
             </select>
           </div>
-          <Button variant="primary" type="submit">Save</Button>
+          <Button variant="primary" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </form>
         <aside className="profile-stats">
           <Stat label="Level" value={profile.level} />

@@ -20,13 +20,14 @@ export function FriendsPage() {
     friends,
     requests,
     isLoading,
+    error,
     searchUsers,
     sendRequest,
     respondRequest,
     sendGift,
     getFriendProfile,
   } = useSocial();
-  const { entries } = useLeaderboard('friends');
+  const { entries, isLoading: leaderboardLoading } = useLeaderboard('friends');
   const { consumables, refetch: refetchInventory } = useInventory();
   const { showToast } = useToastContext();
   const [query, setQuery] = useState('');
@@ -97,7 +98,9 @@ export function FriendsPage() {
             </section>
           )}
 
-          {isLoading ? (
+          {error ? (
+            <div className="friends-empty" role="alert">{error}</div>
+          ) : isLoading ? (
             <div className="friend-list" aria-busy="true">
               {[0, 1, 2].map((i) => <LoadingSkeleton key={i} width="100%" height={96} />)}
             </div>
@@ -130,13 +133,19 @@ export function FriendsPage() {
 
         <aside className="friends-leaderboard">
           <h2>Friends leaderboard</h2>
-          {entries.slice(0, 8).map((entry) => (
-            <div key={entry.id} className="mini-rank-row">
-              <span>{entry.rank}</span>
-              <strong>{entry.display_name}</strong>
-              <em>L{entry.level}</em>
-            </div>
-          ))}
+          {leaderboardLoading ? (
+            <LoadingSkeleton width="100%" height={180} />
+          ) : entries.length === 0 ? (
+            <div className="friends-empty">No ranked friends yet.</div>
+          ) : (
+            entries.slice(0, 8).map((entry) => (
+              <div key={entry.id} className="mini-rank-row">
+                <span>{entry.rank}</span>
+                <strong>{entry.display_name}</strong>
+                <em>L{entry.level}</em>
+              </div>
+            ))
+          )}
         </aside>
       </div>
 
@@ -186,6 +195,7 @@ function AddFriendModal({
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -211,12 +221,15 @@ function AddFriendModal({
   }, [query, searchUsers, showToast]);
 
   async function request(username: string) {
+    setSending(username);
     try {
       await sendRequest(username);
       showToast('Friend request sent.', 'success');
       onClose();
     } catch (err) {
       showToast(extractMessage(err), 'error');
+    } finally {
+      setSending(null);
     }
   }
 
@@ -224,16 +237,20 @@ function AddFriendModal({
     <Modal isOpen onClose={onClose} title="Add Friend">
       <div className="add-friend-modal">
         <input className="input" placeholder="Search username" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus />
-        {loading ? <LoadingSkeleton width="100%" height={64} /> : (
+        {loading ? <LoadingSkeleton width="100%" height={64} /> : query.trim().length >= 2 && results.length === 0 ? (
+          <div className="friends-empty">No users found.</div>
+        ) : (
           <ul className="search-results" role="list">
             {results.map((user) => (
               <li key={user.id}>
                 <Avatar name={user.display_name} url={user.avatar_url} />
                 <div>
                   <strong>{user.display_name}</strong>
-                  <span>@{user.username} · L{user.level}</span>
+                  <span>@{user.username} - L{user.level}</span>
                 </div>
-                <Button size="sm" variant="primary" onClick={() => request(user.username)}>Send Request</Button>
+                <Button size="sm" variant="primary" disabled={sending === user.username} onClick={() => request(user.username)}>
+                  {sending === user.username ? 'Sending...' : 'Send Request'}
+                </Button>
               </li>
             ))}
           </ul>
@@ -257,14 +274,18 @@ function SendGiftModal({
   const { showToast } = useToastContext();
   const [selected, setSelected] = useState('');
   const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!selected) return;
+    setSending(true);
     try {
       await onSend(selected, message);
     } catch (err) {
       showToast(extractMessage(err), 'error');
+    } finally {
+      setSending(false);
     }
   }
 
@@ -288,7 +309,9 @@ function SendGiftModal({
         <textarea className="textarea" maxLength={280} placeholder="Optional message" value={message} onChange={(event) => setMessage(event.target.value)} />
         <div className="modal-actions">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" disabled={!selected}>Confirm send</Button>
+          <Button variant="primary" type="submit" disabled={!selected || sending}>
+            {sending ? 'Sending...' : 'Confirm send'}
+          </Button>
         </div>
       </form>
     </Modal>

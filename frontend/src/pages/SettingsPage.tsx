@@ -25,6 +25,8 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     applyTheme(theme);
@@ -36,6 +38,7 @@ export function SettingsPage() {
 
   async function submitPassword(event: FormEvent) {
     event.preventDefault();
+    setPasswordSaving(true);
     try {
       await changePassword(currentPassword, newPassword);
       setCurrentPassword('');
@@ -43,15 +46,19 @@ export function SettingsPage() {
       showToast('Password changed.', 'success');
     } catch (err) {
       showToast(extractMessage(err, 'Could not change password.'), 'error');
+    } finally {
+      setPasswordSaving(false);
     }
   }
 
   async function confirmDelete() {
+    setDeleting(true);
     try {
       await deleteAccount();
       logout();
     } catch (err) {
       showToast(extractMessage(err, 'Could not delete account.'), 'error');
+      setDeleting(false);
     }
   }
 
@@ -87,7 +94,9 @@ export function SettingsPage() {
             <form className="settings-form" onSubmit={submitPassword}>
               <input className="input" type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
               <input className="input" type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-              <Button variant="primary" type="submit" disabled={!currentPassword || newPassword.length < 8}>Change password</Button>
+              <Button variant="primary" type="submit" disabled={passwordSaving || !currentPassword || newPassword.length < 8}>
+                {passwordSaving ? 'Changing...' : 'Change password'}
+              </Button>
             </form>
           </section>
         )}
@@ -103,7 +112,9 @@ export function SettingsPage() {
           <input className="input danger-input" value={deleteText} onChange={(e) => setDeleteText(e.target.value)} />
           <div className="modal-actions">
             <Button variant="secondary" onClick={() => setDeleteOpen(false)}>Cancel</Button>
-            <Button variant="primary" disabled={deleteText !== 'DELETE'} onClick={confirmDelete}>Delete Account</Button>
+            <Button variant="primary" disabled={deleting || deleteText !== 'DELETE'} onClick={confirmDelete}>
+              {deleting ? 'Deleting...' : 'Delete Account'}
+            </Button>
           </div>
         </Modal>
       )}

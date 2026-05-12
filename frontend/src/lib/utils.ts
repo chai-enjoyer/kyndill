@@ -1,4 +1,4 @@
-// PLACEHOLDER: Replace with actual item images when delivered.
+// PLACEHOLDER: Replace with final item icons when delivered.
 // Each item gets a deterministic warm-neutral swatch keyed by a tiny string
 // hash, plus the item's first letter on top. Good enough to read at a glance
 // while the artist is still drawing the real assets.

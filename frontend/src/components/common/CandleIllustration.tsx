@@ -1,4 +1,4 @@
-// PLACEHOLDER: Replace with the artist's hero illustration when delivered.
+// PLACEHOLDER: Replace with final candle hero illustration when delivered.
 // Single candle with a warm halo, sized to feel intimate, not iconic.
 
 interface CandleIllustrationProps {

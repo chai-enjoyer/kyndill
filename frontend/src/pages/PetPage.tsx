@@ -31,8 +31,10 @@ export function PetPage() {
   const { cosmetics, refetch: refetchInventory } = useInventory();
   const { showToast } = useToastContext();
   const [slot, setSlot] = useState<EquipSlot | null>(null);
+  const [equippingId, setEquippingId] = useState<string | null>(null);
 
   async function handleEquip(item: InventoryEntry) {
+    setEquippingId(item.id);
     try {
       await equip(item.id);
       await Promise.all([refetch(), refetchInventory()]);
@@ -40,6 +42,8 @@ export function PetPage() {
       setSlot(null);
     } catch (err) {
       showToast(extractMessage(err), 'error');
+    } finally {
+      setEquippingId(null);
     }
   }
 
@@ -74,7 +78,7 @@ export function PetPage() {
       <div className="pet-page__layout">
         <section className="pet-page__hero" aria-label="Pet overview">
           <div className="pet-page__pet-art">
-            {/* PLACEHOLDER */}
+            {/* PLACEHOLDER: Replace with final pet display art when delivered. */}
             <PlaceholderPet species={pet.species} mood={pet.health > 60 ? 'happy' : pet.health > 30 ? 'neutral' : 'sad'} size={300} className="pet-breathing" />
           </div>
           <div className="pet-page__stage">
@@ -140,6 +144,7 @@ export function PetPage() {
           items={cosmetics.filter((item) => item.category === slot)}
           onClose={() => setSlot(null)}
           onEquip={handleEquip}
+          equippingId={equippingId}
         />
       )}
     </section>
@@ -170,11 +175,13 @@ function EquipModal({
   items,
   onClose,
   onEquip,
+  equippingId,
 }: {
   slot: EquipSlot;
   items: InventoryEntry[];
   onClose: () => void;
   onEquip: (item: InventoryEntry) => void;
+  equippingId: string | null;
 }) {
   const title = `Equip ${slot}`;
   return (
@@ -185,10 +192,12 @@ function EquipModal({
         <ul className="equip-list" role="list">
           {items.map((item) => (
             <li key={item.id}>
-              <button type="button" className="equip-item" onClick={() => onEquip(item)}>
+              <button type="button" className="equip-item" disabled={equippingId !== null} onClick={() => onEquip(item)}>
                 <span className="equip-item__image" style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }} />
                 <span className="equip-item__name">{item.name}</span>
-                <span className={`rarity-badge rarity-badge--${item.rarity}`}>{item.rarity}</span>
+                <span className={`rarity-badge rarity-badge--${item.rarity}`}>
+                  {equippingId === item.id ? 'Equipping' : item.rarity}
+                </span>
               </button>
             </li>
           ))}

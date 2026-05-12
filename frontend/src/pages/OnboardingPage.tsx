@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { Button } from '../components/common/Button';
-// PLACEHOLDER: Replace PlaceholderPet with artist SVGs when delivered.
+// PLACEHOLDER: Replace with final onboarding pet sprites when delivered.
 import {
   PlaceholderPet,
   type PetSpecies,
