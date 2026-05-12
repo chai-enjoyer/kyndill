@@ -64,6 +64,19 @@ export async function complete(
   }
 }
 
+export async function rateSession(userId: string, sessionId: string, rating: number): Promise<void> {
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new HttpError(400, 'INVALID_RATING', 'rating must be an integer in 1..5');
+  }
+  const { rowCount } = await pool.query(
+    `UPDATE focus_sessions SET rating = $1 WHERE id = $2 AND user_id = $3`,
+    [rating, sessionId, userId],
+  );
+  if (rowCount === 0) {
+    throw new HttpError(404, 'SESSION_NOT_FOUND', 'Focus session not found');
+  }
+}
+
 export async function getStats(userId: string): Promise<FocusStats> {
   const { rows } = await pool.query<{
     total_sessions: number;

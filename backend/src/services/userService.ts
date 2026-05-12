@@ -1,0 +1,206 @@
+import { pool } from '../db/pool';
+import { comparePassword, hashPassword } from './authService';
+import { HttpError } from '../middleware/errorHandler';
+import type { PetSpecies } from './petService';
+
+export interface UserSearchResult {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string | null;
+  level: number;
+}
+
+export interface ProfileDto {
+  id: string;
+  email: string;
+  display_name: string;
+  username: string;
+  bio: string | null;
+  avatar_url: string | null;
+  visibility: 'public' | 'friends' | 'private';
+  level: number;
+  xp: number;
+  coins: number;
+  streak_current: number;
+  streak_longest: number;
+  total_habits: number;
+  total_focus_minutes: number;
+  auth_provider: 'email' | 'google';
+}
+
+export interface PublicFriendProfile {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string | null;
+  visibility: 'public' | 'friends' | 'private';
+  level: number | null;
+  streak_current: number | null;
+  total_habits_completed: number | null;
+  pet: {
+    species: PetSpecies;
+    name: string;
+    health: number;
+    is_fainted: boolean;
+  } | null;
+}
+
+export async function searchUsers(userId: string, query: string): Promise<UserSearchResult[]> {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return [];
+
+  const { rows } = await pool.query<UserSearchResult>(
+    `SELECT id, display_name, username, avatar_url, level
+       FROM users
+      WHERE id <> $1
+        AND LOWER(username) LIKE $2
+      ORDER BY username ASC
+      LIMIT 10`,
+    [userId, `${q}%`],
+  );
+  return rows;
+}
+
+export async function getProfile(userId: string): Promise<ProfileDto> {
+  const { rows } = await pool.query<ProfileDto>(
+    `SELECT u.id, u.email, u.display_name, u.username, u.bio, u.avatar_url,
+            u.visibility, u.level, u.xp, u.coins, u.streak_current, u.streak_longest,
+            CASE WHEN u.oauth_provider = 'google' THEN 'google' ELSE 'email' END AS auth_provider,
+            (SELECT COUNT(*)::int FROM habits h WHERE h.user_id = u.id) AS total_habits,
+            (SELECT COALESCE(SUM(duration_minutes), 0)::int FROM focus_sessions fs WHERE fs.user_id = u.id) AS total_focus_minutes
+       FROM users u
+      WHERE u.id = $1`,
+    [userId],
+  );
+  if (rows.length === 0) throw new HttpError(404, 'USER_NOT_FOUND', 'User does not exist');
+  return rows[0];
+}
+
+export async function updateProfile(
+  userId: string,
+  input: {
+    display_name?: string;
+    username?: string;
+    bio?: string | null;
+    visibility?: 'public' | 'friends' | 'private';
+    avatar_url?: string | null;
+  },
+): Promise<ProfileDto> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (input.display_name !== undefined) {
+    sets.push(`display_name = $${i++}`);
+    values.push(input.display_name.trim());
+  }
+  if (input.username !== undefined) {
+    sets.push(`username = $${i++}`);
+    values.push(input.username.trim().toLowerCase());
+  }
+  if (input.bio !== undefined) {
+    sets.push(`bio = $${i++}`);
+    values.push(input.bio?.trim() ? input.bio.trim() : null);
+  }
+  if (input.visibility !== undefined) {
+    sets.push(`visibility = $${i++}`);
+    values.push(input.visibility);
+  }
+  if (input.avatar_url !== undefined) {
+    sets.push(`avatar_url = $${i++}`);
+    values.push(input.avatar_url);
+  }
+
+  if (sets.length > 0) {
+    values.push(userId);
+    try {
+      await pool.query(`UPDATE users SET ${sets.join(', ')} WHERE id = $${i}`, values);
+    } catch (err) {
+      if (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23505') {
+        throw new HttpError(409, 'USERNAME_TAKEN', 'That username is already taken');
+      }
+      throw err;
+    }
+  }
+
+  return getProfile(userId);
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const { rows } = await pool.query<{ password_hash: string | null }>(
+    `SELECT password_hash FROM users WHERE id = $1`,
+    [userId],
+  );
+  if (rows.length === 0) throw new HttpError(404, 'USER_NOT_FOUND', 'User does not exist');
+  if (!rows[0].password_hash) {
+    throw new HttpError(400, 'OAUTH_ACCOUNT', 'Password changes are only available for email accounts');
+  }
+  const ok = await comparePassword(currentPassword, rows[0].password_hash);
+  if (!ok) throw new HttpError(401, 'INVALID_PASSWORD', 'Current password is incorrect');
+  const next = await hashPassword(newPassword);
+  await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [next, userId]);
+}
+
+export async function deleteAccount(userId: string): Promise<void> {
+  await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+}
+
+export async function getFriendProfile(userId: string, friendId: string): Promise<PublicFriendProfile> {
+  const { rows: friendship } = await pool.query(
+    `SELECT 1 FROM friends WHERE user_id = $1 AND friend_id = $2`,
+    [userId, friendId],
+  );
+  if (friendship.length === 0) {
+    throw new HttpError(404, 'NOT_FRIENDS', 'Friend profile is not available');
+  }
+
+  const { rows } = await pool.query<{
+    id: string;
+    display_name: string;
+    username: string;
+    avatar_url: string | null;
+    visibility: 'public' | 'friends' | 'private';
+    level: number;
+    streak_current: number;
+    species: PetSpecies;
+    pet_name: string;
+    health: number;
+    is_fainted: boolean;
+    total_habits_completed: number;
+  }>(
+    `SELECT u.id, u.display_name, u.username, u.avatar_url, u.visibility,
+            u.level, u.streak_current,
+            p.species, p.name AS pet_name, p.health, p.is_fainted, p.total_habits_completed
+       FROM users u
+       LEFT JOIN pets p ON p.user_id = u.id
+      WHERE u.id = $1`,
+    [friendId],
+  );
+  if (rows.length === 0) throw new HttpError(404, 'USER_NOT_FOUND', 'User does not exist');
+
+  const row = rows[0];
+  const canSeeStats = row.visibility === 'public' || row.visibility === 'friends';
+  return {
+    id: row.id,
+    display_name: row.display_name,
+    username: row.username,
+    avatar_url: row.avatar_url,
+    visibility: row.visibility,
+    level: canSeeStats ? row.level : null,
+    streak_current: canSeeStats ? row.streak_current : null,
+    total_habits_completed: canSeeStats ? row.total_habits_completed : null,
+    pet: row.species
+      ? {
+          species: row.species,
+          name: row.pet_name,
+          health: row.health,
+          is_fainted: row.is_fainted,
+        }
+      : null,
+  };
+}

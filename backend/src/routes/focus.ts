@@ -9,6 +9,8 @@ const completeSchema = z.object({
   duration_minutes: z.number().int().min(1).max(120),
   rating: z.number().int().min(1).max(5).optional(),
 });
+const ratingSchema = z.object({ rating: z.number().int().min(1).max(5) });
+const idParam = z.object({ id: z.string().uuid() });
 
 router.post(
   '/complete',
@@ -35,5 +37,19 @@ router.get('/stats', async (req: Request, res: Response, next: NextFunction) => 
     next(err);
   }
 });
+
+router.patch(
+  '/:id/rating',
+  validate(idParam, 'params'),
+  validate(ratingSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await focusService.rateSession(req.userId!, req.params.id, req.body.rating);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export { router as focusRouter };
