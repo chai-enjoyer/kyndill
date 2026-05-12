@@ -3,7 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4ede2" />
     <title>Kyndill</title>
+    <script>
+      // Apply the stored / preferred theme before paint to avoid a flash.
+      (function () {
+        try {
+          var stored = localStorage.getItem('kyndill_theme');
+          var theme = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+          var dark =
+            theme === 'dark' ||
+            (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          root.classList.toggle('dark', dark);
+          if (theme === 'light' || theme === 'dark') {
+            root.setAttribute('data-theme', theme);
+          }
+        } catch (_) {
+          // localStorage / matchMedia unavailable; fall through to CSS defaults.
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,0 +1,40 @@
+@keyframes kyndill-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes kyndill-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes kyndill-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes kyndill-pet-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.015); }
+}
+
+.fade-in {
+  animation: kyndill-fade-in var(--duration-base) var(--ease-out);
+}
+
+.rise-in {
+  animation: kyndill-rise var(--duration-slow) var(--ease-out);
+}
+
+.pet-breathing {
+  transform-origin: center bottom;
+  animation: kyndill-pet-breathe 4.2s var(--ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in,
+  .rise-in,
+  .pet-breathing {
+    animation: none;
+  }
+}
