@@ -97,7 +97,15 @@ Last 30 completions, newest first.
 
 ### GET `/` (auth)
 
-Full pet row with `equipped` keyed by slot.
+Full pet row with `equipped` keyed by slot. Includes `initialized_at` (null until the user has finished onboarding).
+
+### POST `/initialize` (auth)
+
+Sets the species and name for the user's pet and marks `initialized_at`. The trigger that fires on user creation seeds a default blob named `Kyndill`; this endpoint updates that row exactly once. Subsequent calls fail with `409 ALREADY_INITIALIZED`.
+
+Body: `{ species, name }`. `species` is one of `blob` / `cube` / `sphere` / `pyramid`. `name` is trimmed and must be 1..20 characters.
+
+`200 OK` returns the updated pet row. Errors: `400 VALIDATION_FAILED`, `400 INVALID_NAME`, `404 PET_NOT_FOUND`, `409 ALREADY_INITIALIZED`.
 
 ### POST `/feed` (auth)
 

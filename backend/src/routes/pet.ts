@@ -7,6 +7,10 @@ const router = Router();
 
 const itemIdSchema = z.object({ item_id: z.string().uuid() });
 const slotSchema = z.object({ slot: z.enum(petService.EQUIP_SLOTS) });
+const initializeSchema = z.object({
+  species: z.enum(petService.PET_SPECIES),
+  name: z.string().trim().min(1, 'Name is required').max(20, 'Name must be 20 characters or fewer'),
+});
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -16,6 +20,19 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     next(err);
   }
 });
+
+router.post(
+  '/initialize',
+  validate(initializeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pet = await petService.initialize(req.userId!, req.body.species, req.body.name);
+      res.status(200).json(pet);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post(
   '/feed',

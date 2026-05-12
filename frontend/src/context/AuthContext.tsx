@@ -19,11 +19,13 @@ interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+  petInitialized: boolean | null;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName: string) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
+  markPetInitialized: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -36,17 +38,32 @@ function readStoredToken(): string | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(readStoredToken);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [petInitialized, setPetInitialized] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(!!token);
 
-  const fetchMe = useCallback(async (signal?: AbortSignal): Promise<void> => {
-    try {
-      const { data } = await api.get<AuthUser>('/api/auth/me', { signal });
-      setUser(data);
-    } catch (err) {
-      if (signal?.aborted) return;
+  const hydrate = useCallback(async (signal: AbortSignal): Promise<void> => {
+    const [userResult, petResult] = await Promise.allSettled([
+      api.get<AuthUser>('/api/auth/me', { signal }),
+      api.get<{ initialized_at: string | null }>('/api/pet', { signal }),
+    ]);
+    if (signal.aborted) return;
+
+    if (userResult.status === 'fulfilled') {
+      setUser(userResult.value.data);
+    } else {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);
       setToken(null);
       setUser(null);
+      setPetInitialized(null);
+      return;
+    }
+
+    if (petResult.status === 'fulfilled') {
+      setPetInitialized(petResult.value.data.initialized_at != null);
+    } else {
+      // If /api/pet errors (network blip, missing row), default to "initialized"
+      // so the user is not stuck in an onboarding loop.
+      setPetInitialized(true);
     }
   }, []);
 
@@ -54,29 +71,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!token) {
       setIsLoading(false);
       setUser(null);
+      setPetInitialized(null);
       return;
     }
     const controller = new AbortController();
     setIsLoading(true);
-    fetchMe(controller.signal).finally(() => {
+    hydrate(controller.signal).finally(() => {
       if (!controller.signal.aborted) setIsLoading(false);
     });
     return () => controller.abort();
-  }, [token, fetchMe]);
+  }, [token, hydrate]);
 
-  const acceptAuthResponse = useCallback(
-    async (data: { token: string }) => {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
-      setToken(data.token);
-      await fetchMe();
-    },
-    [fetchMe],
-  );
+  const acceptAuthResponse = useCallback((data: { token: string }) => {
+    window.localStorage.setItem(TOKEN_STORAGE_KEY, data.token);
+    setToken(data.token);
+  }, []);
 
   const login = useCallback(
     async (email: string, password: string) => {
       const { data } = await api.post<{ token: string }>('/api/auth/login', { email, password });
-      await acceptAuthResponse(data);
+      acceptAuthResponse(data);
     },
     [acceptAuthResponse],
   );
@@ -88,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password,
         display_name: displayName,
       });
-      await acceptAuthResponse(data);
+      acceptAuthResponse(data);
     },
     [acceptAuthResponse],
   );
@@ -96,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(
     async (credential: string) => {
       const { data } = await api.post<{ token: string }>('/api/auth/google', { credential });
-      await acceptAuthResponse(data);
+      acceptAuthResponse(data);
     },
     [acceptAuthResponse],
   );
@@ -105,15 +119,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
     setToken(null);
     setUser(null);
+    setPetInitialized(null);
   }, []);
 
   const refresh = useCallback(async () => {
-    if (token) await fetchMe();
-  }, [token, fetchMe]);
+    if (!token) return;
+    const controller = new AbortController();
+    await hydrate(controller.signal);
+  }, [token, hydrate]);
+
+  const markPetInitialized = useCallback(() => {
+    setPetInitialized(true);
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, token, isLoading, login, register, loginWithGoogle, logout, refresh }}
+      value={{
+        user,
+        token,
+        isLoading,
+        petInitialized,
+        login,
+        register,
+        loginWithGoogle,
+        logout,
+        refresh,
+        markPetInitialized,
+      }}
     >
       {children}
     </AuthContext.Provider>

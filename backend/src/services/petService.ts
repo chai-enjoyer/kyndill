@@ -9,10 +9,13 @@ const ALLOWED_STATS: ReadonlySet<string> = new Set(PET_STAT_COLUMNS);
 export const EQUIP_SLOTS = ['hat', 'accessory', 'background'] as const;
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
+export const PET_SPECIES = ['blob', 'cube', 'sphere', 'pyramid'] as const;
+export type PetSpecies = (typeof PET_SPECIES)[number];
+
 export interface PetRow {
   id: string;
   user_id: string;
-  species: string;
+  species: PetSpecies;
   name: string;
   health: number;
   happiness: number;
@@ -22,6 +25,7 @@ export interface PetRow {
   stage: number;
   total_habits_completed: number;
   is_fainted: boolean;
+  initialized_at: string | null;
   created_at: string;
 }
 
@@ -47,7 +51,7 @@ export interface PetCompletionEffect {
 
 const PET_COLUMNS = `
   id, user_id, species, name, health, happiness, hunger, energy, cleanliness,
-  stage, total_habits_completed, is_fainted, created_at
+  stage, total_habits_completed, is_fainted, initialized_at, created_at
 `;
 
 // ============================================================
@@ -91,6 +95,45 @@ async function getEquipped(userId: string): Promise<EquippedMap> {
     };
   }
   return equipped;
+}
+
+// ============================================================
+// Initialize: pick a species and name; marks onboarding complete.
+// Idempotent guard: 409 if already initialized.
+// ============================================================
+
+export async function initialize(
+  userId: string,
+  species: PetSpecies,
+  name: string,
+): Promise<PetRow> {
+  const trimmed = name.trim();
+  if (trimmed.length < 1 || trimmed.length > 20) {
+    throw new HttpError(400, 'INVALID_NAME', 'Name must be 1..20 characters');
+  }
+
+  const { rows } = await pool.query<PetRow>(
+    `UPDATE pets
+        SET species = $1,
+            name = $2,
+            initialized_at = NOW()
+      WHERE user_id = $3 AND initialized_at IS NULL
+      RETURNING ${PET_COLUMNS}`,
+    [species, trimmed, userId],
+  );
+
+  if (rows.length === 0) {
+    const { rows: existing } = await pool.query<{ initialized_at: string | null }>(
+      `SELECT initialized_at FROM pets WHERE user_id = $1`,
+      [userId],
+    );
+    if (existing.length === 0) {
+      throw new HttpError(404, 'PET_NOT_FOUND', 'Pet does not exist');
+    }
+    throw new HttpError(409, 'ALREADY_INITIALIZED', 'Pet has already been initialized');
+  }
+
+  return rows[0];
 }
 
 // ============================================================
@@ -225,12 +268,6 @@ export async function unequip(userId: string, slot: EquipSlot): Promise<void> {
 // Bumps the completion counter (the BEFORE UPDATE trigger updates stage),
 // ratchets health upward toward `streak * 5` (capped at 100), and clears
 // `is_fainted` when the resulting health is positive.
-//
-// Note: this ratchet differs from a literal "set health = MIN(streak*5, 100)"
-// because the latter drops a new user's pet to 5/100 on the very first
-// completion, which clashes with PRODUCT.md's "recoverable, not catastrophic"
-// principle. The cron-driven daily decay (still pending) is the counter-force
-// that lets `streak * 5` reassert itself as the ceiling over time.
 export async function applyHabitCompletionEffects(
   client: PoolClient,
   userId: string,

@@ -15,17 +15,33 @@ import { FocusPage } from './pages/FocusPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { SettingsPage } from './pages/SettingsPage';
 
+function FullPageLoading() {
+  return <div className="app-shell__loading" aria-busy="true" aria-live="polite" />;
+}
+
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { token, isLoading } = useAuthContext();
-  if (isLoading) return <div className="app-shell__loading" aria-busy="true" />;
+  const { token, isLoading, petInitialized } = useAuthContext();
+  if (isLoading) return <FullPageLoading />;
   if (!token) return <Navigate to="/login" replace />;
+  if (petInitialized === false) return <Navigate to="/onboarding" replace />;
+  return <>{children}</>;
+}
+
+function RequireAuthForOnboarding({ children }: { children: ReactNode }) {
+  const { token, isLoading, petInitialized } = useAuthContext();
+  if (isLoading) return <FullPageLoading />;
+  if (!token) return <Navigate to="/login" replace />;
+  if (petInitialized === true) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
 function PublicOnly({ children }: { children: ReactNode }) {
-  const { token, isLoading } = useAuthContext();
-  if (isLoading) return <div className="app-shell__loading" aria-busy="true" />;
-  if (token) return <Navigate to="/" replace />;
+  const { token, isLoading, petInitialized } = useAuthContext();
+  if (isLoading) return <FullPageLoading />;
+  if (token) {
+    if (petInitialized === false) return <Navigate to="/onboarding" replace />;
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 }
 
@@ -52,9 +68,9 @@ export default function App() {
         <Route
           path="/onboarding"
           element={
-            <RequireAuth>
+            <RequireAuthForOnboarding>
               <OnboardingPage />
-            </RequireAuth>
+            </RequireAuthForOnboarding>
           }
         />
 
