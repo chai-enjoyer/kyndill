@@ -26,6 +26,7 @@ interface AuthContextValue {
   logout: () => void;
   refresh: () => Promise<void>;
   markPetInitialized: () => void;
+  mergeUser: (partial: Partial<AuthUser>) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -61,8 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (petResult.status === 'fulfilled') {
       setPetInitialized(petResult.value.data.initialized_at != null);
     } else {
-      // If /api/pet errors (network blip, missing row), default to "initialized"
-      // so the user is not stuck in an onboarding loop.
       setPetInitialized(true);
     }
   }, []);
@@ -132,6 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPetInitialized(true);
   }, []);
 
+  const mergeUser = useCallback((partial: Partial<AuthUser>) => {
+    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -145,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         refresh,
         markPetInitialized,
+        mergeUser,
       }}
     >
       {children}

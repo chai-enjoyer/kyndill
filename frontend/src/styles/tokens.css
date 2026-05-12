@@ -1,11 +1,10 @@
 /*
  * Kyndill design tokens.
  * Color strategy: Restrained. Tinted warm-neutrals plus a single banked-ember accent.
- * Sage and honey accents are reserved for brand surfaces (auth + onboarding) where
- * the spec calls for them; in-app chrome stays on ember.
- * Theme: light defaults; dark via `.dark` class on <html> (preferred) or
- * `[data-theme='dark']` attribute. The inline theme script in index.html toggles
- * the class before first paint, so there is no flash.
+ * Sage and honey accents are reserved for brand surfaces (auth, onboarding, dashboard
+ * sidebar/pet); in-app chrome stays on ember. Habit categories get their own named
+ * roles in --color-category-* so the pills read distinctly.
+ * Theme: light defaults; dark via `.dark` class or `[data-theme='dark']`.
  */
 
 :root {
@@ -37,7 +36,19 @@
   --color-sage-glow: oklch(0.55 0.05 145 / 0.22);
 
   --color-honey: oklch(0.78 0.10 80);
+  --color-honey-strong: oklch(0.66 0.12 75);
   --color-honey-subtle: oklch(0.94 0.04 80);
+
+  --color-category-health: oklch(0.50 0.06 145);
+  --color-category-health-bg: oklch(0.94 0.022 145);
+  --color-category-productivity: oklch(0.50 0.10 230);
+  --color-category-productivity-bg: oklch(0.94 0.026 230);
+  --color-category-social: oklch(0.55 0.10 30);
+  --color-category-social-bg: oklch(0.94 0.030 30);
+  --color-category-learning: oklch(0.50 0.10 285);
+  --color-category-learning-bg: oklch(0.94 0.024 285);
+  --color-category-wellness: oklch(0.55 0.09 95);
+  --color-category-wellness-bg: oklch(0.94 0.026 95);
 
   --color-success: oklch(0.55 0.09 145);
   --color-success-subtle: oklch(0.93 0.04 145);
@@ -147,7 +158,19 @@
   --color-sage-glow: oklch(0.62 0.06 145 / 0.28);
 
   --color-honey: oklch(0.78 0.10 80);
+  --color-honey-strong: oklch(0.85 0.12 80);
   --color-honey-subtle: oklch(0.28 0.04 80);
+
+  --color-category-health: oklch(0.78 0.07 145);
+  --color-category-health-bg: oklch(0.30 0.04 145);
+  --color-category-productivity: oklch(0.78 0.10 230);
+  --color-category-productivity-bg: oklch(0.30 0.05 230);
+  --color-category-social: oklch(0.80 0.10 30);
+  --color-category-social-bg: oklch(0.32 0.05 30);
+  --color-category-learning: oklch(0.78 0.10 285);
+  --color-category-learning-bg: oklch(0.30 0.05 285);
+  --color-category-wellness: oklch(0.82 0.09 95);
+  --color-category-wellness-bg: oklch(0.30 0.05 95);
 
   --color-success: oklch(0.68 0.11 145);
   --color-success-subtle: oklch(0.28 0.05 145);
