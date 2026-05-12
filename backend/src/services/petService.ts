@@ -6,7 +6,15 @@ const PET_STAT_COLUMNS = ['health', 'happiness', 'hunger', 'energy', 'cleanlines
 type PetStat = (typeof PET_STAT_COLUMNS)[number];
 const ALLOWED_STATS: ReadonlySet<string> = new Set(PET_STAT_COLUMNS);
 
-export const EQUIP_SLOTS = ['hat', 'accessory', 'background'] as const;
+export const EQUIP_SLOTS = [
+  'hat',
+  'accessory',
+  'background',
+  'glasses',
+  'scarf',
+  'badge',
+  'charm',
+] as const;
 export type EquipSlot = (typeof EQUIP_SLOTS)[number];
 
 export const PET_SPECIES = ['blob', 'cube', 'sphere', 'pyramid'] as const;

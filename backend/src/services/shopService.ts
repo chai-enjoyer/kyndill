@@ -22,6 +22,7 @@ export interface ShopCosmetic extends ShopItem {
 
 export interface ShopListing {
   coins: number;
+  freeze_count: number;
   items: {
     consumable: ShopItem[];
     cosmetic: ShopCosmetic[];
@@ -30,7 +31,7 @@ export interface ShopListing {
 }
 
 export async function listShop(userId: string): Promise<ShopListing> {
-  const [{ rows: items }, { rows: userRows }, { rows: ownedRows }] = await Promise.all([
+  const [{ rows: items }, { rows: userRows }, { rows: ownedRows }, { rows: streakRows }] = await Promise.all([
     pool.query<ShopItem>(
       `SELECT id, name, type, rarity, price, effect_stat, effect_amount, image_url, category
          FROM items
@@ -39,6 +40,10 @@ export async function listShop(userId: string): Promise<ShopListing> {
     pool.query<{ coins: number }>(`SELECT coins FROM users WHERE id = $1`, [userId]),
     pool.query<{ item_id: string }>(
       `SELECT DISTINCT item_id FROM inventory WHERE user_id = $1`,
+      [userId],
+    ),
+    pool.query<{ freeze_count: number }>(
+      `SELECT freeze_count FROM streaks WHERE user_id = $1`,
       [userId],
     ),
   ]);
@@ -50,6 +55,7 @@ export async function listShop(userId: string): Promise<ShopListing> {
   const owned = new Set(ownedRows.map((r) => r.item_id));
   const listing: ShopListing = {
     coins: userRows[0].coins,
+    freeze_count: streakRows[0]?.freeze_count ?? 0,
     items: { consumable: [], cosmetic: [], streak_freeze: [] },
   };
 

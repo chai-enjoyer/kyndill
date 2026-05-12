@@ -46,7 +46,22 @@ export interface CompleteResult {
   pet_is_fainted: boolean;
 }
 
-export function useHabits() {
+export interface HabitFormInput {
+  name: string;
+  description?: string | null;
+  category: HabitCategory;
+  frequency: HabitFrequency;
+  days_of_week?: number[];
+  completion_start_time?: string | null;
+  completion_end_time?: string | null;
+}
+
+interface UseHabitsOptions {
+  scope?: 'today' | 'all';
+}
+
+export function useHabits(options: UseHabitsOptions = {}) {
+  const scope = options.scope ?? 'today';
   const [habits, setHabits] = useState<HabitWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +69,9 @@ export function useHabits() {
   const refetch = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data } = await api.get<{ habits: HabitWithStatus[] }>('/api/habits');
+      const { data } = await api.get<{ habits: HabitWithStatus[] }>('/api/habits', {
+        params: scope === 'all' ? { scope: 'all' } : undefined,
+      });
       setHabits(data.habits);
       setError(null);
     } catch (err) {
@@ -62,7 +79,7 @@ export function useHabits() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [scope]);
 
   useEffect(() => {
     refetch();
@@ -93,7 +110,66 @@ export function useHabits() {
     [],
   );
 
-  return { habits, isLoading, error, refetch, complete };
+  const create = useCallback(
+    async (input: HabitFormInput): Promise<void> => {
+      await api.post('/api/habits', normalizeHabitInput(input));
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const update = useCallback(
+    async (habitId: string, input: Partial<HabitFormInput> & { is_active?: boolean }): Promise<void> => {
+      await api.put(`/api/habits/${habitId}`, normalizeHabitInput(input));
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const archive = useCallback(
+    async (habitId: string): Promise<void> => {
+      await api.delete(`/api/habits/${habitId}`);
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const reorder = useCallback(async (orderedIds: string[]): Promise<void> => {
+    const snapshot = habits;
+    const byId = new Map(habits.map((habit) => [habit.id, habit]));
+    const next = orderedIds
+      .map((id, index) => {
+        const habit = byId.get(id);
+        return habit ? { ...habit, sort_order: index } : null;
+      })
+      .filter((habit): habit is HabitWithStatus => habit !== null);
+    setHabits(next);
+    try {
+      await api.post('/api/habits/reorder', orderedIds.map((id, index) => ({ id, sort_order: index })));
+    } catch (err) {
+      setHabits(snapshot);
+      throw err;
+    }
+  }, [habits]);
+
+  return { habits, isLoading, error, refetch, complete, create, update, archive, reorder };
+}
+
+function normalizeHabitInput(input: Partial<HabitFormInput> & { is_active?: boolean }) {
+  const next: Record<string, unknown> = { ...input };
+  if ('description' in input) {
+    next.description = input.description?.trim() ? input.description.trim() : null;
+  }
+  if ('days_of_week' in input || input.frequency !== undefined) {
+    next.days_of_week = input.frequency === 'weekly' ? input.days_of_week : undefined;
+  }
+  if ('completion_start_time' in input) {
+    next.completion_start_time = input.completion_start_time || null;
+  }
+  if ('completion_end_time' in input) {
+    next.completion_end_time = input.completion_end_time || null;
+  }
+  return next;
 }
 
 function extractMessage(err: unknown): string {

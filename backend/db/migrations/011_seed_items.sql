@@ -14,10 +14,10 @@ INSERT INTO items (name, type, rarity, price, effect_stat, effect_amount, image_
   ('Beanie Hat',        'cosmetic',   'common',  50, NULL, NULL, '/items/beanie-hat.svg',           'hat'),
   ('Crown',             'cosmetic',   'legendary', 500, NULL, NULL, '/items/crown.svg',             'hat'),
   ('Bow',               'cosmetic',   'common',  40, NULL, NULL, '/items/bow.svg',                  'accessory'),
-  ('Round Glasses',     'cosmetic',   'rare',   100, NULL, NULL, '/items/round-glasses.svg',        'accessory'),
+  ('Round Glasses',     'cosmetic',   'rare',   100, NULL, NULL, '/items/round-glasses.svg',        'glasses'),
   ('Flower',            'cosmetic',   'common',  30, NULL, NULL, '/items/flower.svg',               'accessory'),
-  ('Scarf',             'cosmetic',   'common',  50, NULL, NULL, '/items/scarf.svg',                'accessory'),
-  ('Star Badge',        'cosmetic',   'rare',   150, NULL, NULL, '/items/star-badge.svg',           'accessory'),
+  ('Scarf',             'cosmetic',   'common',  50, NULL, NULL, '/items/scarf.svg',                'scarf'),
+  ('Star Badge',        'cosmetic',   'rare',   150, NULL, NULL, '/items/star-badge.svg',           'badge'),
   ('Clouds Background', 'cosmetic',   'common',  80, NULL, NULL, '/items/clouds-bg.svg',            'background'),
   ('Hearts Background', 'cosmetic',   'rare',   150, NULL, NULL, '/items/hearts-bg.svg',            'background'),
 

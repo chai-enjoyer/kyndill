@@ -10,7 +10,7 @@ export interface EquippedItem {
   image_url: string | null;
 }
 
-export type EquipSlot = 'hat' | 'accessory' | 'background';
+export type EquipSlot = 'hat' | 'accessory' | 'background' | 'glasses' | 'scarf' | 'badge' | 'charm';
 
 export interface PetFullState {
   id: string;
@@ -57,6 +57,13 @@ export function usePet() {
     setPet((prev) => (prev ? { ...prev, ...data } : prev));
   }, []);
 
+  const equip = useCallback(async (itemId: string): Promise<void> => {
+    const { data } = await api.post<{ equipped: PetFullState['equipped'] }>('/api/pet/equip', {
+      item_id: itemId,
+    });
+    setPet((prev) => (prev ? { ...prev, equipped: data.equipped } : prev));
+  }, []);
+
   // Update locally after a habit-completion response, mirroring the backend
   // stage rules so we don't need an extra round-trip.
   const applyCompletion = useCallback(
@@ -75,7 +82,7 @@ export function usePet() {
     [],
   );
 
-  return { pet, isLoading, error, refetch, feed, applyCompletion };
+  return { pet, isLoading, error, refetch, feed, equip, applyCompletion };
 }
 
 function extractMessage(err: unknown): string {

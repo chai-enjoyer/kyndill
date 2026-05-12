@@ -131,6 +131,49 @@ export async function listForToday(userId: string): Promise<HabitWithStatus[]> {
   });
 }
 
+export async function listAll(userId: string): Promise<HabitWithStatus[]> {
+  const today = new Date();
+  const todayStr = toIsoDate(today);
+
+  const { rows: habits } = await pool.query<HabitRow>(
+    `SELECT ${HABIT_COLUMNS}
+       FROM habits
+      WHERE user_id = $1
+      ORDER BY sort_order ASC, created_at ASC`,
+    [userId],
+  );
+  if (habits.length === 0) return [];
+
+  const habitIds = habits.map((h) => h.id);
+  const { rows: completions } = await pool.query<{ habit_id: string; completed_on: string }>(
+    `SELECT habit_id, completed_on::text AS completed_on
+       FROM habit_completions
+      WHERE user_id = $1
+        AND habit_id = ANY($2::uuid[])
+        AND completed_on >= (CURRENT_DATE - INTERVAL '365 days')`,
+    [userId, habitIds],
+  );
+
+  const byHabit = new Map<string, Set<string>>();
+  for (const row of completions) {
+    let set = byHabit.get(row.habit_id);
+    if (!set) {
+      set = new Set<string>();
+      byHabit.set(row.habit_id, set);
+    }
+    set.add(row.completed_on);
+  }
+
+  return habits.map((habit) => {
+    const dates = byHabit.get(habit.id) ?? new Set<string>();
+    return {
+      ...habit,
+      completed_today: dates.has(todayStr),
+      current_streak: computeHabitStreak(habit, dates, today),
+    };
+  });
+}
+
 function computeHabitStreak(habit: HabitRow, completionDates: Set<string>, today: Date): number {
   const cursor = new Date(today);
   if (!completionDates.has(toIsoDate(cursor))) {
@@ -260,12 +303,12 @@ export async function update(
 }
 
 // ============================================================
-// Archive (soft delete)
+// Delete
 // ============================================================
 
 export async function archive(userId: string, habitId: string): Promise<void> {
   const { rowCount } = await pool.query(
-    `UPDATE habits SET is_active = FALSE WHERE id = $1 AND user_id = $2`,
+    `DELETE FROM habits WHERE id = $1 AND user_id = $2`,
     [habitId, userId],
   );
   if (rowCount === 0) {

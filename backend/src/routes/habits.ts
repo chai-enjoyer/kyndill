@@ -15,12 +15,12 @@ const daysOfWeekSchema = z.array(z.number().int().min(0).max(6)).max(7);
 const createHabitSchema = z
   .object({
     name: z.string().trim().min(1).max(100),
-    description: z.string().max(500).optional(),
+    description: z.string().max(500).nullable().optional(),
     category: habitCategorySchema,
     frequency: habitFrequencySchema,
     days_of_week: daysOfWeekSchema.optional(),
-    completion_start_time: timeSchema.optional(),
-    completion_end_time: timeSchema.optional(),
+    completion_start_time: timeSchema.nullable().optional(),
+    completion_end_time: timeSchema.nullable().optional(),
   })
   .refine(
     (data) =>
@@ -49,7 +49,11 @@ const idParamSchema = z.object({ id: z.string().uuid() });
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const habits = await habitService.listForToday(req.userId!);
+    const scope = typeof req.query.scope === 'string' ? req.query.scope : 'today';
+    const habits =
+      scope === 'all'
+        ? await habitService.listAll(req.userId!)
+        : await habitService.listForToday(req.userId!);
     res.status(200).json({ habits });
   } catch (err) {
     next(err);
