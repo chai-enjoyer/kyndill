@@ -11,6 +11,7 @@ import { socialRouter } from './routes/social';
 import { focusRouter } from './routes/focus';
 import { userRouter } from './routes/user';
 import { leaderboardRouter } from './routes/leaderboard';
+import { notificationsRouter } from './routes/notifications';
 
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
@@ -44,6 +45,7 @@ export function createApp(): Express {
   app.use('/api/focus', requireAuth, focusRouter);
   app.use('/api/user', requireAuth, userRouter);
   app.use('/api/leaderboard', requireAuth, leaderboardRouter);
+  app.use('/api/notifications', requireAuth, notificationsRouter);
 
   app.use(errorHandler);
   return app;

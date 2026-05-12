@@ -1,6 +1,6 @@
 # API reference
 
-HTTP and WebSocket contract for the Kyndill backend. Routes marked `501` are still stubs; auth, habits, pet, shop, and inventory are fully implemented.
+HTTP and WebSocket contract for the Kyndill backend. The full set of v1 routes is implemented across auth, habits, pet, shop, inventory, social, focus, leaderboard, and notifications. The `/api/user` surface (profile read/update + public profile lookup) is the only group still returning `501`.
 
 ## Base URL
 
@@ -43,550 +43,304 @@ JWT auth uses HS256 with a 7-day expiry. Tokens carry only `sub` (user id) plus 
 
 Create a local-credentials account. The username is generated from the email's local part; collisions append a 6-char random suffix.
 
-Body:
-
-```json
-{
-  "email": "user@example.com",
-  "password": "minimum-8-chars",
-  "display_name": "Display Name"
-}
-```
-
-`201 Created`:
-
-```json
-{
-  "token": "<JWT>",
-  "user": {
-    "id": "<uuid>",
-    "email": "user@example.com",
-    "display_name": "Display Name",
-    "level": 1,
-    "xp": 0,
-    "coins": 0
-  }
-}
-```
-
-Errors:
-
-- `400 VALIDATION_FAILED` — invalid email, password under 8 characters, or display_name under 2 characters.
-- `409 EMAIL_TAKEN` — email already registered.
+Body: `{ email, password, display_name }`. `201 Created` returns `{ token, user: { id, email, display_name, level, xp, coins } }`. `400 VALIDATION_FAILED`, `409 EMAIL_TAKEN`.
 
 ### POST `/login` (public)
 
-Body:
-
-```json
-{
-  "email": "user@example.com",
-  "password": "the-password"
-}
-```
-
-`200 OK` returns the same shape as `/register`.
-
-Errors:
-
-- `400 VALIDATION_FAILED`
-- `401 INVALID_CREDENTIALS` — unknown email, wrong password, or OAuth-only account (combined to prevent account enumeration).
+Body: `{ email, password }`. `200 OK` with the same shape as `/register`. `401 INVALID_CREDENTIALS` is returned for any auth failure to prevent enumeration.
 
 ### POST `/google` (public)
 
-Exchange a Google ID token for a Kyndill JWT. Creates an account on first sign-in; subsequent sign-ins return the existing user.
-
-Body:
-
-```json
-{
-  "credential": "<Google ID token from Google Identity Services>"
-}
-```
-
-`200 OK` returns the same shape as `/register`.
-
-Errors:
-
-- `400 VALIDATION_FAILED`
-- `401 INVALID_GOOGLE_TOKEN` — token did not verify against `GOOGLE_CLIENT_ID`, or required claims (`email`, `sub`) were missing.
-- `409 EMAIL_TAKEN` — a local-credentials account already uses the email Google returned. Linking is not yet supported; sign in with the password instead.
-- `500 SERVER_MISCONFIGURED` — `GOOGLE_CLIENT_ID` is unset on the server.
+Body: `{ credential }` where `credential` is the Google ID token. `200 OK` with the same shape. `401 INVALID_GOOGLE_TOKEN`, `409 EMAIL_TAKEN`, `500 SERVER_MISCONFIGURED`.
 
 ### POST `/logout` (auth)
 
-Returns `204 No Content`. The server is stateless; the client discards its token. Endpoint exists for client-side symmetry.
+`204 No Content`. Stateless; the client discards its token.
 
 ### GET `/me` (auth)
 
-Returns the authenticated user's profile.
-
-`200 OK`:
-
-```json
-{
-  "id": "<uuid>",
-  "email": "user@example.com",
-  "display_name": "Display Name",
-  "username": "user",
-  "level": 1,
-  "xp": 0,
-  "coins": 0,
-  "streak_current": 0,
-  "streak_longest": 0,
-  "avatar_url": null,
-  "visibility": "private"
-}
-```
-
-Errors:
-
-- `401 UNAUTHORIZED` — missing, malformed, or expired token.
+Returns `{ id, email, display_name, username, level, xp, coins, streak_current, streak_longest, avatar_url, visibility }`.
 
 ## Habits (`/api/habits`, all auth)
 
-`days_of_week` is an array of weekday integers, Sunday = 0 through Saturday = 6. Time fields use `HH:MM` or `HH:MM:SS`. Dates are `YYYY-MM-DD` and currently interpreted in UTC; per-user time zones will land in a later prompt.
+`days_of_week` is an array of weekday integers, Sunday = 0 through Saturday = 6. Time fields use `HH:MM` or `HH:MM:SS`. Dates are `YYYY-MM-DD` in UTC.
 
 ### GET `/` (auth)
 
-Lists today's active habits for the caller. Weekly habits are included only when today's weekday is in `days_of_week`. Each habit carries `completed_today` and `current_streak` (per-habit, computed from completions on expected days).
-
-`200 OK`:
-
-```json
-{
-  "habits": [
-    {
-      "id": "<uuid>",
-      "user_id": "<uuid>",
-      "name": "Drink water",
-      "description": null,
-      "category": "Health",
-      "frequency": "daily",
-      "days_of_week": null,
-      "completion_start_time": null,
-      "completion_end_time": null,
-      "is_active": true,
-      "sort_order": 0,
-      "created_at": "<timestamptz>",
-      "completed_today": false,
-      "current_streak": 3
-    }
-  ]
-}
-```
+Lists today's active habits with per-habit `completed_today` and `current_streak`.
 
 ### POST `/` (auth)
 
-Body:
-
-```json
-{
-  "name": "Morning walk",
-  "description": "Twenty minutes outside",
-  "category": "Wellness",
-  "frequency": "weekly",
-  "days_of_week": [1, 3, 5],
-  "completion_start_time": "06:00",
-  "completion_end_time": "10:00"
-}
-```
-
-Required: `name` (1..100), `category` (`Health`/`Productivity`/`Social`/`Learning`/`Wellness`), `frequency` (`daily`/`weekly`). When `frequency = weekly`, `days_of_week` is required and non-empty.
-
-`201 Created` returns the created habit row.
-
-Errors:
-
-- `400 VALIDATION_FAILED` — schema or invariant violation (e.g. weekly without `days_of_week`).
+Body: `{ name, description?, category, frequency, days_of_week?, completion_start_time?, completion_end_time? }`. Weekly habits require non-empty `days_of_week`. `201 Created` returns the habit row.
 
 ### POST `/reorder` (auth)
 
-Bulk update of `sort_order`. Body is a top-level array.
-
-```json
-[
-  { "id": "<uuid>", "sort_order": 0 },
-  { "id": "<uuid>", "sort_order": 1 }
-]
-```
-
-`204 No Content` on success.
-
-Errors:
-
-- `400 VALIDATION_FAILED`
-- `404 NOT_FOUND` — one or more habit ids are not owned by the caller.
+Body: top-level array of `{ id, sort_order }`. `204` on success, `404 NOT_FOUND` if any id is not owned.
 
 ### PUT `/:id` (auth)
 
-Updates one or more fields on the habit. All body fields are optional; only provided fields are written.
-
-Allowed fields: `name`, `description`, `category`, `frequency`, `days_of_week`, `completion_start_time`, `completion_end_time`, `is_active`, `sort_order`.
-
-`200 OK` returns the updated habit row.
-
-Errors:
-
-- `400 VALIDATION_FAILED`
-- `404 NOT_FOUND` — habit does not exist or is not owned by the caller.
+Partial update; only provided fields are written. `200 OK` returns the updated row.
 
 ### DELETE `/:id` (auth)
 
-Soft delete: sets `is_active = false`. Habit data and historical completions are preserved.
-
-`204 No Content` on success.
-
-Errors:
-
-- `404 NOT_FOUND`
+Soft delete (`is_active = false`). `204`.
 
 ### POST `/:id/complete` (auth)
 
-Marks the habit complete for today as a single database transaction:
-
-1. Validate ownership.
-2. Reject `409 ALREADY_COMPLETED` if a completion already exists for `(habit_id, today)`.
-3. Inside a transaction: lock the user's streak row, recompute streak (yesterday → +1; gap with `freeze_count > 0` → consume freeze, streak holds; otherwise reset to 1), insert the completion with the final xp/coin values, roll an item drop, recompute level, update users + pet, commit.
-4. Best-effort emit `habit_completed` over socket.io to every friend.
-
-`200 OK`:
-
-```json
-{
-  "xp_earned": 12,
-  "coins_earned": 5,
-  "new_streak": 1,
-  "longest_streak": 1,
-  "item_dropped": {
-    "id": "<uuid>",
-    "name": "Apple",
-    "type": "consumable",
-    "rarity": "common",
-    "effect_stat": "hunger",
-    "effect_amount": 15,
-    "image_url": "/items/apple.svg",
-    "category": null
-  },
-  "leveled_up": false,
-  "new_level": 1,
-  "pet_health": 100,
-  "pet_total_habits_completed": 1,
-  "pet_is_fainted": false
-}
-```
-
-`item_dropped` is `null` when the rarity roll lands in the "none" band.
-
-Errors:
-
-- `404 NOT_FOUND`
-- `409 ALREADY_COMPLETED` — habit was already marked complete today.
+Single transaction wrapping streak recompute, completion insert with final xp/coins, item drop, level recompute, user/pet updates, and a best-effort socket fanout to friends. Emits `level_up` to the actor when they cross a level threshold. `200 OK` returns `{ xp_earned, coins_earned, new_streak, longest_streak, item_dropped, leveled_up, new_level, pet_health, pet_total_habits_completed, pet_is_fainted }`. `409 ALREADY_COMPLETED` if the habit was already marked complete today.
 
 ### GET `/:id/history` (auth)
 
-Returns the last 30 completions for the habit, newest first.
-
-`200 OK`:
-
-```json
-{
-  "completions": [
-    {
-      "id": "<uuid>",
-      "completed_on": "2026-05-10",
-      "completed_at": "2026-05-10T19:42:11.000Z",
-      "xp_earned": 12,
-      "coins_earned": 5
-    }
-  ]
-}
-```
-
-Errors:
-
-- `404 NOT_FOUND`
+Last 30 completions, newest first.
 
 ## Pet (`/api/pet`, all auth)
 
 ### GET `/` (auth)
 
-Returns the caller's pet, all five stats, stage, `total_habits_completed`, `is_fainted`, and currently equipped cosmetics keyed by slot.
-
-`200 OK`:
-
-```json
-{
-  "id": "<uuid>",
-  "user_id": "<uuid>",
-  "species": "blob",
-  "name": "Kyndill",
-  "health": 100,
-  "happiness": 100,
-  "hunger": 80,
-  "energy": 90,
-  "cleanliness": 100,
-  "stage": 1,
-  "total_habits_completed": 3,
-  "is_fainted": false,
-  "created_at": "<timestamptz>",
-  "equipped": {
-    "hat": {
-      "id": "<uuid>",
-      "name": "Beanie Hat",
-      "rarity": "common",
-      "image_url": "/items/beanie-hat.svg"
-    }
-  }
-}
-```
-
-Errors:
-
-- `404 PET_NOT_FOUND`
+Full pet row with `equipped` keyed by slot.
 
 ### POST `/feed` (auth)
 
-Apply a consumable from inventory to the pet. Inside a transaction with `FOR UPDATE` on the inventory row: validates ownership and item type, applies `LEAST(stat + effect_amount, 100)` to the stat named by `effect_stat`, and decrements quantity (or deletes the row when quantity reaches zero).
-
-Body:
-
-```json
-{ "item_id": "<uuid>" }
-```
-
-`200 OK` returns the full pet row (without equipped cosmetics).
-
-Errors:
-
-- `400 NOT_CONSUMABLE` — item is not a consumable.
-- `400 INVALID_ITEM` — consumable's `effect_stat` is not a pet stat or `effect_amount` is null.
-- `404 NOT_IN_INVENTORY` — the caller has no copies of this item.
+Body: `{ item_id }`. Transactional apply-consumable; bumps the stat named by the item's `effect_stat` (whitelisted to `health`/`happiness`/`hunger`/`energy`/`cleanliness`) capped at 100, decrements inventory. Returns the updated pet row.
 
 ### POST `/equip` (auth)
 
-Equip a cosmetic to its slot. The slot is read from the item's `category` (`hat` / `accessory` / `background`). UPSERT on `(user_id, slot)` so an existing equip in that slot is replaced. The inventory item is **not** consumed; the user can unequip and re-equip freely.
-
-Body:
-
-```json
-{ "item_id": "<uuid>" }
-```
-
-`200 OK`:
-
-```json
-{
-  "equipped": {
-    "hat": {
-      "id": "<uuid>",
-      "name": "Beanie Hat",
-      "rarity": "common",
-      "image_url": "/items/beanie-hat.svg"
-    }
-  }
-}
-```
-
-Errors:
-
-- `400 NOT_COSMETIC`
-- `400 INVALID_SLOT` — the cosmetic does not specify a valid `hat`/`accessory`/`background` category.
-- `404 NOT_IN_INVENTORY`
+Body: `{ item_id }`. UPSERTs equipped_cosmetics on `(user_id, slot)`; inventory is not consumed.
 
 ### POST `/unequip` (auth)
 
-Body:
-
-```json
-{ "slot": "hat" }
-```
-
-`204 No Content` on success. Idempotent: unequipping an empty slot succeeds silently.
-
-Errors:
-
-- `400 VALIDATION_FAILED` — `slot` not in (`hat`, `accessory`, `background`).
+Body: `{ slot }`. `204`.
 
 ## Shop (`/api/shop`, all auth)
 
 ### GET `/` (auth)
 
-Lists every catalogue item grouped by type, with an `owned` flag on cosmetics and the caller's current coin balance.
-
-`200 OK`:
-
-```json
-{
-  "coins": 130,
-  "items": {
-    "consumable": [
-      {
-        "id": "<uuid>",
-        "name": "Apple",
-        "type": "consumable",
-        "rarity": "common",
-        "price": 10,
-        "effect_stat": "hunger",
-        "effect_amount": 15,
-        "image_url": "/items/apple.svg",
-        "category": null
-      }
-    ],
-    "cosmetic": [
-      {
-        "id": "<uuid>",
-        "name": "Beanie Hat",
-        "type": "cosmetic",
-        "rarity": "common",
-        "price": 50,
-        "effect_stat": null,
-        "effect_amount": null,
-        "image_url": "/items/beanie-hat.svg",
-        "category": "hat",
-        "owned": true
-      }
-    ],
-    "streak_freeze": [
-      {
-        "id": "<uuid>",
-        "name": "Spark Shield",
-        "type": "streak_freeze",
-        "rarity": "common",
-        "price": 50,
-        "effect_stat": "streak_freeze_days",
-        "effect_amount": 1,
-        "image_url": "/items/spark-shield.svg",
-        "category": null
-      }
-    ]
-  }
-}
-```
+Items grouped by type. Cosmetics carry `owned`. Includes the caller's coin balance.
 
 ### POST `/purchase` (auth)
 
-Body:
-
-```json
-{ "item_id": "<uuid>" }
-```
-
-Inside a transaction with `FOR UPDATE` on the user row: validates the item exists, checks the balance, deducts coins, and UPSERTs the item into inventory (`quantity + 1`).
-
-`200 OK`:
-
-```json
-{
-  "new_coin_balance": 80,
-  "item": { "id": "<uuid>", "name": "Apple", "type": "consumable", "...": "..." }
-}
-```
-
-Errors:
-
-- `402 INSUFFICIENT_COINS`
-- `404 ITEM_NOT_FOUND`
+Body: `{ item_id }`. Transactional. `402 INSUFFICIENT_COINS`, `404 ITEM_NOT_FOUND`.
 
 ### POST `/buy-streak-freeze` (auth)
 
-Special purchase: 50 coins, increments `streaks.freeze_count` by 1 (max 3). No body. No inventory row is added; the freeze counter is the in-database mechanism that protects streaks. Catalogue rows for Spark/Ember/Hearth Shield remain purchasable via `/purchase` but have no automatic effect on `freeze_count` (kept available for a future "burn N days from the shield" flow).
-
-`200 OK`:
-
-```json
-{ "new_freeze_count": 2, "new_coin_balance": 80 }
-```
-
-Errors:
-
-- `402 INSUFFICIENT_COINS`
-- `409 FREEZE_LIMIT_REACHED` — caller already has 3 freezes.
+Deducts 50 coins, increments `streaks.freeze_count` (cap 3). No inventory row is added; the counter is the protection mechanism. `402 INSUFFICIENT_COINS`, `409 FREEZE_LIMIT_REACHED`.
 
 ## Inventory (`/api/inventory`, all auth)
 
 ### GET `/` (auth)
 
-Lists everything the caller owns, grouped by type. Cosmetics carry `equipped_slot` (string when currently equipped, `null` otherwise). `quantity` is meaningful for consumables; cosmetics and streak freezes typically have `quantity = 1`.
-
-`200 OK`:
-
-```json
-{
-  "consumables": [
-    {
-      "id": "<uuid>",
-      "name": "Apple",
-      "type": "consumable",
-      "rarity": "common",
-      "price": 10,
-      "effect_stat": "hunger",
-      "effect_amount": 15,
-      "image_url": "/items/apple.svg",
-      "category": null,
-      "quantity": 3,
-      "equipped_slot": null
-    }
-  ],
-  "cosmetics": [
-    {
-      "id": "<uuid>",
-      "name": "Beanie Hat",
-      "type": "cosmetic",
-      "rarity": "common",
-      "price": 50,
-      "effect_stat": null,
-      "effect_amount": null,
-      "image_url": "/items/beanie-hat.svg",
-      "category": "hat",
-      "quantity": 1,
-      "equipped_slot": "hat"
-    }
-  ],
-  "streak_freezes": []
-}
-```
+`{ consumables, cosmetics, streak_freezes }`. Cosmetics carry `equipped_slot` (string or null).
 
 ## Social (`/api/social`, all auth)
 
-| Method | Path                                | Status | Description                                            |
-| ------ | ----------------------------------- | ------ | ------------------------------------------------------ |
-| GET    | `/friends`                          | 501    | List the caller's friends.                             |
-| DELETE | `/friends/:user_id`                 | 501    | Unfriend; removes both directional edges.              |
-| GET    | `/friend-requests`                  | 501    | Incoming pending requests.                             |
-| POST   | `/friend-requests`                  | 501    | Send a request by username.                            |
-| POST   | `/friend-requests/:id/accept`       | 501    | Accept; creates the `friends` rows.                    |
-| POST   | `/friend-requests/:id/reject`       | 501    | Reject; marks the request rejected.                    |
-| GET    | `/gifts`                            | 501    | Gifts received by the caller.                          |
-| POST   | `/gifts`                            | 501    | Send a gift (item from inventory) to a friend.         |
-| POST   | `/gifts/:id/accept`                 | 501    | Accept; transfers the item into the caller's inventory.|
-| POST   | `/gifts/:id/decline`                | 501    | Decline; the gift is dropped.                          |
+### GET `/friends` (auth)
+
+Returns the caller's accepted friends.
+
+```json
+{
+  "friends": [
+    {
+      "id": "<uuid>",
+      "display_name": "Iris",
+      "username": "iris",
+      "avatar_url": null,
+      "level": 4,
+      "streak_current": 7
+    }
+  ]
+}
+```
+
+`streak_current` is `null` when the friend's visibility is `private`. All other fields are visible regardless.
+
+### POST `/friends/request` (auth)
+
+Body: `{ username }`. Validates not-self, not-already-friends, no inbound or outbound pending request. UPSERTs on `(from_user_id, to_user_id)` so a previously rejected request can be re-issued. Emits `friend_request` to the recipient.
+
+`201 Created`:
+
+```json
+{
+  "id": "<uuid>",
+  "from_user_id": "<uuid>",
+  "from_username": "you",
+  "from_display_name": "You",
+  "from_avatar_url": null,
+  "status": "pending",
+  "created_at": "<timestamptz>"
+}
+```
+
+Errors:
+
+- `404 USER_NOT_FOUND`
+- `400 INVALID_TARGET` — self-request.
+- `409 ALREADY_FRIENDS`
+- `409 REQUEST_PENDING` — outbound pending.
+- `409 REQUEST_PENDING_INBOUND` — the other party already sent you one.
+
+### GET `/friends/requests` (auth)
+
+Pending incoming requests with sender details.
+
+### PUT `/friends/request/:id` (auth)
+
+Body: `{ action: "accept" | "reject" }`. Validates the request's `to_user_id` matches the caller. On accept: status `accepted` and both directional rows inserted into `friends`. On reject: status `rejected`. Emits `friend_request_responded` to the original sender.
+
+`200 OK`: `{ id, status }`. `404 NOT_FOUND`, `409 ALREADY_RESPONDED`.
+
+### DELETE `/friends/:friend_id` (auth)
+
+Removes both directional edges. `204`.
+
+### POST `/gifts/send` (auth)
+
+Body: `{ friend_id, item_id, message? }`. Transactional: cooldown check (1 per friend per day), inventory decrement, `gifts` insert, `notifications` insert for the recipient, `activity_events` insert for the sender. Emits `gift_received` to the recipient. Consumables only.
+
+`201 Created`:
+
+```json
+{
+  "gift": {
+    "id": "<uuid>",
+    "from_user_id": "<uuid>",
+    "to_user_id": "<uuid>",
+    "item_id": "<uuid>",
+    "message": "for the rough week",
+    "is_accepted": false,
+    "sent_at": "<timestamptz>"
+  },
+  "item": { "id": "<uuid>", "name": "Apple", "image_url": "/items/apple.svg" }
+}
+```
+
+Errors:
+
+- `404 NOT_FRIENDS`
+- `404 NOT_IN_INVENTORY`
+- `400 NOT_GIFTABLE` — item is not a consumable.
+- `429 GIFT_COOLDOWN` — caller already sent this friend a gift today.
+
+### POST `/gifts/:id/accept` (auth)
+
+UPSERTs the gifted item into the recipient's inventory and flips `is_accepted`. Returns the updated gift row plus the recipient's full inventory listing.
+
+`200 OK`: `{ gift, inventory: { consumables, cosmetics, streak_freezes } }`. `404 NOT_FOUND`, `409 ALREADY_ACCEPTED`.
+
+### GET `/activity` (auth)
+
+Last 20 activity events for the caller and their friends.
+
+```json
+{
+  "activity": [
+    {
+      "user_id": "<uuid>",
+      "user_display_name": "Iris",
+      "type": "gift_sent",
+      "metadata": { "to_user_id": "<uuid>", "item_id": "<uuid>", "item_name": "Apple" },
+      "created_at": "<timestamptz>"
+    }
+  ]
+}
+```
+
+Today only `gift_sent` is written. Habit completions, purchases, friendships, and level-ups will start emitting activity events in a follow-up prompt.
 
 ## Focus (`/api/focus`, all auth)
 
-| Method | Path         | Status | Description                                              |
-| ------ | ------------ | ------ | -------------------------------------------------------- |
-| POST   | `/sessions`  | 501    | Record a completed focus session (duration, optional rating). |
-| GET    | `/sessions`  | 501    | Session history.                                         |
-| GET    | `/stats`     | 501    | Aggregate stats (today / week / all-time minutes).       |
+### POST `/complete` (auth)
 
-## User (`/api/user`, all auth)
+Body: `{ duration_minutes, rating? }`. `duration_minutes` is 1..120; `rating` is 1..5 if provided. Flat reward of 10 coins. `201 Created` returns `{ session_id, coins_earned, total_focus_time }` where `total_focus_time` is the running total across all sessions.
 
-| Method | Path                              | Status | Description                                                |
-| ------ | --------------------------------- | ------ | ---------------------------------------------------------- |
-| GET    | `/profile`                        | 501    | Caller's own profile.                                      |
-| PATCH  | `/profile`                        | 501    | Update display name, bio, avatar, visibility.              |
-| GET    | `/notifications`                  | 501    | List notifications (unread first).                         |
-| PATCH  | `/notifications/:id/read`         | 501    | Mark one as read.                                          |
-| POST   | `/notifications/read-all`         | 501    | Mark all unread as read.                                   |
-| GET    | `/:username`                      | 501    | Public profile lookup by username (respects visibility).   |
+Errors:
+
+- `400 INVALID_DURATION`
+- `400 INVALID_RATING`
+
+### GET `/stats` (auth)
+
+```json
+{
+  "total_sessions": 12,
+  "total_minutes": 380,
+  "average_rating": 4.25,
+  "sessions_this_week": 3
+}
+```
+
+`average_rating` is `null` when the user has no rated sessions.
 
 ## Leaderboard (`/api/leaderboard`, all auth)
 
-| Method | Path        | Status | Description                                                       |
-| ------ | ----------- | ------ | ----------------------------------------------------------------- |
-| GET    | `/friends`  | 501    | Caller + friends, ranked by streak and weekly completions.        |
-| GET    | `/weekly`   | 501    | Public users ranked by this week's completions (visibility-filtered). |
+### GET `/friends` (auth)
+
+Caller plus accepted friends, sorted by `level DESC, xp DESC`, limit 50. Includes the caller so they can see their own rank inside their circle.
+
+```json
+{
+  "entries": [
+    {
+      "rank": 1,
+      "id": "<uuid>",
+      "display_name": "Iris",
+      "username": "iris",
+      "avatar_url": null,
+      "level": 5,
+      "xp": 1240,
+      "streak_current": 9
+    }
+  ]
+}
+```
+
+### GET `/global` (auth)
+
+Top 100 users by `level DESC, xp DESC`, filtered to `visibility = 'public'`. PRODUCT.md principle #3 ("private by default, social by invitation") makes this an opt-in surface: users must set their visibility to `public` to appear here.
+
+## Notifications (`/api/notifications`, all auth)
+
+### GET `/` (auth)
+
+Unread notifications for the caller, newest first.
+
+```json
+{
+  "notifications": [
+    {
+      "id": "<uuid>",
+      "type": "gift_received",
+      "content": "You received Apple as a gift",
+      "metadata": {
+        "gift_id": "<uuid>",
+        "item_id": "<uuid>",
+        "item_name": "Apple",
+        "from_user_id": "<uuid>",
+        "message": null
+      },
+      "is_read": false,
+      "created_at": "<timestamptz>"
+    }
+  ]
+}
+```
+
+Today, only the gift flow writes notifications. Friend-request acceptance and level-ups emit socket events but do not persist a notification row (deliberate; will revisit if offline-recovery matters).
+
+### PUT `/read` (auth)
+
+Marks every unread notification for the caller as read. `204 No Content`.
+
+## User (`/api/user`, all auth)
+
+| Method | Path        | Status | Description                                              |
+| ------ | ----------- | ------ | -------------------------------------------------------- |
+| GET    | `/profile`  | 501    | Caller's own profile.                                    |
+| PATCH  | `/profile`  | 501    | Update display name, bio, avatar, visibility.            |
+| GET    | `/:username`| 501    | Public profile lookup by username (respects visibility). |
+
+(Notification endpoints previously stubbed under `/api/user/notifications/*` have moved to the top-level `/api/notifications` router.)
 
 ## WebSocket
 
@@ -600,6 +354,22 @@ Mounted at the same origin via socket.io. The handshake middleware verifies a JW
 
 ### Server to client
 
-| Event             | Payload | Description                                                          |
-| ----------------- | ------- | -------------------------------------------------------------------- |
-| `habit_completed` | `{ user_id, habit_id, habit_name, new_streak, leveled_up }` | Emitted to each of the actor's friends when they complete a habit. Best-effort; failures don't roll back the completion. |
+| Event                        | Recipient                | Payload                                                                                   | Description                                                          |
+| ---------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `habit_completed`            | Each friend of the actor | `{ user_id, habit_id, habit_name, new_streak, leveled_up }`                              | Emitted when a friend completes a habit.                              |
+| `level_up`                   | The actor                | `{ new_level }`                                                                           | Emitted to the user themselves when a completion crosses a level.    |
+| `friend_request`             | The recipient            | `{ request_id, from_user_id, from_username, from_display_name, from_avatar_url }`        | Emitted on `POST /api/social/friends/request`.                       |
+| `friend_request_responded`   | The original sender      | `{ request_id, status, responder_id, responder_username, responder_display_name }`       | Emitted on `PUT /api/social/friends/request/:id`.                    |
+| `gift_received`              | The recipient            | `{ gift_id, from_user_id, from_username, from_display_name, item_id, item_name, item_image_url, message }` | Emitted on `POST /api/social/gifts/send`.            |
+
+All server emits are best-effort: if delivery fails, the underlying database transaction is not rolled back.
+
+## Cron jobs
+
+`cronService.startCronJobs` registers a daily rollover at `0 0 * * *` UTC. For each user whose last completion is before today:
+
+- gap == 1 day: streak stays intact.
+- gap > 1 day with `freeze_count > 0`: consume one freeze, streak holds.
+- gap > 1 day with `freeze_count == 0`: streak resets to 0.
+
+After streak resolution, pet health is set to `MIN(current_streak * 5, 100)` (cron uses the literal formula; the in-app completion path ratchets up). When the resulting health is 0, `is_fainted` is set to true. Each user is processed in its own transaction; a single failure does not abort the sweep.

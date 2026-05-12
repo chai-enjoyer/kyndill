@@ -428,6 +428,10 @@ export async function complete(userId: string, habitId: string): Promise<Complet
 
     await client.query('COMMIT');
 
+    if (leveledUp) {
+      emitToUser(userId, 'level_up', { new_level: newLevel });
+    }
+
     // Best-effort fanout to friends; failures don't roll back the completion.
     try {
       const { rows: friends } = await pool.query<{ friend_id: string }>(

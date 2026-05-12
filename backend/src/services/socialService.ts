@@ -1,45 +1,510 @@
-// Friends, friend requests, gifts.
+import { pool } from '../db/pool';
+import { HttpError } from '../middleware/errorHandler';
+import { emitToUser } from '../socket/socketHandler';
+import { listForUser as listInventory } from './inventoryService';
+import type { InventoryListing } from './inventoryService';
 
-export async function listFriends(_userId: string): Promise<never> {
-  throw new Error('socialService.listFriends not implemented');
+// ============================================================
+// DTOs
+// ============================================================
+
+export interface FriendDto {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url: string | null;
+  level: number;
+  streak_current: number | null;
+}
+
+export interface FriendRequestDto {
+  id: string;
+  from_user_id: string;
+  from_username: string;
+  from_display_name: string;
+  from_avatar_url: string | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+export interface GiftDto {
+  id: string;
+  from_user_id: string;
+  to_user_id: string;
+  item_id: string;
+  message: string | null;
+  is_accepted: boolean;
+  sent_at: string;
+}
+
+export interface SendGiftResult {
+  gift: GiftDto;
+  item: { id: string; name: string; image_url: string | null };
+}
+
+export interface AcceptGiftResult {
+  gift: GiftDto;
+  inventory: InventoryListing;
+}
+
+export interface ActivityEntry {
+  user_id: string;
+  user_display_name: string;
+  type: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+// ============================================================
+// Friends
+// ============================================================
+
+export async function listFriends(userId: string): Promise<FriendDto[]> {
+  const { rows } = await pool.query<{
+    id: string;
+    display_name: string;
+    username: string;
+    avatar_url: string | null;
+    level: number;
+    streak_current: number;
+    visibility: 'public' | 'friends' | 'private';
+  }>(
+    `SELECT u.id, u.display_name, u.username, u.avatar_url, u.level,
+            u.streak_current, u.visibility
+       FROM friends f
+       JOIN users u ON u.id = f.friend_id
+      WHERE f.user_id = $1
+      ORDER BY u.display_name ASC`,
+    [userId],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    display_name: row.display_name,
+    username: row.username,
+    avatar_url: row.avatar_url,
+    level: row.level,
+    streak_current: row.visibility === 'private' ? null : row.streak_current,
+  }));
 }
 
 export async function sendFriendRequest(
-  _fromUserId: string,
-  _toUsername: string,
-): Promise<never> {
-  throw new Error('socialService.sendFriendRequest not implemented');
+  fromUserId: string,
+  toUsername: string,
+): Promise<FriendRequestDto> {
+  const { rows: targets } = await pool.query<{ id: string }>(
+    `SELECT id FROM users WHERE username = $1`,
+    [toUsername],
+  );
+  if (targets.length === 0) {
+    throw new HttpError(404, 'USER_NOT_FOUND', 'No user with that username');
+  }
+  const toUserId = targets[0].id;
+
+  if (toUserId === fromUserId) {
+    throw new HttpError(400, 'INVALID_TARGET', 'You cannot send a friend request to yourself');
+  }
+
+  const { rows: friendship } = await pool.query(
+    `SELECT 1 FROM friends WHERE user_id = $1 AND friend_id = $2`,
+    [fromUserId, toUserId],
+  );
+  if (friendship.length > 0) {
+    throw new HttpError(409, 'ALREADY_FRIENDS', 'You are already friends');
+  }
+
+  const { rows: pendingOut } = await pool.query(
+    `SELECT 1 FROM friend_requests
+      WHERE from_user_id = $1 AND to_user_id = $2 AND status = 'pending'`,
+    [fromUserId, toUserId],
+  );
+  if (pendingOut.length > 0) {
+    throw new HttpError(409, 'REQUEST_PENDING', 'A request to this user is already pending');
+  }
+
+  const { rows: pendingIn } = await pool.query(
+    `SELECT 1 FROM friend_requests
+      WHERE from_user_id = $1 AND to_user_id = $2 AND status = 'pending'`,
+    [toUserId, fromUserId],
+  );
+  if (pendingIn.length > 0) {
+    throw new HttpError(
+      409,
+      'REQUEST_PENDING_INBOUND',
+      'They already sent you a friend request; accept it instead',
+    );
+  }
+
+  // UPSERT so a previously rejected request can be re-issued.
+  const { rows: inserted } = await pool.query<{
+    id: string;
+    status: 'pending' | 'accepted' | 'rejected';
+    created_at: string;
+  }>(
+    `INSERT INTO friend_requests (from_user_id, to_user_id, status)
+     VALUES ($1, $2, 'pending')
+     ON CONFLICT (from_user_id, to_user_id)
+     DO UPDATE SET status = 'pending', created_at = NOW()
+     RETURNING id, status, created_at`,
+    [fromUserId, toUserId],
+  );
+  const requestRow = inserted[0];
+
+  const { rows: senderRows } = await pool.query<{
+    username: string;
+    display_name: string;
+    avatar_url: string | null;
+  }>(
+    `SELECT username, display_name, avatar_url FROM users WHERE id = $1`,
+    [fromUserId],
+  );
+  const sender = senderRows[0] ?? { username: '', display_name: '', avatar_url: null };
+
+  emitToUser(toUserId, 'friend_request', {
+    request_id: requestRow.id,
+    from_user_id: fromUserId,
+    from_username: sender.username,
+    from_display_name: sender.display_name,
+    from_avatar_url: sender.avatar_url,
+  });
+
+  return {
+    id: requestRow.id,
+    from_user_id: fromUserId,
+    from_username: sender.username,
+    from_display_name: sender.display_name,
+    from_avatar_url: sender.avatar_url,
+    status: requestRow.status,
+    created_at: requestRow.created_at,
+  };
+}
+
+export async function listFriendRequests(userId: string): Promise<FriendRequestDto[]> {
+  const { rows } = await pool.query<FriendRequestDto>(
+    `SELECT fr.id,
+            fr.from_user_id,
+            u.username       AS from_username,
+            u.display_name   AS from_display_name,
+            u.avatar_url     AS from_avatar_url,
+            fr.status,
+            fr.created_at
+       FROM friend_requests fr
+       JOIN users u ON u.id = fr.from_user_id
+      WHERE fr.to_user_id = $1 AND fr.status = 'pending'
+      ORDER BY fr.created_at DESC`,
+    [userId],
+  );
+  return rows;
+}
+
+export interface RespondResult {
+  id: string;
+  status: 'accepted' | 'rejected';
 }
 
 export async function respondToFriendRequest(
-  _userId: string,
-  _requestId: string,
-  _action: 'accept' | 'reject',
-): Promise<never> {
-  throw new Error('socialService.respondToFriendRequest not implemented');
+  userId: string,
+  requestId: string,
+  action: 'accept' | 'reject',
+): Promise<RespondResult> {
+  const { rows: requests } = await pool.query<{
+    id: string;
+    from_user_id: string;
+    to_user_id: string;
+    status: string;
+  }>(
+    `SELECT id, from_user_id, to_user_id, status FROM friend_requests WHERE id = $1`,
+    [requestId],
+  );
+  if (requests.length === 0 || requests[0].to_user_id !== userId) {
+    throw new HttpError(404, 'NOT_FOUND', 'Friend request not found');
+  }
+  const reqRow = requests[0];
+  if (reqRow.status !== 'pending') {
+    throw new HttpError(409, 'ALREADY_RESPONDED', `Request was already ${reqRow.status}`);
+  }
+
+  const newStatus: 'accepted' | 'rejected' = action === 'accept' ? 'accepted' : 'rejected';
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`UPDATE friend_requests SET status = $1 WHERE id = $2`, [
+      newStatus,
+      requestId,
+    ]);
+
+    if (action === 'accept') {
+      await client.query(
+        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2)
+         ON CONFLICT (user_id, friend_id) DO NOTHING`,
+        [userId, reqRow.from_user_id],
+      );
+      await client.query(
+        `INSERT INTO friends (user_id, friend_id) VALUES ($1, $2)
+         ON CONFLICT (user_id, friend_id) DO NOTHING`,
+        [reqRow.from_user_id, userId],
+      );
+    }
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const { rows: responderRows } = await pool.query<{
+    username: string;
+    display_name: string;
+  }>(
+    `SELECT username, display_name FROM users WHERE id = $1`,
+    [userId],
+  );
+  const responder = responderRows[0] ?? { username: '', display_name: '' };
+
+  emitToUser(reqRow.from_user_id, 'friend_request_responded', {
+    request_id: requestId,
+    status: newStatus,
+    responder_id: userId,
+    responder_username: responder.username,
+    responder_display_name: responder.display_name,
+  });
+
+  return { id: requestId, status: newStatus };
 }
 
-export async function removeFriend(_userId: string, _friendId: string): Promise<never> {
-  throw new Error('socialService.removeFriend not implemented');
+export async function removeFriend(userId: string, friendId: string): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`DELETE FROM friends WHERE user_id = $1 AND friend_id = $2`, [
+      userId,
+      friendId,
+    ]);
+    await client.query(`DELETE FROM friends WHERE user_id = $1 AND friend_id = $2`, [
+      friendId,
+      userId,
+    ]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
-export async function listGifts(_userId: string): Promise<never> {
-  throw new Error('socialService.listGifts not implemented');
-}
+// ============================================================
+// Gifts
+// ============================================================
 
 export async function sendGift(
-  _fromUserId: string,
-  _toUserId: string,
-  _itemId: string,
-  _message?: string,
-): Promise<never> {
-  throw new Error('socialService.sendGift not implemented');
+  fromUserId: string,
+  toUserId: string,
+  itemId: string,
+  message?: string,
+): Promise<SendGiftResult> {
+  const { rows: friendship } = await pool.query(
+    `SELECT 1 FROM friends WHERE user_id = $1 AND friend_id = $2`,
+    [fromUserId, toUserId],
+  );
+  if (friendship.length === 0) {
+    throw new HttpError(404, 'NOT_FRIENDS', 'You are not friends with this user');
+  }
+
+  const { rows: invRows } = await pool.query<{
+    quantity: number;
+    type: string;
+    name: string;
+    image_url: string | null;
+  }>(
+    `SELECT inv.quantity, i.type, i.name, i.image_url
+       FROM inventory inv
+       JOIN items i ON i.id = inv.item_id
+      WHERE inv.user_id = $1 AND inv.item_id = $2`,
+    [fromUserId, itemId],
+  );
+  if (invRows.length === 0 || invRows[0].quantity < 1) {
+    throw new HttpError(404, 'NOT_IN_INVENTORY', 'Item not in inventory');
+  }
+  if (invRows[0].type !== 'consumable') {
+    throw new HttpError(400, 'NOT_GIFTABLE', 'Only consumables can be gifted');
+  }
+  const itemInfo = invRows[0];
+
+  const { rows: existing } = await pool.query(
+    `SELECT 1 FROM gifts
+      WHERE from_user_id = $1
+        AND to_user_id = $2
+        AND (sent_at AT TIME ZONE 'UTC')::date = (NOW() AT TIME ZONE 'UTC')::date`,
+    [fromUserId, toUserId],
+  );
+  if (existing.length > 0) {
+    throw new HttpError(
+      429,
+      'GIFT_COOLDOWN',
+      'You can only send one gift per friend per day',
+    );
+  }
+
+  const client = await pool.connect();
+  let gift: GiftDto;
+  try {
+    await client.query('BEGIN');
+
+    if (itemInfo.quantity === 1) {
+      await client.query(`DELETE FROM inventory WHERE user_id = $1 AND item_id = $2`, [
+        fromUserId,
+        itemId,
+      ]);
+    } else {
+      await client.query(
+        `UPDATE inventory SET quantity = quantity - 1
+          WHERE user_id = $1 AND item_id = $2`,
+        [fromUserId, itemId],
+      );
+    }
+
+    const { rows: giftRows } = await client.query<GiftDto>(
+      `INSERT INTO gifts (from_user_id, to_user_id, item_id, message)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, from_user_id, to_user_id, item_id, message, is_accepted, sent_at`,
+      [fromUserId, toUserId, itemId, message ?? null],
+    );
+    gift = giftRows[0];
+
+    await client.query(
+      `INSERT INTO notifications (user_id, type, content, metadata)
+       VALUES ($1, 'gift_received', $2, $3::jsonb)`,
+      [
+        toUserId,
+        `You received ${itemInfo.name} as a gift`,
+        JSON.stringify({
+          gift_id: gift.id,
+          item_id: itemId,
+          item_name: itemInfo.name,
+          from_user_id: fromUserId,
+          message: message ?? null,
+        }),
+      ],
+    );
+
+    await client.query(
+      `INSERT INTO activity_events (user_id, type, metadata)
+       VALUES ($1, 'gift_sent', $2::jsonb)`,
+      [
+        fromUserId,
+        JSON.stringify({
+          to_user_id: toUserId,
+          item_id: itemId,
+          item_name: itemInfo.name,
+        }),
+      ],
+    );
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const { rows: senderRows } = await pool.query<{
+    username: string;
+    display_name: string;
+  }>(
+    `SELECT username, display_name FROM users WHERE id = $1`,
+    [fromUserId],
+  );
+  const sender = senderRows[0] ?? { username: '', display_name: '' };
+
+  emitToUser(toUserId, 'gift_received', {
+    gift_id: gift.id,
+    from_user_id: fromUserId,
+    from_username: sender.username,
+    from_display_name: sender.display_name,
+    item_id: itemId,
+    item_name: itemInfo.name,
+    item_image_url: itemInfo.image_url,
+    message: message ?? null,
+  });
+
+  return {
+    gift,
+    item: { id: itemId, name: itemInfo.name, image_url: itemInfo.image_url },
+  };
 }
 
-export async function respondToGift(
-  _userId: string,
-  _giftId: string,
-  _action: 'accept' | 'decline',
-): Promise<never> {
-  throw new Error('socialService.respondToGift not implemented');
+export async function acceptGift(userId: string, giftId: string): Promise<AcceptGiftResult> {
+  const { rows: gifts } = await pool.query<GiftDto>(
+    `SELECT id, from_user_id, to_user_id, item_id, message, is_accepted, sent_at
+       FROM gifts WHERE id = $1`,
+    [giftId],
+  );
+  if (gifts.length === 0 || gifts[0].to_user_id !== userId) {
+    throw new HttpError(404, 'NOT_FOUND', 'Gift not found');
+  }
+  if (gifts[0].is_accepted) {
+    throw new HttpError(409, 'ALREADY_ACCEPTED', 'Gift was already accepted');
+  }
+  const giftRow = gifts[0];
+
+  const client = await pool.connect();
+  let updated: GiftDto;
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      `INSERT INTO inventory (user_id, item_id, quantity)
+       VALUES ($1, $2, 1)
+       ON CONFLICT (user_id, item_id)
+       DO UPDATE SET quantity = inventory.quantity + 1`,
+      [userId, giftRow.item_id],
+    );
+
+    const { rows: updatedRows } = await client.query<GiftDto>(
+      `UPDATE gifts SET is_accepted = TRUE WHERE id = $1
+       RETURNING id, from_user_id, to_user_id, item_id, message, is_accepted, sent_at`,
+      [giftId],
+    );
+    updated = updatedRows[0];
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  const inventory = await listInventory(userId);
+  return { gift: updated, inventory };
+}
+
+// ============================================================
+// Activity feed
+// ============================================================
+
+// Activity events are currently inserted only by sendGift. Habit completions,
+// purchases, friendships, level-ups, etc. don't yet write to activity_events;
+// expanding this is intentional follow-up work.
+export async function listActivity(userId: string): Promise<ActivityEntry[]> {
+  const { rows } = await pool.query<ActivityEntry>(
+    `SELECT ae.user_id,
+            u.display_name AS user_display_name,
+            ae.type,
+            ae.metadata,
+            ae.created_at
+       FROM activity_events ae
+       JOIN users u ON u.id = ae.user_id
+      WHERE ae.user_id = $1
+         OR ae.user_id IN (SELECT friend_id FROM friends WHERE user_id = $1)
+      ORDER BY ae.created_at DESC
+      LIMIT 20`,
+    [userId],
+  );
+  return rows;
 }
