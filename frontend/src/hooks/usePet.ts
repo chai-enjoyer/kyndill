@@ -10,7 +10,7 @@ export interface EquippedItem {
   image_url: string | null;
 }
 
-export type EquipSlot = 'hat' | 'accessory' | 'background' | 'glasses' | 'scarf' | 'badge' | 'charm';
+export type EquipSlot = 'hat' | 'accessory' | 'glasses' | 'scarf' | 'badge' | 'charm';
 
 export interface PetFullState {
   id: string;
@@ -64,10 +64,33 @@ export function usePet() {
     setPet((prev) => (prev ? { ...prev, equipped: data.equipped } : prev));
   }, []);
 
+  const unequip = useCallback(async (slot: EquipSlot): Promise<void> => {
+    await api.post('/api/pet/unequip', { slot });
+    setPet((prev) => {
+      if (!prev) return prev;
+      const equipped = { ...prev.equipped };
+      delete equipped[slot];
+      return { ...prev, equipped };
+    });
+  }, []);
+
+  const rename = useCallback(async (name: string): Promise<void> => {
+    const { data } = await api.patch<PetFullState>('/api/pet/name', { name });
+    setPet((prev) => (prev ? { ...prev, name: data.name } : data));
+  }, []);
+
   // Update locally after a habit-completion response, mirroring the backend
   // stage rules so we don't need an extra round-trip.
   const applyCompletion = useCallback(
-    (partial: { health: number; total_habits_completed: number; is_fainted: boolean }) => {
+    (partial: {
+      health: number;
+      happiness: number;
+      hunger: number;
+      energy: number;
+      cleanliness: number;
+      total_habits_completed: number;
+      is_fainted: boolean;
+    }) => {
       setPet((prev) => {
         if (!prev) return prev;
         const stage =
@@ -82,7 +105,7 @@ export function usePet() {
     [],
   );
 
-  return { pet, isLoading, error, refetch, feed, equip, applyCompletion };
+  return { pet, isLoading, error, refetch, feed, equip, unequip, rename, applyCompletion };
 }
 
 function extractMessage(err: unknown): string {

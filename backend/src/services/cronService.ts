@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { pool } from '../db/pool';
+import { derivePetHealth } from './petService';
 
 let started = false;
 
@@ -67,10 +68,8 @@ export async function runDailyRollover(): Promise<void> {
       }
     }
 
-    const newHealth = Math.min(100, Math.max(0, newStreak * 5));
-    const willFaint = newHealth === 0;
-
     const client = await pool.connect();
+    let willFaint = false;
     try {
       await client.query('BEGIN');
 
@@ -84,6 +83,22 @@ export async function runDailyRollover(): Promise<void> {
           user.id,
         ]);
       }
+
+      const { rows: petRows } = await client.query<{
+        happiness: number;
+        hunger: number;
+        energy: number;
+        cleanliness: number;
+      }>(
+        `SELECT happiness, hunger, energy, cleanliness
+           FROM pets
+          WHERE user_id = $1
+          FOR UPDATE`,
+        [user.id],
+      );
+      const newHealth =
+        petRows.length > 0 ? derivePetHealth(newStreak, petRows[0]) : Math.min(100, newStreak * 12);
+      willFaint = newHealth === 0;
 
       await client.query(
         `UPDATE pets SET health = $1, is_fainted = $2 WHERE user_id = $3`,

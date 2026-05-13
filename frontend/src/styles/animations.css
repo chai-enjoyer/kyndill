@@ -9,8 +9,8 @@
 }
 
 @keyframes kyndill-page-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
 @keyframes kyndill-shimmer {
@@ -31,6 +31,162 @@
   0%, 100% { opacity: 1; }
   47%      { opacity: 0.96; }
   53%      { opacity: 1; }
+}
+
+@keyframes kyndill-candle-halo {
+  0%, 100% {
+    opacity: 0.84;
+    transform: scale(0.98);
+  }
+  42% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+  62% {
+    opacity: 0.9;
+    transform: scale(1.005);
+  }
+}
+
+@keyframes kyndill-candle-flame {
+  0%, 100% {
+    transform: translateX(0) rotate(-1deg) scale(1, 1);
+  }
+  24% {
+    transform: translateX(1px) rotate(2.5deg) scale(0.96, 1.06);
+  }
+  48% {
+    transform: translateX(-1.5px) rotate(-3deg) scale(1.035, 0.98);
+  }
+  72% {
+    transform: translateX(0.8px) rotate(1.5deg) scale(0.985, 1.045);
+  }
+}
+
+@keyframes kyndill-candle-inner-flame {
+  0%, 100% {
+    opacity: 0.96;
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+  35% {
+    opacity: 1;
+    transform: translateX(-0.8px) rotate(-2deg) scale(0.92, 1.1);
+  }
+  70% {
+    opacity: 0.9;
+    transform: translateX(1px) rotate(2deg) scale(1.04, 0.96);
+  }
+}
+
+@keyframes kyndill-candle-core {
+  0%, 100% {
+    opacity: 0.72;
+    transform: scale(0.92, 1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12, 1.18);
+  }
+}
+
+@keyframes kyndill-candle-spark {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  18% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--spark-x, 0), -34px) scale(0.9);
+  }
+}
+
+@keyframes kyndill-candle-wick {
+  0%, 100% { opacity: 0.86; }
+  50%      { opacity: 1; }
+}
+
+@keyframes kyndill-candle-wax-shine {
+  0%, 100% { opacity: 0.82; }
+  50%      { opacity: 1; }
+}
+
+@keyframes kyndill-flame-icon-outer {
+  0%, 100% {
+    transform: translateX(0) rotate(-1deg) scale(1, 1);
+  }
+  28% {
+    transform: translateX(0.7px) rotate(2deg) scale(0.96, 1.06);
+  }
+  54% {
+    transform: translateX(-0.8px) rotate(-2.5deg) scale(1.04, 0.98);
+  }
+  78% {
+    transform: translateX(0.4px) rotate(1deg) scale(0.99, 1.03);
+  }
+}
+
+@keyframes kyndill-flame-icon-inner {
+  0%, 100% {
+    opacity: 0.82;
+    transform: translateX(0) scale(1);
+  }
+  44% {
+    opacity: 1;
+    transform: translateX(-0.35px) scale(0.92, 1.12);
+  }
+  72% {
+    opacity: 0.9;
+    transform: translateX(0.45px) scale(1.06, 0.96);
+  }
+}
+
+@keyframes kyndill-flame-icon-spark {
+  0%, 30% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.5);
+  }
+  42% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--spark-x, 0), -6px) scale(0.9);
+  }
+}
+
+@keyframes kyndill-value-pop {
+  0% {
+    color: var(--color-honey-strong);
+    transform: translateY(0) scale(1);
+  }
+  42% {
+    color: var(--color-accent);
+    transform: translateY(-1px) scale(1.12);
+  }
+  100% {
+    color: inherit;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes kyndill-soft-confirm {
+  0% {
+    box-shadow: var(--shadow-1);
+    transform: translateY(0);
+  }
+  42% {
+    box-shadow:
+      0 0 0 3px var(--color-sage-glow),
+      var(--shadow-2);
+    transform: translateY(-1px);
+  }
+  100% {
+    box-shadow: var(--shadow-1);
+    transform: translateY(0);
+  }
 }
 
 @keyframes kyndill-checkmark-draw {

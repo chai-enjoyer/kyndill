@@ -4,11 +4,13 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { pool } from '../db/pool';
 import { HttpError } from '../middleware/errorHandler';
+import { normalizeEmail } from '../lib/credentials';
 import type { JwtPayload } from '../types';
 
 const BCRYPT_COST = 12;
 const JWT_ALGORITHM = 'HS256' as const;
 const JWT_EXPIRES_IN = '7d';
+const STARTER_COINS = 20;
 
 // ============================================================
 // Pure utility functions (unit-testable; no DB, no network).
@@ -75,6 +77,11 @@ interface UserRow {
   level: number;
   xp: number;
   coins: number;
+}
+
+interface OAuthUserRow extends UserRow {
+  oauth_provider: string | null;
+  oauth_id: string | null;
 }
 
 function toAuthUserDto(row: UserRow): AuthUserDto {
@@ -153,7 +160,7 @@ export async function register(input: {
   password: string;
   displayName: string;
 }): Promise<AuthResult> {
-  const email = input.email.toLowerCase().trim();
+  const email = normalizeEmail(input.email);
   const displayName = input.displayName.trim();
 
   const existing = await findUserByEmail(email);
@@ -167,10 +174,10 @@ export async function register(input: {
   let newUserId: string;
   try {
     const { rows } = await pool.query<{ id: string }>(
-      `INSERT INTO users (email, password_hash, display_name, username)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO users (email, password_hash, display_name, username, coins)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [email, passwordHash, displayName, username],
+      [email, passwordHash, displayName, username, STARTER_COINS],
     );
     newUserId = rows[0].id;
   } catch (err) {
@@ -193,13 +200,13 @@ export async function register(input: {
       display_name: displayName,
       level: 1,
       xp: 0,
-      coins: 0,
+      coins: STARTER_COINS,
     },
   };
 }
 
 export async function login(input: { email: string; password: string }): Promise<AuthResult> {
-  const email = input.email.toLowerCase().trim();
+  const email = normalizeEmail(input.email);
 
   const user = await findUserByEmail(email);
   if (!user || !user.password_hash) {
@@ -237,8 +244,9 @@ export async function googleSignIn(credential: string): Promise<AuthResult> {
     throw new HttpError(401, 'INVALID_GOOGLE_TOKEN', 'Google credential is missing required claims');
   }
 
-  const email = payload.email.toLowerCase();
+  const email = normalizeEmail(payload.email);
   const googleId = payload.sub;
+  const emailVerified = payload.email_verified !== false;
   const name = (payload.name ?? email.split('@')[0] ?? 'user').trim();
   const picture = payload.picture ?? null;
 
@@ -256,16 +264,51 @@ export async function googleSignIn(credential: string): Promise<AuthResult> {
     };
   }
 
+  const { rows: matchingEmail } = await pool.query<OAuthUserRow>(
+    `SELECT id, email, password_hash, display_name, level, xp, coins, oauth_provider, oauth_id
+       FROM users
+      WHERE email = $1`,
+    [email],
+  );
+
+  if (matchingEmail.length > 0) {
+    const user = matchingEmail[0];
+    if (user.oauth_id && user.oauth_id !== googleId) {
+      throw new HttpError(409, 'EMAIL_TAKEN', 'This email is linked to another Google account');
+    }
+    if (!emailVerified) {
+      throw new HttpError(401, 'INVALID_GOOGLE_TOKEN', 'Google email is not verified');
+    }
+
+    await pool.query(
+      `UPDATE users
+          SET oauth_provider = 'google',
+              oauth_id = $2,
+              avatar_url = COALESCE(avatar_url, $3)
+        WHERE id = $1`,
+      [user.id, googleId, picture],
+    );
+
+    return {
+      token: generateToken(user.id),
+      user: toAuthUserDto(user),
+    };
+  }
+
+  if (!emailVerified) {
+    throw new HttpError(401, 'INVALID_GOOGLE_TOKEN', 'Google email is not verified');
+  }
+
   const username = await generateAvailableUsername(email, name);
 
   let newUserId: string;
   try {
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO users
-         (email, password_hash, display_name, username, avatar_url, oauth_provider, oauth_id)
-       VALUES ($1, NULL, $2, $3, $4, 'google', $5)
+         (email, password_hash, display_name, username, avatar_url, oauth_provider, oauth_id, coins)
+       VALUES ($1, NULL, $2, $3, $4, 'google', $5, $6)
        RETURNING id`,
-      [email, name, username, picture, googleId],
+      [email, name, username, picture, googleId, STARTER_COINS],
     );
     newUserId = rows[0].id;
   } catch (err) {
@@ -302,7 +345,7 @@ export async function googleSignIn(credential: string): Promise<AuthResult> {
       display_name: name,
       level: 1,
       xp: 0,
-      coins: 0,
+      coins: STARTER_COINS,
     },
   };
 }

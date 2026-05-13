@@ -4,13 +4,20 @@ import { AxiosError } from 'axios';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useSocketContext } from '../context/SocketContext';
-import { useHabits, type CompleteResult } from '../hooks/useHabits';
+import { useHabits, type CompleteResult, type DroppedItem } from '../hooks/useHabits';
+import { useActivityFeed } from '../hooks/useActivityFeed';
 import { usePet } from '../hooks/usePet';
+import { useRecoveryPrompt } from '../hooks/useRecovery';
+import { useShop } from '../hooks/useShop';
 import { DashboardSidebar } from '../components/dashboard/DashboardSidebar';
 import { HabitListItem } from '../components/dashboard/HabitListItem';
 import { PetPanel } from '../components/dashboard/PetPanel';
 import { LevelUpModal } from '../components/dashboard/LevelUpModal';
 import { FeedModal } from '../components/dashboard/FeedModal';
+import { ItemDropToast } from '../components/dashboard/ItemDropToast';
+import { HabitFeedbackModal } from '../components/dashboard/HabitFeedbackModal';
+import { RecoveryReflectionModal } from '../components/dashboard/RecoveryReflectionModal';
+import { AnimatedValue } from '../components/common/AnimatedValue';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 
 export function DashboardPage() {
@@ -18,9 +25,23 @@ export function DashboardPage() {
   const { showToast } = useToastContext();
   const { socket } = useSocketContext();
   const { habits, isLoading: habitsLoading, error: habitsError, complete, refetch: refetchHabits } = useHabits();
+  const {
+    activity,
+    isLoading: activityLoading,
+    error: activityError,
+    refetch: refetchActivity,
+  } = useActivityFeed();
+  const {
+    prompt: recoveryPrompt,
+    save: saveRecoveryReflection,
+    dismiss: dismissRecoveryPrompt,
+  } = useRecoveryPrompt();
   const { pet, isLoading: petLoading, applyCompletion, refetch: refetchPet } = usePet();
+  const { freezeCount, refetch: refetchShop } = useShop();
 
   const [levelUp, setLevelUp] = useState<number | null>(null);
+  const [itemDrop, setItemDrop] = useState<DroppedItem | null>(null);
+  const [feedbackHabit, setFeedbackHabit] = useState<{ id: string; name: string } | null>(null);
   const [feedOpen, setFeedOpen] = useState(false);
   const [pullStart, setPullStart] = useState<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -54,14 +75,24 @@ export function DashboardPage() {
       });
       applyCompletion({
         health: result.pet_health,
+        happiness: result.pet_happiness,
+        hunger: result.pet_hunger,
+        energy: result.pet_energy,
+        cleanliness: result.pet_cleanliness,
         total_habits_completed: result.pet_total_habits_completed,
         is_fainted: result.pet_is_fainted,
       });
       if (result.item_dropped) {
-        showToast(`You found ${result.item_dropped.name}.`, 'success');
+        setItemDrop(result.item_dropped);
       }
       if (result.leveled_up) {
         setLevelUp(result.new_level);
+      }
+      if (result.completed_today) {
+        void refetchShop();
+        void refetchActivity();
+        const habit = habits.find((h) => h.id === habitId);
+        setFeedbackHabit({ id: habitId, name: habit?.name ?? 'habit' });
       }
       return result;
     } catch (err) {
@@ -73,7 +104,7 @@ export function DashboardPage() {
   async function refreshDashboard() {
     setRefreshing(true);
     try {
-      await Promise.all([refetchHabits(), refetchPet()]);
+      await Promise.all([refetchHabits(), refetchPet(), refetchShop(), refetchActivity()]);
       showToast('Dashboard refreshed.', 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
@@ -114,6 +145,7 @@ export function DashboardPage() {
     month: 'long',
     day: 'numeric',
   });
+  const xp = getXpProgress(user?.xp ?? 0, user?.level ?? 1);
 
   return (
     <div
@@ -127,20 +159,39 @@ export function DashboardPage() {
         {refreshing ? 'Refreshing...' : pullDistance > 70 ? 'Release to refresh' : 'Pull to refresh'}
       </div>
       <DashboardSidebar
-        pet={pet}
         completed={completed}
         total={total}
         streak={user?.streak_current ?? 0}
-        isLoading={petLoading}
+        freezeCount={freezeCount}
+        activity={activity}
+        activityLoading={activityLoading}
+        activityError={activityError}
+        onActivityRetry={refetchActivity}
       />
 
       <section className="dashboard__main">
         <header className="dashboard__header">
-          <p className="dashboard__date">{dateLabel}</p>
-          <h1 className="dashboard__greeting">
-            {greeting}
-            {firstName && `, ${firstName}`}.
-          </h1>
+          <div className="dashboard__title">
+            <p className="dashboard__date">{dateLabel}</p>
+            <h1 className="dashboard__greeting">
+              {greeting}
+              {firstName && `, ${firstName}`}.
+            </h1>
+          </div>
+          <section className="dashboard-xp" aria-label={`Level ${user?.level ?? 1} XP progress`}>
+            <div className="dashboard-xp__head">
+              <span>
+                Level <AnimatedValue value={user?.level ?? 1} />
+              </span>
+              <strong>
+                <AnimatedValue value={xp.current.toLocaleString()} /> / {xp.needed.toLocaleString()} XP
+              </strong>
+            </div>
+            <div className="dashboard-xp__track" role="progressbar" aria-valuenow={xp.progress} aria-valuemin={0} aria-valuemax={100}>
+              <span style={{ width: `${xp.progress}%` }} />
+            </div>
+            <Link to="/progress" className="dashboard-xp__link">View progress</Link>
+          </section>
         </header>
 
         {habitsError ? (
@@ -168,6 +219,21 @@ export function DashboardPage() {
 
       {levelUp !== null && <LevelUpModal newLevel={levelUp} onClose={() => setLevelUp(null)} />}
       {feedOpen && <FeedModal onClose={() => setFeedOpen(false)} onFed={refetchPet} />}
+      {itemDrop && <ItemDropToast item={itemDrop} onClose={() => setItemDrop(null)} />}
+      {feedbackHabit && (
+        <HabitFeedbackModal
+          habitId={feedbackHabit.id}
+          habitName={feedbackHabit.name}
+          onClose={() => setFeedbackHabit(null)}
+        />
+      )}
+      {recoveryPrompt && !feedbackHabit && levelUp === null && (
+        <RecoveryReflectionModal
+          prompt={recoveryPrompt}
+          onSave={saveRecoveryReflection}
+          onClose={dismissRecoveryPrompt}
+        />
+      )}
     </div>
   );
 }
@@ -187,6 +253,19 @@ function getGreeting(hour: number): string {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
+}
+
+function getXpProgress(totalXp: number, level: number) {
+  const safeLevel = Math.max(1, Math.floor(level));
+  const currentLevelFloor = safeLevel <= 1 ? 0 : 100 * (safeLevel - 1) * (safeLevel - 1);
+  const nextLevelXp = 100 * safeLevel * safeLevel;
+  const needed = Math.max(1, nextLevelXp - currentLevelFloor);
+  const current = Math.min(needed, Math.max(0, totalXp - currentLevelFloor));
+  return {
+    current,
+    needed,
+    progress: Math.round((current / needed) * 100),
+  };
 }
 
 function HabitsSkeleton() {

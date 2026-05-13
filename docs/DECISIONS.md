@@ -107,3 +107,89 @@ Use Firebase Hosting.
 - Free TLS, global edge caching, generous free tier.
 - We stay inside the Google Cloud ecosystem, consistent with the API VM living on GCP.
 - We accept some lock-in around the Firebase CLI for deploys; mitigated by the build artifact itself being portable static files.
+
+---
+
+## 0005. Persist product preferences and consent server-side
+
+- Status: accepted
+- Date: 2026-05-13
+
+### Context
+
+Notification preferences and research consent are part of account state, not only local UI state. They need to follow the user across browsers and should be available to backend services that filter notifications or generate evaluation exports.
+
+### Decision
+
+Store notification preferences in `users.notification_prefs` as JSONB and research participation in `users.research_consent` as a boolean. The frontend reads and updates both through `/api/user/profile`.
+
+### Consequences
+
+- Preferences now survive device changes and browser storage clears.
+- The backend can apply preferences when listing notifications.
+- Consent is represented in the same persistent record as the user account.
+- JSONB keeps preferences flexible, but validation remains in the route layer.
+
+---
+
+## 0006. Use append-only activity and feedback event tables
+
+- Status: accepted
+- Date: 2026-05-13
+
+### Context
+
+The thesis evaluation needs behavioral metrics and user feedback. The product also needs an activity feed for habits, purchases, friendships, level-ups, and gifts.
+
+### Decision
+
+Store product activity in `activity_events` and explicit feedback/recovery data in `feedback_events`. Use JSONB metadata for event-specific fields.
+
+### Consequences
+
+- The dashboard can show a live activity feed without reconstructing every event from domain tables.
+- Progress/insights can count feedback and recovery reflection records.
+- Friend-visible activity can be redacted at read time.
+- Free-text feedback requires careful anonymization before research export.
+
+---
+
+## 0007. Keep social features opt-in but make level public
+
+- Status: accepted
+- Date: 2026-05-13
+
+### Context
+
+Friends need enough visible information to recognize each other's progress, but habit names and detailed behavioral history can be sensitive.
+
+### Decision
+
+Keep profile visibility controls for streak and total habit history, but expose level as public profile information. Global leaderboard participation still requires `visibility = 'public'`.
+
+### Consequences
+
+- Friend cards and friend profiles no longer contradict each other about level.
+- Users can keep habit/streak details private while still having a light social identity.
+- The app should avoid exposing habit names in friend-visible feeds unless privacy rules change.
+
+---
+
+## 0008. Use Mermaid and PlantUML source diagrams in docs
+
+- Status: accepted
+- Date: 2026-05-13
+
+### Context
+
+The thesis needs architecture, ERD, use case, sequence, state, and deployment diagrams. The diagrams should be maintainable in source control instead of living only as exported images.
+
+### Decision
+
+Keep diagrams in `docs/DIAGRAMS.md` using Mermaid for architecture, ERD, sequence, state, and deployment diagrams, and PlantUML for the use case diagram.
+
+### Consequences
+
+- Diagrams can render in Markdown-compatible tools and be updated with code reviews.
+- The deployment diagram remains explicitly marked as planned until final infrastructure is verified.
+- Exported images for the thesis can be generated from the same source text.

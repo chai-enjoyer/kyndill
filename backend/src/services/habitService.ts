@@ -1,8 +1,10 @@
 import { pool } from '../db/pool';
 import { HttpError } from '../middleware/errorHandler';
 import { emitToUser } from '../socket/socketHandler';
+import { emitActivityUpdated, recordActivity } from './activityService';
 import { applyHabitCompletionEffects } from './petService';
 import { rollItemDrop, type DroppedItem } from './rewardService';
+import type { PoolClient } from 'pg';
 
 // ============================================================
 // Types
@@ -21,6 +23,7 @@ export interface HabitRow {
   days_of_week: number[] | null;
   completion_start_time: string | null;
   completion_end_time: string | null;
+  target_count: number;
   is_active: boolean;
   sort_order: number;
   created_at: string;
@@ -28,6 +31,8 @@ export interface HabitRow {
 
 export interface HabitWithStatus extends HabitRow {
   completed_today: boolean;
+  completed_count: number;
+  today_target_count: number;
   current_streak: number;
 }
 
@@ -36,6 +41,7 @@ export interface CreateHabitInput {
   description?: string;
   category: HabitCategory;
   frequency: HabitFrequency;
+  target_count?: number;
   days_of_week?: number[];
   completion_start_time?: string;
   completion_end_time?: string;
@@ -46,6 +52,7 @@ export interface UpdateHabitInput {
   description?: string | null;
   category?: HabitCategory;
   frequency?: HabitFrequency;
+  target_count?: number;
   days_of_week?: number[];
   completion_start_time?: string | null;
   completion_end_time?: string | null;
@@ -62,14 +69,23 @@ export interface CompleteResult {
   leveled_up: boolean;
   new_level: number;
   pet_health: number;
+  pet_happiness: number;
+  pet_hunger: number;
+  pet_energy: number;
+  pet_cleanliness: number;
   pet_total_habits_completed: number;
   pet_is_fainted: boolean;
+  completed_count: number;
+  target_count: number;
+  completed_today: boolean;
 }
 
 export interface CompletionHistoryEntry {
   id: string;
   completed_on: string;
   completed_at: string;
+  completion_count: number;
+  target_count: number;
   xp_earned: number;
   coins_earned: number;
 }
@@ -78,7 +94,7 @@ const HABIT_COLUMNS = `
   id, user_id, name, description, category, frequency, days_of_week,
   to_char(completion_start_time, 'HH24:MI:SS') AS completion_start_time,
   to_char(completion_end_time,   'HH24:MI:SS') AS completion_end_time,
-  is_active, sort_order, created_at
+  target_count, is_active, sort_order, created_at
 `;
 
 // ============================================================
@@ -102,8 +118,16 @@ export async function listForToday(userId: string): Promise<HabitWithStatus[]> {
   if (todayHabits.length === 0) return [];
 
   const habitIds = todayHabits.map((h) => h.id);
-  const { rows: completions } = await pool.query<{ habit_id: string; completed_on: string }>(
-    `SELECT habit_id, completed_on::text AS completed_on
+  const { rows: completions } = await pool.query<{
+    habit_id: string;
+    completed_on: string;
+    completion_count: number;
+    target_count: number;
+  }>(
+    `SELECT habit_id,
+            completed_on::text AS completed_on,
+            completion_count,
+            target_count
        FROM habit_completions
       WHERE user_id = $1
         AND habit_id = ANY($2::uuid[])
@@ -112,20 +136,34 @@ export async function listForToday(userId: string): Promise<HabitWithStatus[]> {
   );
 
   const byHabit = new Map<string, Set<string>>();
+  const todayProgress = new Map<string, { completion_count: number; target_count: number }>();
   for (const row of completions) {
-    let set = byHabit.get(row.habit_id);
-    if (!set) {
-      set = new Set<string>();
-      byHabit.set(row.habit_id, set);
+    if (row.completion_count >= row.target_count) {
+      let set = byHabit.get(row.habit_id);
+      if (!set) {
+        set = new Set<string>();
+        byHabit.set(row.habit_id, set);
+      }
+      set.add(row.completed_on);
     }
-    set.add(row.completed_on);
+    if (row.completed_on === todayStr) {
+      todayProgress.set(row.habit_id, {
+        completion_count: row.completion_count,
+        target_count: row.target_count,
+      });
+    }
   }
 
   return todayHabits.map((habit) => {
     const dates = byHabit.get(habit.id) ?? new Set<string>();
+    const progress = todayProgress.get(habit.id);
+    const todayTarget = progress?.target_count ?? habit.target_count;
+    const completedCount = progress?.completion_count ?? 0;
     return {
       ...habit,
-      completed_today: dates.has(todayStr),
+      completed_today: completedCount >= todayTarget,
+      completed_count: completedCount,
+      today_target_count: todayTarget,
       current_streak: computeHabitStreak(habit, dates, today),
     };
   });
@@ -145,8 +183,16 @@ export async function listAll(userId: string): Promise<HabitWithStatus[]> {
   if (habits.length === 0) return [];
 
   const habitIds = habits.map((h) => h.id);
-  const { rows: completions } = await pool.query<{ habit_id: string; completed_on: string }>(
-    `SELECT habit_id, completed_on::text AS completed_on
+  const { rows: completions } = await pool.query<{
+    habit_id: string;
+    completed_on: string;
+    completion_count: number;
+    target_count: number;
+  }>(
+    `SELECT habit_id,
+            completed_on::text AS completed_on,
+            completion_count,
+            target_count
        FROM habit_completions
       WHERE user_id = $1
         AND habit_id = ANY($2::uuid[])
@@ -155,20 +201,34 @@ export async function listAll(userId: string): Promise<HabitWithStatus[]> {
   );
 
   const byHabit = new Map<string, Set<string>>();
+  const todayProgress = new Map<string, { completion_count: number; target_count: number }>();
   for (const row of completions) {
-    let set = byHabit.get(row.habit_id);
-    if (!set) {
-      set = new Set<string>();
-      byHabit.set(row.habit_id, set);
+    if (row.completion_count >= row.target_count) {
+      let set = byHabit.get(row.habit_id);
+      if (!set) {
+        set = new Set<string>();
+        byHabit.set(row.habit_id, set);
+      }
+      set.add(row.completed_on);
     }
-    set.add(row.completed_on);
+    if (row.completed_on === todayStr) {
+      todayProgress.set(row.habit_id, {
+        completion_count: row.completion_count,
+        target_count: row.target_count,
+      });
+    }
   }
 
   return habits.map((habit) => {
     const dates = byHabit.get(habit.id) ?? new Set<string>();
+    const progress = todayProgress.get(habit.id);
+    const todayTarget = progress?.target_count ?? habit.target_count;
+    const completedCount = progress?.completion_count ?? 0;
     return {
       ...habit,
-      completed_today: dates.has(todayStr),
+      completed_today: completedCount >= todayTarget,
+      completed_count: completedCount,
+      today_target_count: todayTarget,
       current_streak: computeHabitStreak(habit, dates, today),
     };
   });
@@ -217,8 +277,8 @@ export async function create(userId: string, input: CreateHabitInput): Promise<H
   const { rows } = await pool.query<HabitRow>(
     `INSERT INTO habits
        (user_id, name, description, category, frequency, days_of_week,
-        completion_start_time, completion_end_time)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::time, $8::time)
+        completion_start_time, completion_end_time, target_count)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::time, $8::time, $9)
      RETURNING ${HABIT_COLUMNS}`,
     [
       userId,
@@ -229,6 +289,7 @@ export async function create(userId: string, input: CreateHabitInput): Promise<H
       input.days_of_week ? JSON.stringify(input.days_of_week) : null,
       input.completion_start_time ?? null,
       input.completion_end_time ?? null,
+      input.target_count ?? 1,
     ],
   );
   return rows[0];
@@ -264,6 +325,10 @@ export async function update(
   if (input.frequency !== undefined) {
     sets.push(`frequency = $${i++}`);
     values.push(input.frequency);
+  }
+  if (input.target_count !== undefined) {
+    sets.push(`target_count = $${i++}`);
+    values.push(input.target_count);
   }
   if (input.days_of_week !== undefined) {
     sets.push(`days_of_week = $${i++}::jsonb`);
@@ -353,19 +418,33 @@ export async function complete(userId: string, habitId: string): Promise<Complet
   const habit = await getOwned(userId, habitId);
 
   const today = toIsoDate(new Date());
-
-  const { rows: existing } = await pool.query<{ id: string }>(
-    `SELECT id FROM habit_completions
-      WHERE habit_id = $1 AND completed_on = $2::date`,
-    [habitId, today],
-  );
-  if (existing.length > 0) {
-    throw new HttpError(409, 'ALREADY_COMPLETED', 'Habit already completed today');
-  }
+  const configuredTarget = normalizeTargetCount(habit.target_count);
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    const { rows: completionRows } = await client.query<{
+      id: string;
+      completion_count: number;
+      target_count: number;
+    }>(
+      `SELECT id, completion_count, target_count
+         FROM habit_completions
+        WHERE habit_id = $1
+          AND user_id = $2
+          AND completed_on = $3::date
+        FOR UPDATE`,
+      [habitId, userId, today],
+    );
+    const existingCompletion = completionRows[0] ?? null;
+    const targetCount = normalizeTargetCount(existingCompletion?.target_count ?? configuredTarget);
+    const currentCount = existingCompletion?.completion_count ?? 0;
+    if (currentCount >= targetCount) {
+      throw new HttpError(409, 'ALREADY_COMPLETED', 'Habit already completed today');
+    }
+    const nextCount = Math.min(targetCount, currentCount + 1);
+    const completedToday = nextCount >= targetCount;
 
     // Streak state (locked for the duration of the tx).
     const { rows: streakRows } = await client.query<{
@@ -383,6 +462,60 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       throw new Error('Streaks row missing for user');
     }
     const s = streakRows[0];
+
+    if (!completedToday) {
+      try {
+        if (existingCompletion) {
+          await client.query(
+            `UPDATE habit_completions
+                SET completion_count = $1,
+                    completed_at = NOW()
+              WHERE id = $2`,
+            [nextCount, existingCompletion.id],
+          );
+        } else {
+          await client.query(
+            `INSERT INTO habit_completions
+               (habit_id, user_id, completed_on, completion_count, target_count, xp_earned, coins_earned)
+             VALUES ($1, $2, $3::date, $4, $5, 0, 0)`,
+            [habitId, userId, today, nextCount, targetCount],
+          );
+        }
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          throw new HttpError(409, 'PROGRESS_CONFLICT', 'Progress was already logged. Try again.');
+        }
+        throw err;
+      }
+
+      const pet = await getPetSnapshot(client, userId);
+      const { rows: currentUserRows } = await client.query<{ level: number }>(
+        `SELECT level FROM users WHERE id = $1`,
+        [userId],
+      );
+      if (currentUserRows.length === 0) throw new Error('User not found');
+
+      await client.query('COMMIT');
+      return {
+        xp_earned: 0,
+        coins_earned: 0,
+        new_streak: s.current_streak,
+        longest_streak: s.longest_streak,
+        item_dropped: null,
+        leveled_up: false,
+        new_level: currentUserRows[0].level,
+        pet_health: pet.health,
+        pet_happiness: pet.happiness,
+        pet_hunger: pet.hunger,
+        pet_energy: pet.energy,
+        pet_cleanliness: pet.cleanliness,
+        pet_total_habits_completed: pet.total_habits_completed,
+        pet_is_fainted: pet.is_fainted,
+        completed_count: nextCount,
+        target_count: targetCount,
+        completed_today: false,
+      };
+    }
 
     // Compute new streak.
     let newStreak: number;
@@ -419,22 +552,34 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       [newStreak, newLongest, newFreezeCount, today, userId],
     );
 
-    const xpEarned = 10 + newStreak * 2;
-    const coinsEarned = 5;
+    const xpEarned = computeHabitXp(newStreak, habit.frequency);
+    const coinsEarned = computeHabitCoins(newStreak, habit.frequency);
 
-    try {
+    if (existingCompletion) {
       await client.query(
-        `INSERT INTO habit_completions
-           (habit_id, user_id, completed_on, xp_earned, coins_earned)
-         VALUES ($1, $2, $3::date, $4, $5)`,
-        [habitId, userId, today, xpEarned, coinsEarned],
+        `UPDATE habit_completions
+            SET completion_count = $1,
+                completed_at = NOW(),
+                xp_earned = $2,
+                coins_earned = $3
+          WHERE id = $4`,
+        [nextCount, xpEarned, coinsEarned, existingCompletion.id],
       );
-    } catch (err) {
-      // Concurrent duplicate completion (UNIQUE habit_id, user_id, completed_on).
-      if (isUniqueViolation(err)) {
-        throw new HttpError(409, 'ALREADY_COMPLETED', 'Habit already completed today');
+    } else {
+      try {
+        await client.query(
+          `INSERT INTO habit_completions
+             (habit_id, user_id, completed_on, completion_count, target_count, xp_earned, coins_earned)
+           VALUES ($1, $2, $3::date, $4, $5, $6, $7)`,
+          [habitId, userId, today, nextCount, targetCount, xpEarned, coinsEarned],
+        );
+      } catch (err) {
+        // Concurrent duplicate completion (UNIQUE habit_id, user_id, completed_on).
+        if (isUniqueViolation(err)) {
+          throw new HttpError(409, 'ALREADY_COMPLETED', 'Habit already completed today');
+        }
+        throw err;
       }
-      throw err;
     }
 
     const itemDropped = await rollItemDrop(client, userId, habit.category, newStreak);
@@ -467,12 +612,80 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       [newXp, newLevel, coinsEarned, newStreak, newLongest, today, userId],
     );
 
-    const pet = await applyHabitCompletionEffects(client, userId, newStreak);
+    const pet = await applyHabitCompletionEffects(client, userId, newStreak, habit.category);
+
+    if (itemDropped) {
+      await client.query(
+        `INSERT INTO notifications (user_id, type, content, metadata)
+         VALUES ($1, 'item_drop', $2, $3::jsonb)`,
+        [
+          userId,
+          `You found ${itemDropped.name}`,
+          JSON.stringify({
+            item_id: itemDropped.id,
+            item_name: itemDropped.name,
+            item_type: itemDropped.type,
+            rarity: itemDropped.rarity,
+          }),
+        ],
+      );
+    }
+
+    if (leveledUp) {
+      await client.query(
+        `INSERT INTO notifications (user_id, type, content, metadata)
+         VALUES ($1, 'level_up', $2, $3::jsonb)`,
+        [
+          userId,
+          `You reached Level ${newLevel}`,
+          JSON.stringify({ new_level: newLevel }),
+        ],
+      );
+    }
+
+    await recordActivity(client, userId, 'habit_completed', {
+      habit_id: habitId,
+      habit_name: habit.name,
+      category: habit.category,
+      new_streak: newStreak,
+      completed_count: nextCount,
+      target_count: targetCount,
+      xp_earned: xpEarned,
+      coins_earned: coinsEarned,
+      item_dropped: itemDropped
+        ? {
+            item_id: itemDropped.id,
+            item_name: itemDropped.name,
+            item_type: itemDropped.type,
+            rarity: itemDropped.rarity,
+          }
+        : null,
+    });
+
+    if (leveledUp) {
+      await recordActivity(client, userId, 'level_up', {
+        new_level: newLevel,
+        xp: newXp,
+      });
+    }
 
     await client.query('COMMIT');
 
+    try {
+      await emitActivityUpdated(userId);
+    } catch (err) {
+      console.error('activity_updated emit failed:', err);
+    }
+
     if (leveledUp) {
       emitToUser(userId, 'level_up', { new_level: newLevel });
+    }
+    if (itemDropped) {
+      emitToUser(userId, 'item_dropped', {
+        item_id: itemDropped.id,
+        item_name: itemDropped.name,
+        rarity: itemDropped.rarity,
+      });
     }
 
     // Best-effort fanout to friends; failures don't roll back the completion.
@@ -503,8 +716,15 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       leveled_up: leveledUp,
       new_level: newLevel,
       pet_health: pet.health,
+      pet_happiness: pet.happiness,
+      pet_hunger: pet.hunger,
+      pet_energy: pet.energy,
+      pet_cleanliness: pet.cleanliness,
       pet_total_habits_completed: pet.total_habits_completed,
       pet_is_fainted: pet.is_fainted,
+      completed_count: nextCount,
+      target_count: targetCount,
+      completed_today: true,
     };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -527,9 +747,11 @@ export async function getHistory(
     `SELECT id,
             to_char(completed_on, 'YYYY-MM-DD') AS completed_on,
             completed_at,
+            completion_count,
+            target_count,
             xp_earned,
             coins_earned
-       FROM habit_completions
+      FROM habit_completions
       WHERE habit_id = $1 AND user_id = $2
       ORDER BY completed_on DESC, completed_at DESC
       LIMIT 30`,
@@ -555,7 +777,54 @@ async function getOwned(userId: string, habitId: string): Promise<HabitRow> {
   return rows[0];
 }
 
+async function getPetSnapshot(client: PoolClient, userId: string): Promise<{
+  health: number;
+  happiness: number;
+  hunger: number;
+  energy: number;
+  cleanliness: number;
+  total_habits_completed: number;
+  is_fainted: boolean;
+}> {
+  const { rows } = await client.query<{
+    health: number;
+    happiness: number;
+    hunger: number;
+    energy: number;
+    cleanliness: number;
+    total_habits_completed: number;
+    is_fainted: boolean;
+  }>(
+    `SELECT health, happiness, hunger, energy, cleanliness, total_habits_completed, is_fainted
+       FROM pets
+      WHERE user_id = $1`,
+    [userId],
+  );
+  if (rows.length === 0) throw new Error('Pet not found');
+  return rows[0];
+}
+
 function isUniqueViolation(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false;
   return (err as { code?: string }).code === '23505';
+}
+
+function normalizeTargetCount(value: number): number {
+  return Math.min(24, Math.max(1, Math.floor(value)));
+}
+
+function computeHabitXp(streak: number, frequency: HabitFrequency): number {
+  const safeStreak = Math.max(0, Math.floor(streak));
+  const cadenceBonus = frequency === 'weekly' ? 5 : 0;
+  const streakBonus = Math.min(18, Math.floor(safeStreak / 2));
+  const milestoneBonus = safeStreak > 0 && safeStreak % 7 === 0 ? 6 : 0;
+  return 12 + cadenceBonus + streakBonus + milestoneBonus;
+}
+
+function computeHabitCoins(streak: number, frequency: HabitFrequency): number {
+  const safeStreak = Math.max(0, Math.floor(streak));
+  const cadenceBonus = frequency === 'weekly' ? 4 : 0;
+  const streakBonus = Math.min(8, Math.floor(safeStreak / 3));
+  const milestoneBonus = safeStreak > 0 && safeStreak % 7 === 0 ? 5 : 0;
+  return 7 + cadenceBonus + streakBonus + milestoneBonus;
 }

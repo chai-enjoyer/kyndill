@@ -7,9 +7,10 @@ interface ModalProps {
   title?: string;
   children: ReactNode;
   describedBy?: string;
+  wide?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, children, describedBy }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, describedBy, wide = false }: ModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export function Modal({ isOpen, onClose, title, children, describedBy }: ModalPr
       />
       <div
         ref={contentRef}
-        className="modal__content"
+        className={`modal__content ${wide ? 'modal__content--wide' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}

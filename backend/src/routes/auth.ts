@@ -3,21 +3,59 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import { validate } from '../middleware/validate';
 import * as authService from '../services/authService';
+import {
+  getEmailValidationMessage,
+  getPasswordValidationMessages,
+  normalizeEmail,
+} from '../lib/credentials';
 
 const router = Router();
 
-const registerSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  display_name: z
-    .string()
-    .trim()
-    .min(2, 'Display name must be at least 2 characters')
-    .max(60, 'Display name must be at most 60 characters'),
+const emailSchema = z
+  .string()
+  .transform(normalizeEmail)
+  .superRefine((email, ctx) => {
+    const message = getEmailValidationMessage(email);
+    if (message) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message,
+      });
+    }
+  });
+
+const strongPasswordSchema = z.string().superRefine((password, ctx) => {
+  for (const message of getPasswordValidationMessages(password)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message,
+    });
+  }
 });
 
+const registerSchema = z
+  .object({
+    email: emailSchema,
+    password: strongPasswordSchema,
+    password_confirmation: z.string().min(1, 'Repeat your password'),
+    display_name: z
+      .string()
+      .trim()
+      .min(2, 'Display name must be at least 2 characters')
+      .max(60, 'Display name must be at most 60 characters'),
+  })
+  .superRefine((input, ctx) => {
+    if (input.password_confirmation !== input.password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passwords do not match',
+        path: ['password_confirmation'],
+      });
+    }
+  });
+
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(1, 'Password is required'),
 });
 

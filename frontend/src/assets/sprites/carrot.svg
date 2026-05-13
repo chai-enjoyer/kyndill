@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="carrot-body" x1="34" y1="31" x2="74" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F0A35E"/>
+      <stop offset="1" stop-color="#C8723A"/>
+    </linearGradient>
+    <linearGradient id="carrot-leaf" x1="35" y1="9" x2="76" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#92B775"/>
+      <stop offset="1" stop-color="#5A855A"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="54" cy="91" rx="25" ry="6" fill="#34251F18"/>
+  <path d="M49 31c-10-8-15-17-12-27 10 2 18 10 20 24 3-12 11-20 23-21 1 12-7 22-21 26-8 3-9 1-10-2Z" fill="url(#carrot-leaf)"/>
+  <path d="M35 35c10-8 28-8 38 0-1 22-9 45-19 64-10-19-18-42-19-64Z" fill="url(#carrot-body)"/>
+  <path d="M45 49h16M48 63h16M52 77h10" fill="none" stroke="#A85831" stroke-width="5" stroke-linecap="round" opacity=".55"/>
+  <path d="M45 39c8-4 17-4 24 0" fill="none" stroke="#F7C18A" stroke-width="5" stroke-linecap="round" opacity=".58"/>
+</svg>

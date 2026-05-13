@@ -1,11 +1,11 @@
-// PLACEHOLDER: Replace with final pet sprites when delivered.
+// PLACEHOLDER: Replace with final pet artist assets when delivered.
 // Geometric stand-ins per species; mood swaps eye/mouth paths only. Colors
 // here are placeholders supplied in the foundation brief; they are not
 // design-token-aligned because the final art will supersede them.
 
 import type { CSSProperties } from 'react';
 
-export type PetSpecies = 'blob' | 'cube' | 'sphere' | 'pyramid';
+export type PetSpecies = 'star' | 'cube' | 'sphere' | 'pyramid';
 export type PetMood = 'happy' | 'neutral' | 'sad';
 
 interface PlaceholderPetProps {
@@ -17,14 +17,14 @@ interface PlaceholderPetProps {
 }
 
 const SPECIES_COLORS: Record<PetSpecies, string> = {
-  blob: '#7A9B76',
+  star: '#7A9B76',
   cube: '#D4A574',
   sphere: '#C17B68',
   pyramid: '#8BA3B5',
 };
 
 const FACE_OFFSET: Record<PetSpecies, number> = {
-  blob: 0,
+  star: 0,
   cube: 0,
   sphere: 0,
   pyramid: 20,
@@ -58,8 +58,8 @@ export function PlaceholderPet({
 
 function renderShape(species: PetSpecies, color: string) {
   switch (species) {
-    case 'blob':
-      return <rect x="20" y="20" width="120" height="120" rx="60" fill={color} />;
+    case 'star':
+      return <polygon points="80,18 96,58 139,61 106,88 117,131 80,108 43,131 54,88 21,61 64,58" fill={color} />;
     case 'cube':
       return <rect x="20" y="20" width="120" height="120" rx="22" fill={color} />;
     case 'sphere':

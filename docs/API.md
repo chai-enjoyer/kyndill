@@ -1,383 +1,586 @@
-# API reference
+# API Reference
 
-HTTP and WebSocket contract for the Kyndill backend. The full set of v1 routes is implemented across auth, habits, pet, shop, inventory, social, focus, leaderboard, and notifications. The `/api/user` surface (profile read/update + public profile lookup) is the only group still returning `501`.
+HTTP and WebSocket contract for the current Kyndill backend. All route groups listed here are implemented: auth, habits, pet, shop, inventory, social, focus, leaderboard, notifications, user profile, feedback, progress, and recovery.
 
 ## Base URL
 
 - Local: `http://localhost:3000`
-- Production: TBD
+- Production: planned Google Cloud API origin; set in the frontend with `VITE_API_URL`.
 
 ## Conventions
 
 - All requests and responses are JSON.
 - Timestamps are ISO 8601 in UTC; dates are `YYYY-MM-DD`.
-- IDs are UUIDs (string).
-- Authentication is via JSON Web Tokens passed as `Authorization: Bearer <token>`. Tokens are signed with HS256 and expire after 7 days.
-- Errors follow the shape:
-  ```json
-  { "error": { "code": "STRING_CODE", "message": "Human readable" } }
-  ```
-- Validation errors include an `issues` array describing each failing field.
+- IDs are UUID strings.
+- Authentication uses JWT bearer tokens: `Authorization: Bearer <token>`.
+- Tokens are signed with HS256 and expire after 7 days.
+- Validation errors return `400 VALIDATION_FAILED` and include an `issues` array.
+- Standard error shape:
 
-## Authentication scope
+```json
+{ "error": { "code": "STRING_CODE", "message": "Human readable" } }
+```
 
-Public endpoints (no token required):
+## Authentication Scope
+
+Public endpoints:
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/google`
 
-Every other endpoint under `/api/*` requires a valid bearer token. Missing or expired tokens return `401 UNAUTHORIZED`.
+Every other `/api/*` endpoint requires a valid bearer token. Missing or expired tokens return `401 UNAUTHORIZED`.
 
 ## Health
 
-| Method | Path      | Auth | Description           |
-| ------ | --------- | ---- | --------------------- |
-| GET    | `/health` | no   | Service liveness probe (returns `{ "status": "ok" }`). |
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/health` | no | Liveness probe. Returns `{ "status": "ok" }`. |
 
 ## Auth (`/api/auth`)
 
-JWT auth uses HS256 with a 7-day expiry. Tokens carry only `sub` (user id) plus standard `iat` / `exp` claims.
+### POST `/register`
 
-### POST `/register` (public)
+Creates an email/password account. The username is generated from the email local part; collisions append a random suffix. New users start with 20 coins and two streak freezes.
 
-Create a local-credentials account. The username is generated from the email's local part; collisions append a 6-char random suffix.
-
-Body: `{ email, password, display_name }`. `201 Created` returns `{ token, user: { id, email, display_name, level, xp, coins } }`. `400 VALIDATION_FAILED`, `409 EMAIL_TAKEN`.
-
-### POST `/login` (public)
-
-Body: `{ email, password }`. `200 OK` with the same shape as `/register`. `401 INVALID_CREDENTIALS` is returned for any auth failure to prevent enumeration.
-
-### POST `/google` (public)
-
-Body: `{ credential }` where `credential` is the Google ID token. `200 OK` with the same shape. `401 INVALID_GOOGLE_TOKEN`, `409 EMAIL_TAKEN`, `500 SERVER_MISCONFIGURED`.
-
-### POST `/logout` (auth)
-
-`204 No Content`. Stateless; the client discards its token.
-
-### GET `/me` (auth)
-
-Returns `{ id, email, display_name, username, level, xp, coins, streak_current, streak_longest, avatar_url, visibility }`.
-
-## Habits (`/api/habits`, all auth)
-
-`days_of_week` is an array of weekday integers, Sunday = 0 through Saturday = 6. Time fields use `HH:MM` or `HH:MM:SS`. Dates are `YYYY-MM-DD` in UTC.
-
-### GET `/` (auth)
-
-Lists today's active habits with per-habit `completed_today` and `current_streak`.
-
-### POST `/` (auth)
-
-Body: `{ name, description?, category, frequency, days_of_week?, completion_start_time?, completion_end_time? }`. Weekly habits require non-empty `days_of_week`. `201 Created` returns the habit row.
-
-### POST `/reorder` (auth)
-
-Body: top-level array of `{ id, sort_order }`. `204` on success, `404 NOT_FOUND` if any id is not owned.
-
-### PUT `/:id` (auth)
-
-Partial update; only provided fields are written. `200 OK` returns the updated row.
-
-### DELETE `/:id` (auth)
-
-Soft delete (`is_active = false`). `204`.
-
-### POST `/:id/complete` (auth)
-
-Single transaction wrapping streak recompute, completion insert with final xp/coins, item drop, level recompute, user/pet updates, and a best-effort socket fanout to friends. Emits `level_up` to the actor when they cross a level threshold. `200 OK` returns `{ xp_earned, coins_earned, new_streak, longest_streak, item_dropped, leveled_up, new_level, pet_health, pet_total_habits_completed, pet_is_fainted }`. `409 ALREADY_COMPLETED` if the habit was already marked complete today.
-
-### GET `/:id/history` (auth)
-
-Last 30 completions, newest first.
-
-## Pet (`/api/pet`, all auth)
-
-### GET `/` (auth)
-
-Full pet row with `equipped` keyed by slot. Includes `initialized_at` (null until the user has finished onboarding).
-
-### POST `/initialize` (auth)
-
-Sets the species and name for the user's pet and marks `initialized_at`. The trigger that fires on user creation seeds a default blob named `Kyndill`; this endpoint updates that row exactly once. Subsequent calls fail with `409 ALREADY_INITIALIZED`.
-
-Body: `{ species, name }`. `species` is one of `blob` / `cube` / `sphere` / `pyramid`. `name` is trimmed and must be 1..20 characters.
-
-`200 OK` returns the updated pet row. Errors: `400 VALIDATION_FAILED`, `400 INVALID_NAME`, `404 PET_NOT_FOUND`, `409 ALREADY_INITIALIZED`.
-
-### POST `/feed` (auth)
-
-Body: `{ item_id }`. Transactional apply-consumable; bumps the stat named by the item's `effect_stat` (whitelisted to `health`/`happiness`/`hunger`/`energy`/`cleanliness`) capped at 100, decrements inventory. Returns the updated pet row.
-
-### POST `/equip` (auth)
-
-Body: `{ item_id }`. UPSERTs equipped_cosmetics on `(user_id, slot)`; inventory is not consumed.
-
-### POST `/unequip` (auth)
-
-Body: `{ slot }`. `204`.
-
-## Shop (`/api/shop`, all auth)
-
-### GET `/` (auth)
-
-Items grouped by type. Cosmetics carry `owned`. Includes the caller's coin balance.
-
-### POST `/purchase` (auth)
-
-Body: `{ item_id }`. Transactional. `402 INSUFFICIENT_COINS`, `404 ITEM_NOT_FOUND`.
-
-### POST `/buy-streak-freeze` (auth)
-
-Deducts 50 coins, increments `streaks.freeze_count` (cap 3). No inventory row is added; the counter is the protection mechanism. `402 INSUFFICIENT_COINS`, `409 FREEZE_LIMIT_REACHED`.
-
-## Inventory (`/api/inventory`, all auth)
-
-### GET `/` (auth)
-
-`{ consumables, cosmetics, streak_freezes }`. Cosmetics carry `equipped_slot` (string or null).
-
-## Social (`/api/social`, all auth)
-
-### GET `/friends` (auth)
-
-Returns the caller's accepted friends.
+Body:
 
 ```json
 {
-  "friends": [
-    {
-      "id": "<uuid>",
-      "display_name": "Iris",
-      "username": "iris",
-      "avatar_url": null,
-      "level": 4,
-      "streak_current": 7
-    }
-  ]
+  "email": "iris@example.com",
+  "password": "StrongPass1!",
+  "password_confirmation": "StrongPass1!",
+  "display_name": "Iris"
 }
 ```
 
-`streak_current` is `null` when the friend's visibility is `private`. All other fields are visible regardless.
+Password requirements: 10 to 72 characters, at least one lowercase letter, one uppercase letter, one number, and one symbol.
 
-### POST `/friends/request` (auth)
+Returns `201 Created`:
 
-Body: `{ username }`. Validates not-self, not-already-friends, no inbound or outbound pending request. UPSERTs on `(from_user_id, to_user_id)` so a previously rejected request can be re-issued. Emits `friend_request` to the recipient.
+```json
+{
+  "token": "<jwt>",
+  "user": {
+    "id": "<uuid>",
+    "email": "iris@example.com",
+    "display_name": "Iris",
+    "level": 1,
+    "xp": 0,
+    "coins": 20
+  }
+}
+```
 
-`201 Created`:
+Errors: `400 VALIDATION_FAILED`, `409 EMAIL_TAKEN`.
+
+### POST `/login`
+
+Body: `{ "email": "iris@example.com", "password": "StrongPass1!" }`.
+
+Returns `200 OK` with `{ token, user }`. Invalid credentials return `401 INVALID_CREDENTIALS`.
+
+### POST `/google`
+
+Body: `{ "credential": "<google-id-token>" }`.
+
+The backend verifies the token against `GOOGLE_CLIENT_ID`. If a local account already exists with the same verified email, Google sign-in links that account to the Google subject id.
+
+Returns `200 OK` with `{ token, user }`.
+
+Errors: `401 INVALID_GOOGLE_TOKEN`, `409 EMAIL_TAKEN`, `500 SERVER_MISCONFIGURED`.
+
+### POST `/logout`
+
+Auth required. Returns `204 No Content`. JWT auth is stateless; the client discards its token.
+
+### GET `/me`
+
+Auth required. Returns the current auth user:
 
 ```json
 {
   "id": "<uuid>",
-  "from_user_id": "<uuid>",
-  "from_username": "you",
-  "from_display_name": "You",
-  "from_avatar_url": null,
-  "status": "pending",
-  "created_at": "<timestamptz>"
+  "email": "iris@example.com",
+  "display_name": "Iris",
+  "username": "iris",
+  "level": 3,
+  "xp": 240,
+  "coins": 64,
+  "streak_current": 5,
+  "streak_longest": 9,
+  "avatar_url": null,
+  "visibility": "friends"
 }
 ```
 
-Errors:
+## Habits (`/api/habits`)
 
-- `404 USER_NOT_FOUND`
-- `400 INVALID_TARGET` — self-request.
-- `409 ALREADY_FRIENDS`
-- `409 REQUEST_PENDING` — outbound pending.
-- `409 REQUEST_PENDING_INBOUND` — the other party already sent you one.
+`days_of_week` uses Sunday = 0 through Saturday = 6. Time fields are `HH:MM` or `HH:MM:SS`.
 
-### GET `/friends/requests` (auth)
+### GET `/`
 
-Pending incoming requests with sender details.
+Query:
 
-### PUT `/friends/request/:id` (auth)
+- `scope=today` or omitted: active habits expected today
+- `scope=all`: all habits for the Habits page
 
-Body: `{ action: "accept" | "reject" }`. Validates the request's `to_user_id` matches the caller. On accept: status `accepted` and both directional rows inserted into `friends`. On reject: status `rejected`. Emits `friend_request_responded` to the original sender.
+Returns `{ "habits": [...] }`.
 
-`200 OK`: `{ id, status }`. `404 NOT_FOUND`, `409 ALREADY_RESPONDED`.
+### POST `/`
 
-### DELETE `/friends/:friend_id` (auth)
+Creates a habit.
 
-Removes both directional edges. `204`.
-
-### POST `/gifts/send` (auth)
-
-Body: `{ friend_id, item_id, message? }`. Transactional: cooldown check (1 per friend per day), inventory decrement, `gifts` insert, `notifications` insert for the recipient, `activity_events` insert for the sender. Emits `gift_received` to the recipient. Consumables only.
-
-`201 Created`:
+Body:
 
 ```json
 {
-  "gift": {
-    "id": "<uuid>",
-    "from_user_id": "<uuid>",
-    "to_user_id": "<uuid>",
-    "item_id": "<uuid>",
-    "message": "for the rough week",
-    "is_accepted": false,
-    "sent_at": "<timestamptz>"
-  },
-  "item": { "id": "<uuid>", "name": "Apple", "image_url": "/items/apple.svg" }
+  "name": "Drink water",
+  "description": "A few check-ins through the day",
+  "category": "Health",
+  "frequency": "daily",
+  "target_count": 4,
+  "days_of_week": [1, 2, 3, 4, 5],
+  "completion_start_time": "08:00",
+  "completion_end_time": "22:00"
 }
 ```
 
-Errors:
+Rules:
 
-- `404 NOT_FRIENDS`
-- `404 NOT_IN_INVENTORY`
-- `400 NOT_GIFTABLE` — item is not a consumable.
-- `429 GIFT_COOLDOWN` — caller already sent this friend a gift today.
+- `category`: `Health`, `Productivity`, `Social`, `Learning`, or `Wellness`
+- `frequency`: `daily` or `weekly`
+- weekly habits require at least one `days_of_week` value
+- `target_count`: `1..24`; values above 1 make the habit repeat within the day
 
-### POST `/gifts/:id/accept` (auth)
+Returns `201 Created` with the habit row.
 
-UPSERTs the gifted item into the recipient's inventory and flips `is_accepted`. Returns the updated gift row plus the recipient's full inventory listing.
+### POST `/reorder`
 
-`200 OK`: `{ gift, inventory: { consumables, cosmetics, streak_freezes } }`. `404 NOT_FOUND`, `409 ALREADY_ACCEPTED`.
+Body is a top-level array:
 
-### GET `/activity` (auth)
+```json
+[
+  { "id": "<uuid>", "sort_order": 0 },
+  { "id": "<uuid>", "sort_order": 1 }
+]
+```
 
-Last 20 activity events for the caller and their friends.
+Returns `204 No Content`.
+
+### PUT `/:id`
+
+Partial update for habit fields, including `is_active` and `sort_order`. Returns the updated habit row.
+
+### DELETE `/:id`
+
+Archives the habit by setting `is_active = false`. Returns `204 No Content`.
+
+### POST `/:id/complete`
+
+Completes or increments today's progress for a habit.
+
+The service runs a transaction that locks the habit, completion row, and streak row. If the habit has `target_count > 1`, intermediate check-ins update `completion_count` but do not award XP/coins until the target is reached.
+
+Final completion updates:
+
+- `habit_completions`
+- `streaks`
+- mirrored streak fields on `users`
+- `users.xp`, `users.level`, `users.coins`
+- pet stats and derived health
+- possible item drop and inventory
+- notifications and activity events
+- socket events for the actor and friends
+
+Returns:
 
 ```json
 {
-  "activity": [
-    {
-      "user_id": "<uuid>",
-      "user_display_name": "Iris",
-      "type": "gift_sent",
-      "metadata": { "to_user_id": "<uuid>", "item_id": "<uuid>", "item_name": "Apple" },
-      "created_at": "<timestamptz>"
-    }
-  ]
+  "xp_earned": 18,
+  "coins_earned": 12,
+  "new_streak": 5,
+  "longest_streak": 9,
+  "item_dropped": null,
+  "leveled_up": false,
+  "new_level": 3,
+  "pet_health": 76,
+  "pet_happiness": 88,
+  "pet_hunger": 72,
+  "pet_energy": 80,
+  "pet_cleanliness": 91,
+  "pet_total_habits_completed": 42,
+  "pet_is_fainted": false,
+  "completed_count": 4,
+  "target_count": 4,
+  "completed_today": true
 }
 ```
 
-Today only `gift_sent` is written. Habit completions, purchases, friendships, and level-ups will start emitting activity events in a follow-up prompt.
+Errors: `404 NOT_FOUND`, `409 ALREADY_COMPLETED`, `409 PROGRESS_CONFLICT`.
 
-## Focus (`/api/focus`, all auth)
+### GET `/:id/history`
 
-### POST `/complete` (auth)
+Returns `{ "completions": [...] }` for the last 30 completion days.
 
-Body: `{ duration_minutes, rating? }`. `duration_minutes` is 1..120; `rating` is 1..5 if provided. Flat reward of 10 coins. `201 Created` returns `{ session_id, coins_earned, total_focus_time }` where `total_focus_time` is the running total across all sessions.
+## Pet (`/api/pet`)
 
-Errors:
+### GET `/`
 
-- `400 INVALID_DURATION`
-- `400 INVALID_RATING`
+Returns the full pet row plus equipped cosmetics keyed by slot. Reading pet state applies passive daily stat decay and recalculates health.
 
-### GET `/stats` (auth)
+### POST `/initialize`
+
+Sets pet species/name and marks onboarding complete.
+
+Body:
+
+```json
+{ "species": "star", "name": "Kyndill" }
+```
+
+`species` is `star`, `cube`, `sphere`, or `pyramid`. Name must be 1..20 characters.
+
+Returns the updated pet. Subsequent calls return `409 ALREADY_INITIALIZED`.
+
+### PATCH `/name`
+
+Renames the pet.
+
+Body: `{ "name": "Nova" }`.
+
+Returns the updated pet.
+
+### POST `/feed`
+
+Body: `{ "item_id": "<uuid>" }`.
+
+Consumes a consumable item from inventory and applies its effect to one pet stat. Returns the updated pet.
+
+### POST `/equip`
+
+Body: `{ "item_id": "<uuid>" }`.
+
+Equips an owned cosmetic in its slot. Valid slots are `hat`, `accessory`, `glasses`, `scarf`, `badge`, and `charm`. Returns `{ "equipped": ... }`.
+
+### POST `/unequip`
+
+Body: `{ "slot": "hat" }`.
+
+Returns `204 No Content`.
+
+## Shop (`/api/shop`)
+
+### GET `/`
+
+Returns the caller's coin balance, streak-freeze count, and shop items grouped by type.
 
 ```json
 {
-  "total_sessions": 12,
-  "total_minutes": 380,
-  "average_rating": 4.25,
-  "sessions_this_week": 3
+  "coins": 64,
+  "freeze_count": 2,
+  "items": {
+    "consumable": [],
+    "cosmetic": [],
+    "streak_freeze": []
+  }
 }
 ```
 
-`average_rating` is `null` when the user has no rated sessions.
+Cosmetics include `owned`. Only sprite-backed cosmetics are returned.
 
-## Leaderboard (`/api/leaderboard`, all auth)
+### POST `/purchase`
 
-### GET `/friends` (auth)
+Body: `{ "item_id": "<uuid>" }`.
 
-Caller plus accepted friends, sorted by `level DESC, xp DESC`, limit 50. Includes the caller so they can see their own rank inside their circle.
+Deducts coins, adds the item to inventory, and records a purchase activity event.
+
+Returns `{ "new_coin_balance": 29, "item": { ... } }`.
+
+Errors: `402 INSUFFICIENT_COINS`, `404 ITEM_NOT_FOUND`, `404 ITEM_NOT_AVAILABLE`, `409 ALREADY_OWNED`.
+
+### POST `/buy-streak-freeze`
+
+Buys one streak freeze for 35 coins. The counter is stored in `streaks.freeze_count` and is capped at 3.
+
+Returns `{ "new_freeze_count": 3, "new_coin_balance": 29 }`.
+
+Errors: `402 INSUFFICIENT_COINS`, `409 FREEZE_LIMIT_REACHED`.
+
+## Inventory (`/api/inventory`)
+
+### GET `/`
+
+Returns:
 
 ```json
 {
-  "entries": [
-    {
-      "rank": 1,
-      "id": "<uuid>",
-      "display_name": "Iris",
-      "username": "iris",
-      "avatar_url": null,
-      "level": 5,
-      "xp": 1240,
-      "streak_current": 9
-    }
-  ]
+  "consumables": [],
+  "cosmetics": [],
+  "streak_freezes": []
 }
 ```
 
-### GET `/global` (auth)
+Inventory entries include item metadata, `quantity`, and `equipped_slot`.
 
-Top 100 users by `level DESC, xp DESC`, filtered to `visibility = 'public'`. PRODUCT.md principle #3 ("private by default, social by invitation") makes this an opt-in surface: users must set their visibility to `public` to appear here.
+## Social (`/api/social`)
 
-## Notifications (`/api/notifications`, all auth)
+### GET `/friends`
 
-### GET `/` (auth)
+Returns accepted friends. `level` is public; `streak_current` is `null` when the friend's visibility is private.
 
-Unread notifications for the caller, newest first.
+### POST `/friends/request`
+
+Body: `{ "username": "iris" }`.
+
+Validates not-self, not already friends, and no pending request in either direction. Inserts or reissues a pending request and notifies the recipient.
+
+Returns `201 Created` with the friend request.
+
+### GET `/friends/requests`
+
+Returns pending incoming requests.
+
+### GET `/friends/requests/sent`
+
+Returns pending outgoing requests.
+
+### PUT `/friends/request/:id`
+
+Body: `{ "action": "accept" }` or `{ "action": "reject" }`.
+
+Accepting inserts both directed `friends` rows and records a friendship activity event. Returns `{ "id": "<uuid>", "status": "accepted" }`.
+
+### DELETE `/friends/:friend_id`
+
+Deletes both directed friendship edges. Returns `204 No Content`.
+
+### POST `/gifts/send`
+
+Body:
 
 ```json
 {
-  "notifications": [
-    {
-      "id": "<uuid>",
-      "type": "gift_received",
-      "content": "You received Apple as a gift",
-      "metadata": {
-        "gift_id": "<uuid>",
-        "item_id": "<uuid>",
-        "item_name": "Apple",
-        "from_user_id": "<uuid>",
-        "message": null
-      },
-      "is_read": false,
-      "created_at": "<timestamptz>"
-    }
-  ]
+  "friend_id": "<uuid>",
+  "item_id": "<uuid>",
+  "message": "For today"
 }
 ```
 
-Today, only the gift flow writes notifications. Friend-request acceptance and level-ups emit socket events but do not persist a notification row (deliberate; will revisit if offline-recovery matters).
+Only consumables can be gifted. The sender can send one gift per friend per day.
 
-### PUT `/read` (auth)
+Returns `201 Created` with `{ gift, item }`.
 
-Marks every unread notification for the caller as read. `204 No Content`.
+### POST `/gifts/:id/accept`
 
-## User (`/api/user`, all auth)
+Adds the gifted item to the recipient inventory and marks the gift accepted.
 
-| Method | Path        | Status | Description                                              |
-| ------ | ----------- | ------ | -------------------------------------------------------- |
-| GET    | `/profile`  | 501    | Caller's own profile.                                    |
-| PATCH  | `/profile`  | 501    | Update display name, bio, avatar, visibility.            |
-| GET    | `/:username`| 501    | Public profile lookup by username (respects visibility). |
+Returns `{ "gift": { ... }, "inventory": { ... } }`.
 
-(Notification endpoints previously stubbed under `/api/user/notifications/*` have moved to the top-level `/api/notifications` router.)
+### GET `/activity`
+
+Returns the last 30 activity events for the caller and accepted friends. Habit names are redacted from friend-visible habit completion metadata.
+
+Activity types currently include `habit_completed`, `purchase`, `friendship`, `level_up`, and `gift_sent`.
+
+## Focus (`/api/focus`)
+
+### POST `/complete`
+
+Body: `{ "duration_minutes": 25, "rating": 4 }`.
+
+`duration_minutes` is `1..120`. `rating` is optional and must be `1..5`. Coins scale with session length from 4 to 36.
+
+Returns `201 Created`:
+
+```json
+{
+  "session_id": "<uuid>",
+  "coins_earned": 8,
+  "total_focus_time": 180
+}
+```
+
+### GET `/stats`
+
+Returns total sessions, total minutes, average rating, and sessions in the last 7 days.
+
+### PATCH `/:id/rating`
+
+Body: `{ "rating": 5 }`.
+
+Updates the rating for one owned focus session. Returns `204 No Content`.
+
+## Leaderboard (`/api/leaderboard`)
+
+### GET `/friends`
+
+Returns the caller plus accepted friends, sorted by `level DESC, xp DESC`, limit 50.
+
+### GET `/global`
+
+Returns the top 100 users with `visibility = 'public'`, sorted by `level DESC, xp DESC`.
+
+## Notifications (`/api/notifications`)
+
+### GET `/`
+
+Returns unread notifications newest first. Notification preferences stored in `users.notification_prefs` are applied when listing friend-request and gift notifications.
+
+Notification types currently written include friend requests, friend request responses, gifts, item drops, and level-ups.
+
+### PUT `/read`
+
+Marks all unread notifications for the caller as read. Returns `204 No Content`.
+
+## User (`/api/user`)
+
+### GET `/search?q=...`
+
+Searches users by username prefix. Requires at least 2 characters. Returns `{ "users": [...] }`.
+
+### GET `/profile`
+
+Returns the caller's full profile, including profile fields, stats, auth provider, notification preferences, and research consent.
+
+### PATCH `/profile`
+
+Partial profile update.
+
+Allowed fields:
+
+- `display_name`
+- `username`
+- `bio`
+- `visibility`
+- `avatar_url` as an image data URL or URL
+- `notification_prefs`
+- `research_consent`
+
+Returns the updated profile.
+
+### POST `/change-password`
+
+Email/password accounts only.
+
+Body:
+
+```json
+{
+  "current_password": "OldPass1!",
+  "new_password": "NewStrongPass1!"
+}
+```
+
+New password uses the same strength rules as registration and cannot equal the current password.
+
+Returns `204 No Content`.
+
+### DELETE `/account`
+
+Body: `{ "confirmation": "DELETE" }`.
+
+Deletes the user row; user-owned records are removed through cascading foreign keys. Returns `204 No Content`.
+
+### GET `/friends/:id/profile`
+
+Returns a friend's profile plus pet summary. The friend's level is public. Streak and total habit history are included only when visibility allows it.
+
+### GET `/:username`
+
+Looks up a user by exact username using the search endpoint's result shape.
+
+## Feedback (`/api/feedback`)
+
+### POST `/`
+
+Stores explicit feedback or habit-completion mood feedback.
+
+Body:
+
+```json
+{
+  "habit_id": "<uuid>",
+  "context": "habit_completion",
+  "mood": "calm",
+  "rating": 4,
+  "note": "This felt doable today."
+}
+```
+
+`habit_id`, `mood`, `rating`, and `note` are optional. Returns `201 Created` with `{ "ok": true }`.
+
+## Progress (`/api/progress`)
+
+### GET `/summary`
+
+Returns generated behavioral metrics for the Progress page:
+
+- total habits created and active habits
+- total check-ins and completed habit-days
+- active days
+- current and longest streak
+- focus minutes and sessions
+- friends, gifts sent, gifts received
+- feedback and recovery reflection counts
+- 7-day completion summary
+- most consistent habit over the last 30 days
+- category breakdown
+
+## Recovery (`/api/recovery`)
+
+### GET `/prompt`
+
+Returns `{ "prompt": null }` or a gentle missed-habit recovery prompt with `missed_on` and up to four missed habits.
+
+### POST `/reflection`
+
+Body:
+
+```json
+{
+  "missed_on": "2026-05-12",
+  "habit_id": "<uuid>",
+  "mood": "tired",
+  "note": "Schedule was too tight.",
+  "skipped": false
+}
+```
+
+Stores a recovery reflection in `feedback_events`. Returns `201 Created` with `{ "ok": true }`.
 
 ## WebSocket
 
-Mounted at the same origin via socket.io. The handshake middleware verifies a JWT supplied via one of: `socket.handshake.auth.token`, the `token` query parameter, or an `Authorization: Bearer ...` header. Unauthenticated handshakes are rejected with `UNAUTHORIZED`. Authenticated sockets join a room named `user:<id>`.
+socket.io is mounted on the same backend server. The handshake accepts a JWT from:
 
-### Client to server
+- `socket.handshake.auth.token`
+- `token` query parameter
+- `Authorization: Bearer <token>` header
 
-| Event | Payload | Description           |
-| ----- | ------- | --------------------- |
-| _none yet_ |     |                       |
+Authenticated sockets join `user:<id>`.
 
-### Server to client
+### Server To Client Events
 
-| Event                        | Recipient                | Payload                                                                                   | Description                                                          |
-| ---------------------------- | ------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `habit_completed`            | Each friend of the actor | `{ user_id, habit_id, habit_name, new_streak, leveled_up }`                              | Emitted when a friend completes a habit.                              |
-| `level_up`                   | The actor                | `{ new_level }`                                                                           | Emitted to the user themselves when a completion crosses a level.    |
-| `friend_request`             | The recipient            | `{ request_id, from_user_id, from_username, from_display_name, from_avatar_url }`        | Emitted on `POST /api/social/friends/request`.                       |
-| `friend_request_responded`   | The original sender      | `{ request_id, status, responder_id, responder_username, responder_display_name }`       | Emitted on `PUT /api/social/friends/request/:id`.                    |
-| `gift_received`              | The recipient            | `{ gift_id, from_user_id, from_username, from_display_name, item_id, item_name, item_image_url, message }` | Emitted on `POST /api/social/gifts/send`.            |
+| Event | Recipient | Payload summary |
+| --- | --- | --- |
+| `habit_completed` | Friends of actor | `user_id`, `habit_id`, `habit_name`, `new_streak`, `leveled_up` |
+| `level_up` | Actor | `new_level` |
+| `item_dropped` | Actor | `item_id`, `item_name`, `rarity` |
+| `friend_request` | Recipient | request id and sender profile fields |
+| `friend_request_responded` | Original sender | request id, status, responder profile fields |
+| `gift_received` | Recipient | gift id, sender fields, item fields, optional message |
+| `activity_updated` | Actor and friends | `actor_user_id` |
 
-All server emits are best-effort: if delivery fails, the underlying database transaction is not rolled back.
+All server emits are best effort. Socket delivery failure does not roll back the database transaction.
 
-## Cron jobs
+## Cron Jobs
 
-`cronService.startCronJobs` registers a daily rollover at `0 0 * * *` UTC. For each user whose last completion is before today:
+`cronService.startCronJobs` registers a daily rollover at `0 0 * * *` UTC.
 
-- gap == 1 day: streak stays intact.
-- gap > 1 day with `freeze_count > 0`: consume one freeze, streak holds.
-- gap > 1 day with `freeze_count == 0`: streak resets to 0.
+For users whose last completion date is before today:
 
-After streak resolution, pet health is set to `MIN(current_streak * 5, 100)` (cron uses the literal formula; the in-app completion path ratchets up). When the resulting health is 0, `is_fainted` is set to true. Each user is processed in its own transaction; a single failure does not abort the sweep.
+- gap of 1 day: streak remains intact
+- gap greater than 1 day with freezes available: one freeze is consumed and streak is preserved
+- gap greater than 1 day without freezes: streak resets to 0
+
+The cron job recalculates pet health with the same `derivePetHealth` model used by pet reads: streak momentum plus happiness, hunger, energy, and cleanliness. Each user is processed in its own transaction so one failure does not abort the entire sweep.

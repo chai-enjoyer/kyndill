@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { api } from '../lib/api';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
-import { PlaceholderPet } from '../components/common/PlaceholderPet';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { extractMessage } from '../hooks/useSocial';
@@ -15,7 +14,16 @@ const PRESETS = [
 ] as const;
 
 type PresetKey = (typeof PRESETS)[number]['key'];
-type Ambient = 'rain' | 'forest' | 'cafe' | 'white' | 'off';
+
+const AMBIENT_OPTIONS = [
+  { key: 'rain', label: 'Rain', src: '/ambient/rain.mp3' },
+  { key: 'forest', label: 'Forest', src: '/ambient/forest.mp3' },
+  { key: 'night', label: 'Night', src: '/ambient/night.mp3' },
+  { key: 'brown', label: 'Brown noise', src: '/ambient/brown_noise.mp3' },
+  { key: 'off', label: 'Off', src: null },
+] as const;
+
+type Ambient = (typeof AMBIENT_OPTIONS)[number]['key'];
 
 export function FocusPage() {
   const [preset, setPreset] = useState<PresetKey>('pomodoro');
@@ -23,9 +31,11 @@ export function FocusPage() {
   const [remaining, setRemaining] = useState(25 * 60);
   const [running, setRunning] = useState(false);
   const [ambient, setAmbient] = useState<Ambient>('off');
+  const [volume, setVolume] = useState(0.45);
   const [complete, setComplete] = useState<{ sessionId: string; coins: number; minutes: number } | null>(null);
-  const audioRef = useRef<AudioContext | null>(null);
-  const noiseRef = useRef<AudioScheduledSourceNode | OscillatorNode | null>(null);
+  const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
+  const completionAudioRef = useRef<AudioContext | null>(null);
+  const audioErrorShownRef = useRef(false);
   const completedRef = useRef(false);
   const { mergeUser, user } = useAuthContext();
   const { showToast } = useToastContext();
@@ -55,14 +65,32 @@ export function FocusPage() {
   }, [running]);
 
   useEffect(() => {
-    startAmbient(ambient, audioRef, noiseRef);
-    return () => stopAmbient(noiseRef);
-  }, [ambient]);
+    if (!running || ambient === 'off') {
+      stopAmbientAudio(ambientAudioRef);
+      return;
+    }
+    void playAmbientAudio(ambient, volume, ambientAudioRef).catch(() => {
+      if (audioErrorShownRef.current) return;
+      audioErrorShownRef.current = true;
+      showToast('Browser blocked ambient audio. Press Start again after choosing a sound.', 'error');
+    });
+  }, [ambient, running, showToast, volume]);
+
+  useEffect(() => {
+    return () => {
+      stopAmbientAudio(ambientAudioRef);
+      void completionAudioRef.current?.close();
+    };
+  }, []);
 
   async function finishSession(rating?: number) {
     if (completedRef.current) return;
     completedRef.current = true;
     setRunning(false);
+    stopAmbientAudio(ambientAudioRef);
+    if (ambient === 'off') {
+      void playCompletionChime(completionAudioRef, volume);
+    }
     try {
       const minutes = Math.max(1, Math.round(totalSeconds / 60));
       const { data } = await api.post<{ session_id: string; coins_earned: number; total_focus_time: number }>('/api/focus/complete', {
@@ -77,13 +105,33 @@ export function FocusPage() {
     }
   }
 
+  function toggleRunning() {
+    setRunning((prev) => {
+      const next = !prev;
+      if (next) {
+        primeCompletionAudio(completionAudioRef);
+        audioErrorShownRef.current = false;
+      } else {
+        stopAmbientAudio(ambientAudioRef);
+      }
+      return next;
+    });
+  }
+
+  function resetTimer() {
+    setRunning(false);
+    stopAmbientAudio(ambientAudioRef);
+    setRemaining(totalSeconds);
+    completedRef.current = false;
+  }
+
   return (
     <section className="page focus-page">
       <div className="focus-shell">
-        <div className="focus-pet">
-          {/* PLACEHOLDER: Replace with final focus companion art when delivered. */}
-          <PlaceholderPet species="blob" mood="neutral" size={92} />
-        </div>
+        <header className="focus-header">
+          <p className="page__eyebrow">Focus</p>
+          <h1>Focus session</h1>
+        </header>
         <div className="focus-presets">
           {PRESETS.map((item) => (
             <button key={item.key} type="button" className={preset === item.key ? 'is-active' : ''} onClick={() => setPreset(item.key)}>
@@ -102,16 +150,37 @@ export function FocusPage() {
           <div className="focus-timer">{formatTime(remaining)}</div>
         </div>
         <div className="focus-actions">
-          <Button variant="primary" onClick={() => setRunning((prev) => !prev)}>{running ? 'Pause' : 'Start'}</Button>
-          <Button variant="secondary" onClick={() => { setRunning(false); setRemaining(totalSeconds); }}>Reset</Button>
+          <Button variant="primary" onClick={toggleRunning}>{running ? 'Pause' : 'Start'}</Button>
+          <Button variant="secondary" onClick={resetTimer}>Reset</Button>
         </div>
-        <div className="ambient-controls" aria-label="Ambient sound">
-          {(['rain', 'forest', 'cafe', 'white', 'off'] as Ambient[]).map((item) => (
-            <button key={item} type="button" className={ambient === item ? 'is-active' : ''} onClick={() => setAmbient(item)} title={item}>
-              {ambientIcon(item)}
-            </button>
-          ))}
-        </div>
+        <section className="focus-audio" aria-label="Focus audio">
+          <div className="ambient-controls" aria-label="Ambient sound">
+            {AMBIENT_OPTIONS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={ambient === item.key ? 'is-active' : ''}
+                onClick={() => setAmbient(item.key)}
+                title={item.label}
+                aria-pressed={ambient === item.key}
+              >
+                <AmbientIcon type={item.key} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+          <label className="focus-volume">
+            <span>Volume</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(volume * 100)}
+              onChange={(event) => setVolume(Number(event.target.value) / 100)}
+            />
+            <strong>{Math.round(volume * 100)}%</strong>
+          </label>
+        </section>
       </div>
 
       {complete && (
@@ -179,33 +248,105 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs}`;
 }
 
-function ambientIcon(item: Ambient): string {
-  return { rain: 'Rain', forest: 'Forest', cafe: 'Cafe', white: 'Noise', off: 'Off' }[item];
+function getAmbientSource(ambient: Ambient): string | null {
+  return AMBIENT_OPTIONS.find((item) => item.key === ambient)?.src ?? null;
 }
 
-function stopAmbient(sourceRef: MutableRefObject<AudioScheduledSourceNode | OscillatorNode | null>) {
-  try { sourceRef.current?.stop(); } catch { /* already stopped */ }
-  sourceRef.current = null;
+function stopAmbientAudio(audioRef: MutableRefObject<HTMLAudioElement | null>) {
+  if (!audioRef.current) return;
+  audioRef.current.pause();
+  audioRef.current.currentTime = 0;
 }
 
-function startAmbient(
+async function playAmbientAudio(
   ambient: Ambient,
-  contextRef: MutableRefObject<AudioContext | null>,
-  sourceRef: MutableRefObject<AudioScheduledSourceNode | OscillatorNode | null>,
-) {
-  stopAmbient(sourceRef);
-  if (ambient === 'off' || typeof window === 'undefined') return;
+  volume: number,
+  audioRef: MutableRefObject<HTMLAudioElement | null>,
+): Promise<void> {
+  const src = getAmbientSource(ambient);
+  if (!src) {
+    stopAmbientAudio(audioRef);
+    return;
+  }
+  const current = audioRef.current;
+  const needsNewAudio = !current || current.dataset.src !== src;
+  const audio = needsNewAudio ? new Audio(src) : current;
+  if (needsNewAudio) {
+    stopAmbientAudio(audioRef);
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.dataset.src = src;
+    audioRef.current = audio;
+  }
+  audio.volume = clamp(volume, 0, 1);
+  await audio.play();
+}
+
+function getAudioContext(ref: MutableRefObject<AudioContext | null>): AudioContext | null {
+  if (typeof window === 'undefined') return null;
   const Ctor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctor) return;
-  const ctx = contextRef.current ?? new Ctor();
-  contextRef.current = ctx;
+  if (!Ctor) return null;
+  ref.current ??= new Ctor();
+  return ref.current;
+}
+
+function primeCompletionAudio(ref: MutableRefObject<AudioContext | null>) {
+  const ctx = getAudioContext(ref);
+  if (ctx?.state === 'suspended') void ctx.resume();
+}
+
+async function playCompletionChime(ref: MutableRefObject<AudioContext | null>, volume: number) {
+  const ctx = getAudioContext(ref);
+  if (!ctx) return;
+  if (ctx.state === 'suspended') await ctx.resume();
+  const now = ctx.currentTime;
   const gain = ctx.createGain();
-  gain.gain.value = ambient === 'white' ? 0.015 : 0.02;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(0.16 * clamp(volume, 0.15, 1), now + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
   gain.connect(ctx.destination);
-  const osc = ctx.createOscillator();
-  osc.type = ambient === 'rain' ? 'sine' : ambient === 'forest' ? 'triangle' : 'sawtooth';
-  osc.frequency.value = ambient === 'cafe' ? 140 : ambient === 'forest' ? 220 : 90;
-  osc.connect(gain);
-  osc.start();
-  sourceRef.current = osc;
+  [523.25, 659.25, 783.99].forEach((frequency, index) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = frequency;
+    osc.connect(gain);
+    osc.start(now + index * 0.09);
+    osc.stop(now + 0.72 + index * 0.05);
+  });
+}
+
+function AmbientIcon({ type }: { type: Ambient }) {
+  if (type === 'off') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 4l16 16M8 9v6h3l4 3V6l-3.2 2.4" />
+      </svg>
+    );
+  }
+  if (type === 'rain') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7.5 17.5l-1 2M12 17.5l-1 2M16.5 17.5l-1 2M7 14h9.5a3.5 3.5 0 0 0 .7-6.9A5.1 5.1 0 0 0 7.1 8.2 3 3 0 0 0 7 14z" />
+      </svg>
+    );
+  }
+  if (type === 'forest') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 19V9M4.5 14.5L7 11l2.5 3.5M12 20V6M8.8 14.4L12 9l3.2 5.4M17 19v-8M14.8 15.2L17 12l2.2 3.2" />
+      </svg>
+    );
+  }
+  if (type === 'night') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M17.8 15.3A7.1 7.1 0 0 1 8.7 6.2 7.2 7.2 0 1 0 17.8 15.3zM17 5.5h.01M20 9h.01" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 12h2M8 12h2M12 12h2M16 12h2M20 12h.01M6 8h2M10 8h2M14 8h2M18 8h.01M6 16h2M10 16h2M14 16h2M18 16h.01" />
+    </svg>
+  );
 }

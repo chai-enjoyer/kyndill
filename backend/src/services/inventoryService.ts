@@ -1,4 +1,5 @@
 import { pool } from '../db/pool';
+import { isSpriteBackedCosmetic } from './catalog';
 
 export interface InventoryEntry {
   id: string;
@@ -41,7 +42,7 @@ export async function listForUser(userId: string): Promise<InventoryListing> {
 
   for (const entry of rows) {
     if (entry.type === 'consumable') listing.consumables.push(entry);
-    else if (entry.type === 'cosmetic') listing.cosmetics.push(entry);
+    else if (entry.type === 'cosmetic' && isSpriteBackedCosmetic(entry.name)) listing.cosmetics.push(entry);
     else if (entry.type === 'streak_freeze') listing.streak_freezes.push(entry);
   }
 

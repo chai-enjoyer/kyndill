@@ -15,10 +15,13 @@ export interface HabitWithStatus {
   days_of_week: number[] | null;
   completion_start_time: string | null;
   completion_end_time: string | null;
+  target_count: number;
   is_active: boolean;
   sort_order: number;
   created_at: string;
   completed_today: boolean;
+  completed_count: number;
+  today_target_count: number;
   current_streak: number;
 }
 
@@ -42,8 +45,15 @@ export interface CompleteResult {
   leveled_up: boolean;
   new_level: number;
   pet_health: number;
+  pet_happiness: number;
+  pet_hunger: number;
+  pet_energy: number;
+  pet_cleanliness: number;
   pet_total_habits_completed: number;
   pet_is_fainted: boolean;
+  completed_count: number;
+  target_count: number;
+  completed_today: boolean;
 }
 
 export interface HabitFormInput {
@@ -51,6 +61,7 @@ export interface HabitFormInput {
   description?: string | null;
   category: HabitCategory;
   frequency: HabitFrequency;
+  target_count?: number;
   days_of_week?: number[];
   completion_start_time?: string | null;
   completion_end_time?: string | null;
@@ -85,22 +96,41 @@ export function useHabits(options: UseHabitsOptions = {}) {
     refetch();
   }, [refetch]);
 
-  // Optimistic complete: bumps completed_today + per-habit streak immediately,
-  // rolls back on failure. The functional setState captures the previous list
-  // so the callback identity stays stable across renders.
+  // Optimistic complete: increments today's progress immediately, only marking
+  // the habit complete when the configured target is reached.
   const complete = useCallback(
     async (habitId: string): Promise<CompleteResult> => {
       let snapshot: HabitWithStatus[] = [];
       setHabits((prev) => {
         snapshot = prev;
-        return prev.map((h) =>
-          h.id === habitId
-            ? { ...h, completed_today: true, current_streak: h.current_streak + 1 }
-            : h,
-        );
+        return prev.map((h) => {
+          if (h.id !== habitId) return h;
+          const target = Math.max(1, h.today_target_count || h.target_count || 1);
+          const nextCount = Math.min(target, h.completed_count + 1);
+          const completed = nextCount >= target;
+          return {
+            ...h,
+            completed_count: nextCount,
+            today_target_count: target,
+            completed_today: completed,
+            current_streak: completed && !h.completed_today ? h.current_streak + 1 : h.current_streak,
+          };
+        });
       });
       try {
         const { data } = await api.post<CompleteResult>(`/api/habits/${habitId}/complete`);
+        setHabits((prev) =>
+          prev.map((h) =>
+            h.id === habitId
+              ? {
+                  ...h,
+                  completed_count: data.completed_count,
+                  today_target_count: data.target_count,
+                  completed_today: data.completed_today,
+                }
+              : h,
+          ),
+        );
         return data;
       } catch (err) {
         setHabits(snapshot);

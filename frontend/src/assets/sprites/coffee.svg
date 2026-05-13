@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="coffee-cup" x1="27" y1="33" x2="78" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F2E2C6"/>
+      <stop offset="1" stop-color="#D4B486"/>
+    </linearGradient>
+    <linearGradient id="coffee-fill" x1="31" y1="34" x2="75" y2="45" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7B5137"/>
+      <stop offset="1" stop-color="#4C3327"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="54" cy="91" rx="27" ry="6" fill="#34251F18"/>
+  <path d="M29 37h47v32c0 15-10 25-23 25S30 84 30 69V37Z" fill="url(#coffee-cup)"/>
+  <path d="M75 49h8c8 0 14 6 14 13s-6 13-14 13h-8V64h7c3 0 5-1 5-3s-2-4-5-4h-7V49Z" fill="#D4B486"/>
+  <ellipse cx="53" cy="38" rx="24" ry="8" fill="url(#coffee-fill)"/>
+  <path d="M42 22c-4-6 5-9 1-15M55 22c-4-6 5-9 1-15M68 24c-3-5 4-8 1-12" fill="none" stroke="#A68062" stroke-width="5" stroke-linecap="round" opacity=".62"/>
+  <path d="M39 53v16c0 7 4 12 10 14" fill="none" stroke="#FFF7E8" stroke-width="6" stroke-linecap="round" opacity=".54"/>
+</svg>

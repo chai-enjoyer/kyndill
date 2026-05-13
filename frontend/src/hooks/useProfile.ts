@@ -18,6 +18,14 @@ export interface ProfileData {
   total_habits: number;
   total_focus_minutes: number;
   auth_provider: 'email' | 'google';
+  notification_prefs: NotificationPrefs;
+  research_consent: boolean;
+}
+
+export interface NotificationPrefs {
+  friendRequests: boolean;
+  gifts: boolean;
+  focusReminders: boolean;
 }
 
 export function useProfile() {

@@ -9,6 +9,7 @@ CREATE TABLE habits (
   days_of_week           JSONB,
   completion_start_time  TIME,
   completion_end_time    TIME,
+  target_count           INTEGER NOT NULL DEFAULT 1 CHECK (target_count BETWEEN 1 AND 24),
   is_active              BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order             INTEGER NOT NULL DEFAULT 0,
   created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),

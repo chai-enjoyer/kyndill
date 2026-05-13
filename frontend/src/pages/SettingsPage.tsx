@@ -2,42 +2,103 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from '../components/common/Button';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
+import { PasswordRequirements } from '../components/common/PasswordRequirements';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useProfile } from '../hooks/useProfile';
 import { extractMessage } from '../hooks/useSocial';
+import { api } from '../lib/api';
+import { getPasswordValidationMessage, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../lib/credentials';
 import { applyTheme, getStoredTheme, type Theme } from '../lib/utils';
 
-const PREF_KEY = 'kyndill_notification_prefs';
 type NotificationPrefs = {
   friendRequests: boolean;
   gifts: boolean;
   focusReminders: boolean;
 };
 
+type PasswordFieldErrors = {
+  current?: string;
+  next?: string;
+};
+
+const DEFAULT_PREFS: NotificationPrefs = {
+  friendRequests: true,
+  gifts: true,
+  focusReminders: true,
+};
+
+const FAQ_ITEMS = [
+  {
+    question: 'How does pet health work?',
+    answer: 'Health combines care stats and streak momentum. There is no guaranteed base, so low hunger, energy, cleanliness, or happiness can pull health down even if you have progress.',
+  },
+  {
+    question: 'Do pet stats change over time?',
+    answer: 'Yes. Hunger, energy, cleanliness, and happiness decay a little each day you return, which gives consumables and daily habit check-ins a purpose.',
+  },
+  {
+    question: 'What happens when I complete a habit?',
+    answer: 'You get XP, coins, streak progress, pet stat changes, and sometimes an item drop. Early habits now pay enough for useful consumables quickly, while longer streaks add coin bonuses.',
+  },
+  {
+    question: 'How do I afford shop items?',
+    answer: 'New users start with 20 coins. Small consumables cost only a few coins, common cosmetics are reachable after several habit completions, and focus sessions are a steady way to earn extra coins.',
+  },
+  {
+    question: 'What stays private?',
+    answer: 'Your level is public so friends can recognize progress. Streak and total habit history still follow your profile visibility setting.',
+  },
+  {
+    question: 'What are streak freezes?',
+    answer: 'A streak freeze protects your streak after a missed day. New users start with two, and you can hold up to three.',
+  },
+] as const;
+
 export function SettingsPage() {
-  const { profile, isLoading, changePassword, deleteAccount } = useProfile();
+  const { profile, isLoading, save, changePassword, deleteAccount } = useProfile();
   const { logout } = useAuthContext();
   const { showToast } = useToastContext();
   const [theme, setTheme] = useState<Theme>(getStoredTheme());
-  const [prefs, setPrefs] = useState<NotificationPrefs>(() => readPrefs());
+  const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
+  const [researchConsent, setResearchConsent] = useState(false);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [passwordErrors, setPasswordErrors] = useState<PasswordFieldErrors>({});
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState('');
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    if (!profile) return;
+    setPrefs({ ...DEFAULT_PREFS, ...profile.notification_prefs });
+    setResearchConsent(profile.research_consent);
+  }, [profile]);
+
+  useEffect(() => {
     applyTheme(theme);
   }, [theme]);
 
-  useEffect(() => {
-    window.localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
-  }, [prefs]);
-
   async function submitPassword(event: FormEvent) {
     event.preventDefault();
+    const passwordIssue = getPasswordValidationMessage(newPassword);
+    if (!currentPassword) {
+      setPasswordErrors({ current: 'Current password is required.' });
+      return;
+    }
+    if (passwordIssue) {
+      setPasswordErrors({ next: passwordIssue });
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setPasswordErrors({ next: 'Choose a password different from your current one.' });
+      return;
+    }
+
+    setPasswordErrors({});
     setPasswordSaving(true);
     try {
       await changePassword(currentPassword, newPassword);
@@ -62,9 +123,54 @@ export function SettingsPage() {
     }
   }
 
+  async function submitFeedback(event: FormEvent) {
+    event.preventDefault();
+    if (!feedbackNote.trim()) return;
+    setFeedbackSaving(true);
+    try {
+      await api.post('/api/feedback', {
+        context: 'general_feedback',
+        note: feedbackNote.trim(),
+      });
+      setFeedbackNote('');
+      showToast('Feedback saved.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err, 'Could not save feedback.'), 'error');
+    } finally {
+      setFeedbackSaving(false);
+    }
+  }
+
+  async function updateNotificationPref(key: keyof NotificationPrefs, value: boolean) {
+    const next = { ...prefs, [key]: value };
+    setPrefs(next);
+    try {
+      await save({ notification_prefs: next });
+    } catch (err) {
+      setPrefs(prefs);
+      showToast(extractMessage(err, 'Could not save notification preference.'), 'error');
+    }
+  }
+
+  async function updateResearchConsent(value: boolean) {
+    setResearchConsent(value);
+    try {
+      await save({ research_consent: value });
+    } catch (err) {
+      setResearchConsent(!value);
+      showToast(extractMessage(err, 'Could not save consent setting.'), 'error');
+    }
+  }
+
   if (isLoading || !profile) {
     return <section className="page settings-page"><LoadingSkeleton width="100%" height={420} /></section>;
   }
+
+  const passwordRequirementsId = 'settings-new-password-requirements';
+  const currentPasswordErrorId = 'settings-current-password-error';
+  const newPasswordErrorId = 'settings-new-password-error';
+  const passwordIssue = getPasswordValidationMessage(newPassword);
+  const canSubmitPassword = Boolean(currentPassword) && !passwordIssue;
 
   return (
     <section className="page settings-page">
@@ -79,27 +185,103 @@ export function SettingsPage() {
           </label>
         </section>
         <section className="settings-card">
+          <h2>Account</h2>
+          <p className="text-muted">Signed in as {profile.email}.</p>
+          <Button variant="secondary" type="button" onClick={logout}>Sign out</Button>
+        </section>
+        <section className="settings-card settings-card--notifications">
           <h2>Notifications</h2>
           {(['friendRequests', 'gifts', 'focusReminders'] as const).map((key) => (
             <label key={key} className="switch settings-switch">
-              <input type="checkbox" checked={prefs[key]} onChange={(e) => setPrefs((prev) => ({ ...prev, [key]: e.target.checked }))} />
+              <input type="checkbox" checked={prefs[key]} onChange={(e) => updateNotificationPref(key, e.target.checked)} />
               <span className="switch__track" aria-hidden="true" />
               <span className="switch__label">{labelPref(key)}</span>
             </label>
           ))}
         </section>
+        <section className="settings-card settings-card--feedback">
+          <h2>Research and feedback</h2>
+          <p className="text-muted">Kyndill uses anonymized interaction records and optional feedback to evaluate engagement, usability, and motivational impact.</p>
+          <label className="switch settings-switch">
+            <input type="checkbox" checked={researchConsent} onChange={(e) => updateResearchConsent(e.target.checked)} />
+            <span className="switch__track" aria-hidden="true" />
+            <span className="switch__label">Participate in anonymized evaluation</span>
+          </label>
+          <form className="settings-feedback" onSubmit={submitFeedback}>
+            <textarea className="textarea" maxLength={1000} placeholder="Share feedback about Kyndill" value={feedbackNote} onChange={(e) => setFeedbackNote(e.target.value)} />
+            <Button variant="secondary" type="submit" disabled={feedbackSaving || !feedbackNote.trim()}>
+              {feedbackSaving ? 'Sending...' : 'Send feedback'}
+            </Button>
+          </form>
+        </section>
         {profile.auth_provider === 'email' && (
-          <section className="settings-card">
+          <section className="settings-card settings-card--password">
             <h2>Change password</h2>
-            <form className="settings-form" onSubmit={submitPassword}>
-              <input className="input" type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-              <input className="input" type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-              <Button variant="primary" type="submit" disabled={passwordSaving || !currentPassword || newPassword.length < 8}>
+            <form className="settings-form settings-form--password" onSubmit={submitPassword} noValidate>
+              <div className={`field ${passwordErrors.current ? 'field--error' : ''}`}>
+                <label className="field__label" htmlFor="settings-current-password">Current password</label>
+                <input
+                  id="settings-current-password"
+                  className="input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => {
+                    setCurrentPassword(e.target.value);
+                    setPasswordErrors({});
+                  }}
+                  aria-describedby={passwordErrors.current ? currentPasswordErrorId : undefined}
+                  aria-invalid={Boolean(passwordErrors.current) || undefined}
+                  required
+                />
+                {passwordErrors.current && (
+                  <p className="field__error" id={currentPasswordErrorId} role="alert">
+                    {passwordErrors.current}
+                  </p>
+                )}
+              </div>
+              <div className={`field ${passwordErrors.next ? 'field--error' : ''}`}>
+                <label className="field__label" htmlFor="settings-new-password">New password</label>
+                <input
+                  id="settings-new-password"
+                  className="input"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setPasswordErrors({});
+                  }}
+                  aria-describedby={`${passwordRequirementsId}${passwordErrors.next ? ` ${newPasswordErrorId}` : ''}`}
+                  aria-invalid={Boolean(passwordErrors.next) || undefined}
+                  minLength={PASSWORD_MIN_LENGTH}
+                  maxLength={PASSWORD_MAX_LENGTH}
+                  required
+                />
+                <PasswordRequirements id={passwordRequirementsId} password={newPassword} />
+                {passwordErrors.next && (
+                  <p className="field__error" id={newPasswordErrorId} role="alert">
+                    {passwordErrors.next}
+                  </p>
+                )}
+              </div>
+              <Button variant="primary" type="submit" disabled={passwordSaving || !canSubmitPassword}>
                 {passwordSaving ? 'Changing...' : 'Change password'}
               </Button>
             </form>
           </section>
         )}
+        <section className="settings-card settings-card--faq">
+          <h2>FAQ</h2>
+          <div className="faq-list">
+            {FAQ_ITEMS.map((item) => (
+              <details key={item.question} className="faq-item">
+                <summary>{item.question}</summary>
+                <p>{item.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
         <section className="settings-card settings-card--danger">
           <h2>Danger zone</h2>
           <p className="text-muted">Delete your account and all Kyndill data.</p>
@@ -120,16 +302,6 @@ export function SettingsPage() {
       )}
     </section>
   );
-}
-
-function readPrefs(): NotificationPrefs {
-  try {
-    const raw = window.localStorage.getItem(PREF_KEY);
-    if (raw) return { friendRequests: true, gifts: true, focusReminders: true, ...JSON.parse(raw) };
-  } catch {
-    // localStorage can be unavailable in private contexts.
-  }
-  return { friendRequests: true, gifts: true, focusReminders: true };
 }
 
 function labelPref(key: 'friendRequests' | 'gifts' | 'focusReminders'): string {

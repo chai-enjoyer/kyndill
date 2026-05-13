@@ -11,9 +11,18 @@ export interface NotificationRow {
 
 export async function listUnread(userId: string): Promise<NotificationRow[]> {
   const { rows } = await pool.query<NotificationRow>(
-    `SELECT id, type, content, metadata, is_read, created_at
-       FROM notifications
-      WHERE user_id = $1 AND is_read = FALSE
+    `SELECT n.id, n.type, n.content, n.metadata, n.is_read, n.created_at
+       FROM notifications n
+       JOIN users u ON u.id = n.user_id
+      WHERE n.user_id = $1
+        AND is_read = FALSE
+        AND CASE
+          WHEN n.type IN ('friend_request', 'friend_request_response') THEN
+            COALESCE((u.notification_prefs->>'friendRequests')::boolean, TRUE)
+          WHEN n.type IN ('gift_received', 'gift_sent') THEN
+            COALESCE((u.notification_prefs->>'gifts')::boolean, TRUE)
+          ELSE TRUE
+        END
       ORDER BY created_at DESC`,
     [userId],
   );

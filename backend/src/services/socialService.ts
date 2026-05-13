@@ -1,6 +1,12 @@
 import { pool } from '../db/pool';
 import { HttpError } from '../middleware/errorHandler';
 import { emitToUser } from '../socket/socketHandler';
+import {
+  emitActivityUpdated,
+  listForUser as listActivityForUser,
+  recordActivity,
+  type ActivityEntry,
+} from './activityService';
 import { listForUser as listInventory } from './inventoryService';
 import type { InventoryListing } from './inventoryService';
 
@@ -27,6 +33,16 @@ export interface FriendRequestDto {
   created_at: string;
 }
 
+export interface SentFriendRequestDto {
+  id: string;
+  to_user_id: string;
+  to_username: string;
+  to_display_name: string;
+  to_avatar_url: string | null;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
 export interface GiftDto {
   id: string;
   from_user_id: string;
@@ -45,14 +61,6 @@ export interface SendGiftResult {
 export interface AcceptGiftResult {
   gift: GiftDto;
   inventory: InventoryListing;
-}
-
-export interface ActivityEntry {
-  user_id: string;
-  user_display_name: string;
-  type: string;
-  metadata: Record<string, unknown>;
-  created_at: string;
 }
 
 // ============================================================
@@ -160,6 +168,21 @@ export async function sendFriendRequest(
   );
   const sender = senderRows[0] ?? { username: '', display_name: '', avatar_url: null };
 
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, content, metadata)
+     VALUES ($1, 'friend_request', $2, $3::jsonb)`,
+    [
+      toUserId,
+      `${sender.display_name || sender.username} sent you a friend request`,
+      JSON.stringify({
+        request_id: requestRow.id,
+        from_user_id: fromUserId,
+        from_username: sender.username,
+        from_display_name: sender.display_name,
+      }),
+    ],
+  );
+
   emitToUser(toUserId, 'friend_request', {
     request_id: requestRow.id,
     from_user_id: fromUserId,
@@ -191,6 +214,24 @@ export async function listFriendRequests(userId: string): Promise<FriendRequestD
        FROM friend_requests fr
        JOIN users u ON u.id = fr.from_user_id
       WHERE fr.to_user_id = $1 AND fr.status = 'pending'
+      ORDER BY fr.created_at DESC`,
+    [userId],
+  );
+  return rows;
+}
+
+export async function listSentFriendRequests(userId: string): Promise<SentFriendRequestDto[]> {
+  const { rows } = await pool.query<SentFriendRequestDto>(
+    `SELECT fr.id,
+            fr.to_user_id,
+            u.username       AS to_username,
+            u.display_name   AS to_display_name,
+            u.avatar_url     AS to_avatar_url,
+            fr.status,
+            fr.created_at
+       FROM friend_requests fr
+       JOIN users u ON u.id = fr.to_user_id
+      WHERE fr.from_user_id = $1 AND fr.status = 'pending'
       ORDER BY fr.created_at DESC`,
     [userId],
   );
@@ -245,6 +286,27 @@ export async function respondToFriendRequest(
          ON CONFLICT (user_id, friend_id) DO NOTHING`,
         [reqRow.from_user_id, userId],
       );
+
+      const { rows: pairRows } = await client.query<{
+        id: string;
+        username: string;
+        display_name: string;
+      }>(
+        `SELECT id, username, display_name
+           FROM users
+          WHERE id = ANY($1::uuid[])`,
+        [[userId, reqRow.from_user_id]],
+      );
+      const byId = new Map(pairRows.map((row) => [row.id, row]));
+      const friend = byId.get(reqRow.from_user_id);
+      const actor = byId.get(userId);
+      await recordActivity(client, userId, 'friendship', {
+        friend_id: reqRow.from_user_id,
+        friend_username: friend?.username ?? '',
+        friend_display_name: friend?.display_name ?? 'A friend',
+        actor_username: actor?.username ?? '',
+        actor_display_name: actor?.display_name ?? 'You',
+      });
     }
 
     await client.query('COMMIT');
@@ -264,6 +326,22 @@ export async function respondToFriendRequest(
   );
   const responder = responderRows[0] ?? { username: '', display_name: '' };
 
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, content, metadata)
+     VALUES ($1, 'friend_request_response', $2, $3::jsonb)`,
+    [
+      reqRow.from_user_id,
+      `${responder.display_name || responder.username} ${newStatus} your friend request`,
+      JSON.stringify({
+        request_id: requestId,
+        status: newStatus,
+        responder_id: userId,
+        responder_username: responder.username,
+        responder_display_name: responder.display_name,
+      }),
+    ],
+  );
+
   emitToUser(reqRow.from_user_id, 'friend_request_responded', {
     request_id: requestId,
     status: newStatus,
@@ -271,6 +349,12 @@ export async function respondToFriendRequest(
     responder_username: responder.username,
     responder_display_name: responder.display_name,
   });
+
+  if (action === 'accept') {
+    void emitActivityUpdated(userId).catch((err) => {
+      console.error('activity_updated emit failed:', err);
+    });
+  }
 
   return { id: requestId, status: newStatus };
 }
@@ -391,20 +475,16 @@ export async function sendGift(
       ],
     );
 
-    await client.query(
-      `INSERT INTO activity_events (user_id, type, metadata)
-       VALUES ($1, 'gift_sent', $2::jsonb)`,
-      [
-        fromUserId,
-        JSON.stringify({
-          to_user_id: toUserId,
-          item_id: itemId,
-          item_name: itemInfo.name,
-        }),
-      ],
-    );
+    await recordActivity(client, fromUserId, 'gift_sent', {
+      to_user_id: toUserId,
+      item_id: itemId,
+      item_name: itemInfo.name,
+    });
 
     await client.query('COMMIT');
+    void emitActivityUpdated(fromUserId).catch((err) => {
+      console.error('activity_updated emit failed:', err);
+    });
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -488,23 +568,6 @@ export async function acceptGift(userId: string, giftId: string): Promise<Accept
 // Activity feed
 // ============================================================
 
-// Activity events are currently inserted only by sendGift. Habit completions,
-// purchases, friendships, level-ups, etc. don't yet write to activity_events;
-// expanding this is intentional follow-up work.
 export async function listActivity(userId: string): Promise<ActivityEntry[]> {
-  const { rows } = await pool.query<ActivityEntry>(
-    `SELECT ae.user_id,
-            u.display_name AS user_display_name,
-            ae.type,
-            ae.metadata,
-            ae.created_at
-       FROM activity_events ae
-       JOIN users u ON u.id = ae.user_id
-      WHERE ae.user_id = $1
-         OR ae.user_id IN (SELECT friend_id FROM friends WHERE user_id = $1)
-      ORDER BY ae.created_at DESC
-      LIMIT 20`,
-    [userId],
-  );
-  return rows;
+  return listActivityForUser(userId);
 }

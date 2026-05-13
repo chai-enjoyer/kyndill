@@ -2,20 +2,46 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import * as userService from '../services/userService';
+import { getPasswordValidationMessages } from '../lib/credentials';
 
 const router = Router();
+
+const notificationPrefsSchema = z.object({
+  friendRequests: z.boolean(),
+  gifts: z.boolean(),
+  focusReminders: z.boolean(),
+});
+
+const avatarUrlSchema = z
+  .string()
+  .max(750_000)
+  .refine(
+    (value) =>
+      /^data:image\/(png|jpe?g|webp);base64,[a-zA-Z0-9+/=]+$/.test(value) ||
+      z.string().url().safeParse(value).success,
+    'Avatar must be an image upload or URL',
+  );
 
 const profileSchema = z.object({
   display_name: z.string().trim().min(2).max(60).optional(),
   username: z.string().trim().min(3).max(40).regex(/^[a-zA-Z0-9_-]+$/).optional(),
   bio: z.string().max(280).nullable().optional(),
   visibility: z.enum(['public', 'friends', 'private']).optional(),
-  avatar_url: z.string().url().nullable().optional(),
+  avatar_url: avatarUrlSchema.nullable().optional(),
+  notification_prefs: notificationPrefsSchema.optional(),
+  research_consent: z.boolean().optional(),
 });
 
 const passwordSchema = z.object({
   current_password: z.string().min(1),
-  new_password: z.string().min(8),
+  new_password: z.string().superRefine((password, ctx) => {
+    for (const message of getPasswordValidationMessages(password)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message,
+      });
+    }
+  }),
 });
 
 const deleteSchema = z.object({ confirmation: z.literal('DELETE') });

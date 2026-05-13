@@ -1,7 +1,9 @@
 import { pool } from '../db/pool';
 import { HttpError } from '../middleware/errorHandler';
+import { emitActivityUpdated, recordActivity } from './activityService';
+import { SPRITE_BACKED_COSMETICS, isSpriteBackedCosmetic } from './catalog';
 
-export const STREAK_FREEZE_PRICE = 50;
+export const STREAK_FREEZE_PRICE = 35;
 export const STREAK_FREEZE_MAX = 3;
 
 export interface ShopItem {
@@ -30,7 +32,11 @@ export interface ShopListing {
   };
 }
 
+let spriteCatalogReady = false;
+
 export async function listShop(userId: string): Promise<ShopListing> {
+  await ensureSpriteCosmetics();
+
   const [{ rows: items }, { rows: userRows }, { rows: ownedRows }, { rows: streakRows }] = await Promise.all([
     pool.query<ShopItem>(
       `SELECT id, name, type, rarity, price, effect_stat, effect_amount, image_url, category
@@ -61,6 +67,7 @@ export async function listShop(userId: string): Promise<ShopListing> {
 
   for (const item of items) {
     if (item.type === 'cosmetic') {
+      if (!isSpriteBackedCosmetic(item.name)) continue;
       listing.items.cosmetic.push({ ...item, owned: owned.has(item.id) });
     } else if (item.type === 'consumable') {
       listing.items.consumable.push(item);
@@ -70,6 +77,28 @@ export async function listShop(userId: string): Promise<ShopListing> {
   }
 
   return listing;
+}
+
+async function ensureSpriteCosmetics(): Promise<void> {
+  if (spriteCatalogReady) return;
+
+  for (const item of SPRITE_BACKED_COSMETICS) {
+    await pool.query(
+      `INSERT INTO items (name, type, rarity, price, effect_stat, effect_amount, image_url, category)
+       VALUES ($1, 'cosmetic', $2, $3, NULL, NULL, $4, $5)
+       ON CONFLICT (name) DO UPDATE SET
+         type = EXCLUDED.type,
+         rarity = EXCLUDED.rarity,
+         price = EXCLUDED.price,
+         effect_stat = EXCLUDED.effect_stat,
+         effect_amount = EXCLUDED.effect_amount,
+         image_url = EXCLUDED.image_url,
+         category = EXCLUDED.category`,
+      [item.name, item.rarity, item.price, item.image_url, item.category],
+    );
+  }
+
+  spriteCatalogReady = true;
 }
 
 export interface PurchaseResult {
@@ -91,6 +120,9 @@ export async function purchaseItem(userId: string, itemId: string): Promise<Purc
       throw new HttpError(404, 'ITEM_NOT_FOUND', 'Item does not exist');
     }
     const item = itemRows[0];
+    if (item.type === 'cosmetic' && !isSpriteBackedCosmetic(item.name)) {
+      throw new HttpError(404, 'ITEM_NOT_AVAILABLE', 'That cosmetic is not available');
+    }
 
     const { rows: userRows } = await client.query<{ coins: number }>(
       `SELECT coins FROM users WHERE id = $1 FOR UPDATE`,
@@ -109,6 +141,16 @@ export async function purchaseItem(userId: string, itemId: string): Promise<Purc
       );
     }
 
+    if (item.type === 'cosmetic') {
+      const { rows: ownedCosmetic } = await client.query(
+        `SELECT 1 FROM inventory WHERE user_id = $1 AND item_id = $2`,
+        [userId, itemId],
+      );
+      if (ownedCosmetic.length > 0) {
+        throw new HttpError(409, 'ALREADY_OWNED', 'You already own that cosmetic');
+      }
+    }
+
     const newCoins = currentCoins - item.price;
     await client.query(`UPDATE users SET coins = $1 WHERE id = $2`, [newCoins, userId]);
 
@@ -120,7 +162,18 @@ export async function purchaseItem(userId: string, itemId: string): Promise<Purc
       [userId, itemId],
     );
 
+    await recordActivity(client, userId, 'purchase', {
+      item_id: item.id,
+      item_name: item.name,
+      item_type: item.type,
+      rarity: item.rarity,
+      price: item.price,
+    });
+
     await client.query('COMMIT');
+    void emitActivityUpdated(userId).catch((err) => {
+      console.error('activity_updated emit failed:', err);
+    });
     return { new_coin_balance: newCoins, item };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -182,7 +235,17 @@ export async function buyStreakFreeze(userId: string): Promise<BuyFreezeResult> 
       [newFreeze, userId],
     );
 
+    await recordActivity(client, userId, 'purchase', {
+      item_name: 'Streak Freeze',
+      item_type: 'streak_freeze',
+      price: STREAK_FREEZE_PRICE,
+      new_freeze_count: newFreeze,
+    });
+
     await client.query('COMMIT');
+    void emitActivityUpdated(userId).catch((err) => {
+      console.error('activity_updated emit failed:', err);
+    });
     return { new_freeze_count: newFreeze, new_coin_balance: newCoins };
   } catch (err) {
     await client.query('ROLLBACK');

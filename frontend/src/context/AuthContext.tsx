@@ -21,7 +21,12 @@ interface AuthContextValue {
   isLoading: boolean;
   petInitialized: boolean | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    passwordConfirmation: string,
+    displayName: string,
+  ) => Promise<void>;
   loginWithGoogle: (credential: string) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
@@ -95,10 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (email: string, password: string, displayName: string) => {
+    async (email: string, password: string, passwordConfirmation: string, displayName: string) => {
       const { data } = await api.post<{ token: string }>('/api/auth/register', {
         email,
         password,
+        password_confirmation: passwordConfirmation,
         display_name: displayName,
       });
       acceptAuthResponse(data);

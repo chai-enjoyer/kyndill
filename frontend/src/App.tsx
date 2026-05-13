@@ -6,6 +6,7 @@ import { AppShell } from './components/layout/AppShell';
 import { AuthPage } from './pages/AuthPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ProgressPage } from './pages/ProgressPage';
 import { HabitsPage } from './pages/HabitsPage';
 import { PetPage } from './pages/PetPage';
 import { ShopPage } from './pages/ShopPage';
@@ -82,6 +83,7 @@ export default function App() {
           }
         >
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/progress" element={<ProgressPage />} />
           <Route path="/habits" element={<HabitsPage />} />
           <Route path="/pet" element={<PetPage />} />
           <Route path="/shop" element={<ShopPage />} />

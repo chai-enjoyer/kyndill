@@ -46,6 +46,15 @@ router.get('/friends/requests', async (req: Request, res: Response, next: NextFu
   }
 });
 
+router.get('/friends/requests/sent', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requests = await socialService.listSentFriendRequests(req.userId!);
+    res.status(200).json({ requests });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.put(
   '/friends/request/:id',
   validate(idParam, 'params'),

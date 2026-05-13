@@ -12,6 +12,9 @@ import { focusRouter } from './routes/focus';
 import { userRouter } from './routes/user';
 import { leaderboardRouter } from './routes/leaderboard';
 import { notificationsRouter } from './routes/notifications';
+import { feedbackRouter } from './routes/feedback';
+import { progressRouter } from './routes/progress';
+import { recoveryRouter } from './routes/recovery';
 
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
@@ -46,6 +49,9 @@ export function createApp(): Express {
   app.use('/api/user', requireAuth, userRouter);
   app.use('/api/leaderboard', requireAuth, leaderboardRouter);
   app.use('/api/notifications', requireAuth, notificationsRouter);
+  app.use('/api/feedback', requireAuth, feedbackRouter);
+  app.use('/api/progress', requireAuth, progressRouter);
+  app.use('/api/recovery', requireAuth, recoveryRouter);
 
   app.use(errorHandler);
   return app;

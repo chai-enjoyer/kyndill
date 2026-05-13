@@ -1,7 +1,8 @@
 import { pool } from '../db/pool';
 import { comparePassword, hashPassword } from './authService';
 import { HttpError } from '../middleware/errorHandler';
-import type { PetSpecies } from './petService';
+import { applyPassiveDecay, derivePetHealth, type PetSpecies } from './petService';
+import { getPasswordValidationMessage } from '../lib/credentials';
 
 export interface UserSearchResult {
   id: string;
@@ -27,6 +28,14 @@ export interface ProfileDto {
   total_habits: number;
   total_focus_minutes: number;
   auth_provider: 'email' | 'google';
+  notification_prefs: NotificationPrefs;
+  research_consent: boolean;
+}
+
+export interface NotificationPrefs {
+  friendRequests: boolean;
+  gifts: boolean;
+  focusReminders: boolean;
 }
 
 export interface PublicFriendProfile {
@@ -35,7 +44,7 @@ export interface PublicFriendProfile {
   username: string;
   avatar_url: string | null;
   visibility: 'public' | 'friends' | 'private';
-  level: number | null;
+  level: number;
   streak_current: number | null;
   total_habits_completed: number | null;
   pet: {
@@ -67,6 +76,8 @@ export async function getProfile(userId: string): Promise<ProfileDto> {
     `SELECT u.id, u.email, u.display_name, u.username, u.bio, u.avatar_url,
             u.visibility, u.level, u.xp, u.coins, u.streak_current, u.streak_longest,
             CASE WHEN u.oauth_provider = 'google' THEN 'google' ELSE 'email' END AS auth_provider,
+            u.notification_prefs,
+            u.research_consent,
             (SELECT COUNT(*)::int FROM habits h WHERE h.user_id = u.id) AS total_habits,
             (SELECT COALESCE(SUM(duration_minutes), 0)::int FROM focus_sessions fs WHERE fs.user_id = u.id) AS total_focus_minutes
        FROM users u
@@ -85,6 +96,8 @@ export async function updateProfile(
     bio?: string | null;
     visibility?: 'public' | 'friends' | 'private';
     avatar_url?: string | null;
+    notification_prefs?: NotificationPrefs;
+    research_consent?: boolean;
   },
 ): Promise<ProfileDto> {
   const sets: string[] = [];
@@ -110,6 +123,14 @@ export async function updateProfile(
   if (input.avatar_url !== undefined) {
     sets.push(`avatar_url = $${i++}`);
     values.push(input.avatar_url);
+  }
+  if (input.notification_prefs !== undefined) {
+    sets.push(`notification_prefs = $${i++}::jsonb`);
+    values.push(JSON.stringify(input.notification_prefs));
+  }
+  if (input.research_consent !== undefined) {
+    sets.push(`research_consent = $${i++}`);
+    values.push(input.research_consent);
   }
 
   if (sets.length > 0) {
@@ -142,6 +163,10 @@ export async function changePassword(
   }
   const ok = await comparePassword(currentPassword, rows[0].password_hash);
   if (!ok) throw new HttpError(401, 'INVALID_PASSWORD', 'Current password is incorrect');
+  const passwordIssue = getPasswordValidationMessage(newPassword);
+  if (passwordIssue) throw new HttpError(400, 'WEAK_PASSWORD', passwordIssue);
+  const reused = await comparePassword(newPassword, rows[0].password_hash);
+  if (reused) throw new HttpError(400, 'PASSWORD_REUSED', 'Choose a password different from your current one');
   const next = await hashPassword(newPassword);
   await pool.query(`UPDATE users SET password_hash = $1 WHERE id = $2`, [next, userId]);
 }
@@ -158,6 +183,7 @@ export async function getFriendProfile(userId: string, friendId: string): Promis
   if (friendship.length === 0) {
     throw new HttpError(404, 'NOT_FRIENDS', 'Friend profile is not available');
   }
+  await applyPassiveDecay(friendId);
 
   const { rows } = await pool.query<{
     id: string;
@@ -170,12 +196,17 @@ export async function getFriendProfile(userId: string, friendId: string): Promis
     species: PetSpecies;
     pet_name: string;
     health: number;
+    happiness: number;
+    hunger: number;
+    energy: number;
+    cleanliness: number;
     is_fainted: boolean;
     total_habits_completed: number;
   }>(
     `SELECT u.id, u.display_name, u.username, u.avatar_url, u.visibility,
             u.level, u.streak_current,
-            p.species, p.name AS pet_name, p.health, p.is_fainted, p.total_habits_completed
+            p.species, p.name AS pet_name, p.health, p.happiness, p.hunger, p.energy,
+            p.cleanliness, p.is_fainted, p.total_habits_completed
        FROM users u
        LEFT JOIN pets p ON p.user_id = u.id
       WHERE u.id = $1`,
@@ -191,14 +222,14 @@ export async function getFriendProfile(userId: string, friendId: string): Promis
     username: row.username,
     avatar_url: row.avatar_url,
     visibility: row.visibility,
-    level: canSeeStats ? row.level : null,
+    level: row.level,
     streak_current: canSeeStats ? row.streak_current : null,
     total_habits_completed: canSeeStats ? row.total_habits_completed : null,
     pet: row.species
       ? {
           species: row.species,
           name: row.pet_name,
-          health: row.health,
+          health: derivePetHealth(row.streak_current, row),
           is_fainted: row.is_fainted,
         }
       : null,

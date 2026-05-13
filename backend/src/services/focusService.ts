@@ -1,8 +1,6 @@
 import { pool } from '../db/pool';
 import { HttpError } from '../middleware/errorHandler';
 
-const FOCUS_COIN_REWARD = 10;
-
 export interface FocusCompleteResult {
   session_id: string;
   coins_earned: number;
@@ -31,6 +29,7 @@ export async function complete(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const coinsEarned = computeFocusCoins(durationMinutes);
 
     const { rows: inserted } = await client.query<{ id: string }>(
       `INSERT INTO focus_sessions (user_id, duration_minutes, rating)
@@ -39,10 +38,7 @@ export async function complete(
       [userId, durationMinutes, rating ?? null],
     );
 
-    await client.query(`UPDATE users SET coins = coins + $1 WHERE id = $2`, [
-      FOCUS_COIN_REWARD,
-      userId,
-    ]);
+    await client.query(`UPDATE users SET coins = coins + $1 WHERE id = $2`, [coinsEarned, userId]);
 
     const { rows: totals } = await client.query<{ total: number }>(
       `SELECT COALESCE(SUM(duration_minutes), 0)::int AS total
@@ -53,7 +49,7 @@ export async function complete(
     await client.query('COMMIT');
     return {
       session_id: inserted[0].id,
-      coins_earned: FOCUS_COIN_REWARD,
+      coins_earned: coinsEarned,
       total_focus_time: totals[0].total,
     };
   } catch (err) {
@@ -62,6 +58,10 @@ export async function complete(
   } finally {
     client.release();
   }
+}
+
+function computeFocusCoins(durationMinutes: number): number {
+  return Math.min(36, Math.max(4, Math.round(durationMinutes / 3)));
 }
 
 export async function rateSession(userId: string, sessionId: string, rating: number): Promise<void> {

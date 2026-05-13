@@ -1,10 +1,18 @@
 import { useMemo, useState, type DragEvent, type FormEvent } from 'react';
 import { AxiosError } from 'axios';
+import { AnimatedValue } from '../components/common/AnimatedValue';
 import { Button } from '../components/common/Button';
+import { FlameIcon } from '../components/common/FlameIcon';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
 import { CategoryPill } from '../components/dashboard/CategoryPill';
 import { useToastContext } from '../context/ToastContext';
+import {
+  HABIT_TEMPLATES,
+  formatTemplateMeta,
+  templateToHabitInput,
+  type HabitTemplate,
+} from '../lib/habitTemplates';
 import {
   useHabits,
   type HabitCategory,
@@ -28,11 +36,16 @@ export function HabitsPage() {
   const { habits, isLoading, create, update, archive, reorder } = useHabits({ scope: 'all' });
   const { showToast } = useToastContext();
   const [createOpen, setCreateOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [editing, setEditing] = useState<HabitWithStatus | null>(null);
   const [deleting, setDeleting] = useState<HabitWithStatus | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
 
   const orderedIds = useMemo(() => habits.map((habit) => habit.id), [habits]);
+  const existingNames = useMemo(
+    () => new Set(habits.map((habit) => habit.name.trim().toLowerCase())),
+    [habits],
+  );
 
   async function handleToggle(habit: HabitWithStatus) {
     try {
@@ -77,9 +90,14 @@ export function HabitsPage() {
           <p className="page__eyebrow">Habit library</p>
           <h1>Habits</h1>
         </div>
-        <Button variant="primary" onClick={() => setCreateOpen(true)}>
-          Add Habit
-        </Button>
+        <div className="habits-page__actions">
+          <Button variant="secondary" onClick={() => setTemplatesOpen(true)}>
+            Add from templates
+          </Button>
+          <Button variant="primary" onClick={() => setCreateOpen(true)}>
+            Add Habit
+          </Button>
+        </div>
       </header>
 
       {isLoading ? (
@@ -91,9 +109,14 @@ export function HabitsPage() {
       ) : habits.length === 0 ? (
         <div className="habits-page__empty">
           <p>No habits yet.</p>
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            Add Habit
-          </Button>
+          <div className="habits-page__actions">
+            <Button variant="secondary" onClick={() => setTemplatesOpen(true)}>
+              Add from templates
+            </Button>
+            <Button variant="primary" onClick={() => setCreateOpen(true)}>
+              Add Habit
+            </Button>
+          </div>
         </div>
       ) : (
         <ul className="habits-page__list" role="list">
@@ -121,6 +144,17 @@ export function HabitsPage() {
             await create(input);
             showToast('Habit added.', 'success');
             setCreateOpen(false);
+          }}
+        />
+      )}
+
+      {templatesOpen && (
+        <HabitTemplatesModal
+          existingNames={existingNames}
+          onClose={() => setTemplatesOpen(false)}
+          onAdd={async (template) => {
+            await create(templateToHabitInput(template));
+            showToast(`${template.name} added.`, 'success');
           }}
         />
       )}
@@ -154,6 +188,78 @@ export function HabitsPage() {
         </Modal>
       )}
     </section>
+  );
+}
+
+function HabitTemplatesModal({
+  existingNames,
+  onClose,
+  onAdd,
+}: {
+  existingNames: Set<string>;
+  onClose: () => void;
+  onAdd: (template: HabitTemplate) => Promise<void>;
+}) {
+  const { showToast } = useToastContext();
+  const [query, setQuery] = useState('');
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const filtered = HABIT_TEMPLATES.filter((template) => {
+    const haystack = `${template.name} ${template.description ?? ''} ${template.category}`.toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  });
+
+  async function addTemplate(template: HabitTemplate) {
+    setAddingId(template.id);
+    try {
+      await onAdd(template);
+    } catch (err) {
+      showToast(extractMessage(err), 'error');
+    } finally {
+      setAddingId(null);
+    }
+  }
+
+  return (
+    <Modal isOpen onClose={onClose} title="Add from templates" wide>
+      <div className="habit-template-modal">
+        <input
+          className="input"
+          type="search"
+          placeholder="Search templates"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          autoFocus
+        />
+
+        {filtered.length === 0 ? (
+          <div className="friends-empty">No templates match that search.</div>
+        ) : (
+          <div className="habit-template-grid">
+            {filtered.map((template) => {
+              const alreadyAdded = existingNames.has(template.name.trim().toLowerCase());
+              return (
+                <article key={template.id} className="habit-template-card">
+                  <div className="habit-template-card__head">
+                    <h3>{template.name}</h3>
+                    <CategoryPill category={template.category} />
+                  </div>
+                  <p>{template.summary}</p>
+                  <span className="habit-template-card__meta">{formatTemplateMeta(template)}</span>
+                  <Button
+                    variant={alreadyAdded ? 'secondary' : 'primary'}
+                    size="sm"
+                    disabled={alreadyAdded || addingId === template.id}
+                    onClick={() => addTemplate(template)}
+                  >
+                    {alreadyAdded ? 'Added' : addingId === template.id ? 'Adding...' : 'Add'}
+                  </Button>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -209,8 +315,13 @@ function HabitCard({
         {habit.description && <p className="habit-card__description">{habit.description}</p>}
         <div className="habit-card__meta">
           <span>{formatFrequency(habit)}</span>
+          <span>{habit.target_count > 1 ? `${habit.target_count} times/day` : 'Once/day'}</span>
           <span>{formatWindow(habit)}</span>
-          <span className="habit-card__streak">{habit.current_streak} day streak</span>
+          <span className="habit-card__streak">
+            <FlameIcon size={15} />
+            <AnimatedValue value={habit.current_streak} />
+            <span>day streak</span>
+          </span>
         </div>
       </div>
       <div className="habit-card__actions">
@@ -243,6 +354,7 @@ function HabitModal({ title, habit, onClose, onSubmit }: HabitModalProps) {
   const [description, setDescription] = useState(habit?.description ?? '');
   const [category, setCategory] = useState<HabitCategory>(habit?.category ?? 'Health');
   const [frequency, setFrequency] = useState<HabitFrequency>(habit?.frequency ?? 'daily');
+  const [targetCount, setTargetCount] = useState(habit?.target_count ?? 1);
   const [days, setDays] = useState<number[]>(habit?.days_of_week ?? [1, 2, 3, 4, 5]);
   const [startTime, setStartTime] = useState(normalizeTime(habit?.completion_start_time));
   const [endTime, setEndTime] = useState(normalizeTime(habit?.completion_end_time));
@@ -251,7 +363,7 @@ function HabitModal({ title, habit, onClose, onSubmit }: HabitModalProps) {
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const nextErrors = validateForm({ name, frequency, days, startTime, endTime });
+    const nextErrors = validateForm({ name, frequency, targetCount, days, startTime, endTime });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -262,6 +374,7 @@ function HabitModal({ title, habit, onClose, onSubmit }: HabitModalProps) {
         description,
         category,
         frequency,
+        target_count: targetCount,
         days_of_week: frequency === 'weekly' ? days : undefined,
         completion_start_time: startTime || null,
         completion_end_time: endTime || null,
@@ -316,6 +429,24 @@ function HabitModal({ title, habit, onClose, onSubmit }: HabitModalProps) {
           </div>
         </div>
 
+        <div className={`field ${errors.targetCount ? 'field--error' : ''}`}>
+          <label className="field__label" htmlFor="habit-target-count">Times per active day</label>
+          <input
+            id="habit-target-count"
+            className="input"
+            type="number"
+            min={1}
+            max={24}
+            step={1}
+            value={targetCount}
+            onChange={(e) => setTargetCount(clampTargetCount(Number(e.target.value)))}
+          />
+          <span className="field__help">
+            Use 1 for normal habits, or a higher number for habits like drinking water.
+          </span>
+          {errors.targetCount && <span className="field__error">{errors.targetCount}</span>}
+        </div>
+
         {frequency === 'weekly' && (
           <div className={`field ${errors.days ? 'field--error' : ''}`}>
             <span className="field__label">Days</span>
@@ -363,6 +494,7 @@ function HabitModal({ title, habit, onClose, onSubmit }: HabitModalProps) {
 function validateForm(input: {
   name: string;
   frequency: HabitFrequency;
+  targetCount: number;
   days: number[];
   startTime: string;
   endTime: string;
@@ -370,6 +502,9 @@ function validateForm(input: {
   const errors: Record<string, string> = {};
   if (!input.name.trim()) errors.name = 'Name is required.';
   if (input.name.trim().length > 100) errors.name = 'Name must be 100 characters or fewer.';
+  if (!Number.isInteger(input.targetCount) || input.targetCount < 1 || input.targetCount > 24) {
+    errors.targetCount = 'Choose a number from 1 to 24.';
+  }
   if (input.frequency === 'weekly' && input.days.length === 0) {
     errors.days = 'Choose at least one day.';
   }
@@ -379,6 +514,11 @@ function validateForm(input: {
     errors.window = 'End time must be after start time.';
   }
   return errors;
+}
+
+function clampTargetCount(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.min(24, Math.max(1, Math.floor(value)));
 }
 
 function normalizeTime(value?: string | null): string {

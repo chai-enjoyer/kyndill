@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <radialGradient id="toy-ball" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(39 35) rotate(48) scale(61)">
+      <stop stop-color="#F2C96D"/>
+      <stop offset=".54" stop-color="#D99A58"/>
+      <stop offset="1" stop-color="#A95D48"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="54" cy="91" rx="28" ry="6" fill="#34251F18"/>
+  <circle cx="54" cy="56" r="37" fill="url(#toy-ball)"/>
+  <path d="M19 58c18 0 25-12 33-27M56 93c-6-18 3-30 20-46M35 23c12 10 26 13 44 8M30 81c13-8 30-8 48 1" fill="none" stroke="#F9E4A3" stroke-width="7" stroke-linecap="round" opacity=".72"/>
+  <path d="M35 37c7-6 16-9 25-8" fill="none" stroke="#FFF1C0" stroke-width="6" stroke-linecap="round" opacity=".55"/>
+</svg>

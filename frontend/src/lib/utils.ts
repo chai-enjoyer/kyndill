@@ -1,11 +1,24 @@
-// PLACEHOLDER: Replace with final item icons when delivered.
-// Each item gets a deterministic warm-neutral swatch keyed by a tiny string
-// hash, plus the item's first letter on top. Good enough to read at a glance
-// while the artist is still drawing the real assets.
+import apple from '../assets/sprites/apple.svg';
+import bow from '../assets/sprites/bow.png';
+import bowTie from '../assets/sprites/bow_tie.png';
+import bread from '../assets/sprites/bread.svg';
+import carrot from '../assets/sprites/carrot.svg';
+import coffee from '../assets/sprites/coffee.svg';
+import cylinderHat from '../assets/sprites/cylinder_hat.png';
+import fish from '../assets/sprites/fish.svg';
+import medal from '../assets/sprites/medal.png';
+import soap from '../assets/sprites/soap.svg';
+import sunglasses from '../assets/sprites/sunglasses.png';
+import toyBall from '../assets/sprites/toy_ball.svg';
+import water from '../assets/sprites/water.svg';
+import wizardHat from '../assets/sprites/wizard_hat.png';
 
 const ITEM_SWATCHES = ['#C99E83', '#9F8B6E', '#8E6F58', '#A88D6B', '#B07F5D'];
 
 export function getItemPlaceholder(itemName: string): string {
+  const asset = getSpriteItemAsset(itemName);
+  if (asset) return asset;
+
   const seed = hashString(itemName);
   const color = ITEM_SWATCHES[seed % ITEM_SWATCHES.length];
   const initial = (itemName[0] ?? '?').toUpperCase();
@@ -16,6 +29,26 @@ export function getItemPlaceholder(itemName: string): string {
 </svg>`;
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+function getSpriteItemAsset(itemName: string): string | null {
+  const name = itemName.toLowerCase();
+  if (name === 'apple') return apple;
+  if (name === 'bread') return bread;
+  if (name === 'fish') return fish;
+  if (name === 'carrot') return carrot;
+  if (name === 'water') return water;
+  if (name === 'coffee') return coffee;
+  if (name === 'soap') return soap;
+  if (name === 'toy ball') return toyBall;
+  if (name === 'bow') return bow;
+  if (name.includes('bow tie')) return bowTie;
+  if (name.includes('sunglasses')) return sunglasses;
+  if (name.includes('wizard hat')) return wizardHat;
+  if (name.includes('cylinder hat')) return cylinderHat;
+  if (name.includes('badge')) return medal;
+  if (name.includes('medal')) return medal;
+  return null;
 }
 
 function hashString(s: string): number {
@@ -58,6 +91,27 @@ export function toDateString(d: Date = new Date()): string {
 
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat().format(n);
+}
+
+export interface PetCareStats {
+  happiness: number;
+  hunger: number;
+  energy: number;
+  cleanliness: number;
+}
+
+export function derivePetHealth(streak: number, stats: PetCareStats): number {
+  const safeStreak = Math.max(0, Math.floor(streak));
+  const careAverage = (stats.happiness + stats.hunger + stats.energy + stats.cleanliness) / 4;
+  const streakScore = Math.min(100, safeStreak * 12);
+  const consistencyBonus = Math.min(12, safeStreak * 2);
+  return Math.round(Math.min(100, Math.max(0, careAverage * 0.55 + streakScore * 0.35 + consistencyBonus)));
+}
+
+export function deriveStreakHealth(streak: number, stats?: PetCareStats): number {
+  if (stats) return derivePetHealth(streak, stats);
+  const safeStreak = Math.max(0, Math.floor(streak));
+  return Math.min(100, safeStreak * 12);
 }
 
 // ============================================================

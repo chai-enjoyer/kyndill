@@ -31,12 +31,16 @@ html {
   font-family: var(--font-body);
   font-size: 16px;
   font-feature-settings: 'cv11', 'ss03';
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
 body {
+  overflow-x: hidden;
   font-family: var(--font-body);
   font-size: var(--text-base);
   line-height: var(--leading-normal);

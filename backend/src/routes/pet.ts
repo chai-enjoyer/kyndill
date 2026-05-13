@@ -11,6 +11,9 @@ const initializeSchema = z.object({
   species: z.enum(petService.PET_SPECIES),
   name: z.string().trim().min(1, 'Name is required').max(20, 'Name must be 20 characters or fewer'),
 });
+const renameSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(20, 'Name must be 20 characters or fewer'),
+});
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -27,6 +30,19 @@ router.post(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const pet = await petService.initialize(req.userId!, req.body.species, req.body.name);
+      res.status(200).json(pet);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.patch(
+  '/name',
+  validate(renameSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pet = await petService.rename(req.userId!, req.body.name);
       res.status(200).json(pet);
     } catch (err) {
       next(err);

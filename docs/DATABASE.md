@@ -18,17 +18,21 @@ PostgreSQL 14+ schema for Kyndill, applied through versioned SQL migrations unde
 | id                     | UUID PK     | `gen_random_uuid()`                                          |
 | email                  | TEXT UNIQUE | Required                                                     |
 | password_hash          | TEXT        | Nullable; OAuth-only users have no local password            |
+| oauth_provider         | TEXT        | Nullable; currently `google`                                |
+| oauth_id               | TEXT        | Nullable; Google subject id when linked                      |
 | display_name           | TEXT        | Required; shown across the UI                                |
 | username               | TEXT UNIQUE | Required; URL-safe handle                                    |
 | bio                    | TEXT        | Nullable                                                     |
 | avatar_url             | TEXT        | Nullable                                                     |
 | level                  | INTEGER     | Default 1; gamification level derived from xp                |
 | xp                     | INTEGER     | Default 0                                                    |
-| coins                  | INTEGER     | Default 0; shop currency                                     |
+| coins                  | INTEGER     | Default 20; shop currency                                    |
 | streak_current         | INTEGER     | Mirror of `streaks.current_streak`                           |
 | streak_longest         | INTEGER     | Mirror of `streaks.longest_streak`                           |
 | last_completion_date   | DATE        | Mirror of `streaks.last_completion_date`                     |
 | visibility             | TEXT        | `public` / `friends` / `private`; default `private`          |
+| notification_prefs     | JSONB       | Friend request, gift, and focus reminder preferences         |
+| research_consent       | BOOLEAN     | Consent flag for anonymized evaluation data                  |
 | created_at             | TIMESTAMPTZ | Default `NOW()`                                              |
 
 The trio (`streak_current`, `streak_longest`, `last_completion_date`) is denormalized from `streaks`. See *Design notes* below.
@@ -41,7 +45,7 @@ One pet per user (enforced by `UNIQUE (user_id)`). Created automatically by the 
 | ------------------------ | ----------- | ----------------------------------------------------------- |
 | id                       | UUID PK     |                                                             |
 | user_id                  | UUID UNIQUE | FK -> users                                                 |
-| species                  | TEXT        | `blob` / `cube` / `sphere` / `pyramid`; default `blob`      |
+| species                  | TEXT        | `star` / `cube` / `sphere` / `pyramid`; default `star`      |
 | name                     | TEXT        | Default `Kyndill`                                           |
 | health                   | INTEGER     | 0..100, default 100                                         |
 | happiness                | INTEGER     | 0..100                                                      |
@@ -51,6 +55,8 @@ One pet per user (enforced by `UNIQUE (user_id)`). Created automatically by the 
 | stage                    | SMALLINT    | 1 / 2 / 3; auto-maintained by trigger                       |
 | total_habits_completed   | INTEGER     | Running counter; drives stage                               |
 | is_fainted               | BOOLEAN     | Default false                                               |
+| last_decay_at            | TIMESTAMPTZ | Used for passive daily stat decay                           |
+| initialized_at           | TIMESTAMPTZ | Null until onboarding completes                             |
 | created_at               | TIMESTAMPTZ |                                                             |
 
 ### `habits`
@@ -66,6 +72,7 @@ One pet per user (enforced by `UNIQUE (user_id)`). Created automatically by the 
 | days_of_week          | JSONB       | Array of weekday integers (0=Sunday); used when `frequency = 'weekly'`      |
 | completion_start_time | TIME        | Optional time-of-day window start                                           |
 | completion_end_time   | TIME        | Optional window end; must be after start if both set                        |
+| target_count          | INTEGER     | Default 1; `1..24` logs required per active day                             |
 | is_active             | BOOLEAN     | Default true; archived habits flip this to false                            |
 | sort_order            | INTEGER     | User-controlled ordering                                                    |
 | created_at            | TIMESTAMPTZ |                                                                             |
@@ -79,10 +86,12 @@ One pet per user (enforced by `UNIQUE (user_id)`). Created automatically by the 
 | user_id       | UUID        | FK -> users                                                      |
 | completed_on  | DATE        | The calendar day the habit was completed (user-local)            |
 | completed_at  | TIMESTAMPTZ | The instant the completion was recorded                          |
+| completion_count | INTEGER  | Number of logs recorded for this habit/date                      |
+| target_count  | INTEGER     | Target captured for this habit/date                              |
 | xp_earned     | INTEGER     | Default 0                                                        |
 | coins_earned  | INTEGER     | Default 0                                                        |
 
-`UNIQUE (habit_id, user_id, completed_on)` enforces "one completion per habit per day."
+`UNIQUE (habit_id, user_id, completed_on)` keeps one progress row per habit per day. Repeating habits increment `completion_count` until it reaches `target_count`.
 
 ### `streaks`
 
@@ -110,7 +119,7 @@ Global shop catalogue, seeded by `011_seed_items.sql`.
 | effect_stat    | TEXT    | Consumables: pet stat affected. Freezes: `streak_freeze_days`     |
 | effect_amount  | INTEGER | Magnitude of the effect                                          |
 | image_url      | TEXT    | Path to placeholder SVG until the artist delivers final art      |
-| category       | TEXT    | For cosmetics: target equip slot (`hat` / `accessory` / `background`) |
+| category       | TEXT    | For cosmetics: target equip slot (`hat`, `accessory`, `glasses`, etc.) |
 
 ### `inventory`
 
@@ -128,7 +137,7 @@ A user has at most one cosmetic per slot. Composite PK on `(user_id, slot)` enfo
 | -------- | ---- | ------------------------------------------- |
 | user_id  | UUID | PK part 1; FK -> users                      |
 | item_id  | UUID | FK -> items                                 |
-| slot     | TEXT | `hat` / `accessory` / `background`; PK part 2 |
+| slot     | TEXT | `hat` / `accessory` / `glasses` / `scarf` / `badge` / `charm`; PK part 2 |
 
 ### `friend_requests`
 
@@ -193,9 +202,24 @@ Append-only event log; never updated, never deleted by the app.
 | ---------- | ----------- | ------------------------------------------------------------- |
 | id         | UUID PK     |                                                               |
 | user_id    | UUID        | FK -> users                                                   |
-| type       | TEXT        | `habit_completed`, `focus_finished`, `friend_added`, etc.     |
+| type       | TEXT        | `habit_completed`, `purchase`, `friendship`, `level_up`, `gift_sent` |
 | metadata   | JSONB       | Default `{}`                                                  |
 | created_at | TIMESTAMPTZ |                                                               |
+
+### `feedback_events`
+
+Stores mood feedback, general feedback, and missed-habit recovery reflections.
+
+| Column     | Type        | Notes                                                   |
+| ---------- | ----------- | ------------------------------------------------------- |
+| id         | UUID PK     |                                                         |
+| user_id    | UUID        | FK -> users                                             |
+| habit_id   | UUID        | Nullable FK -> habits; set null if the habit is deleted |
+| context    | TEXT        | App-defined context such as `habit_completion`          |
+| mood       | TEXT        | Optional short mood label                               |
+| rating     | SMALLINT    | Optional 1..5 rating                                    |
+| note       | TEXT        | Optional free-text feedback                             |
+| created_at | TIMESTAMPTZ |                                                         |
 
 ## Relationships, at a glance
 
@@ -210,6 +234,8 @@ users 1 --- * gifts * --- 1 items
 users 1 --- * focus_sessions
 users 1 --- * notifications
 users 1 --- * activity_events
+users 1 --- * feedback_events
+habits 1 --- * feedback_events (optional)
 ```
 
 ## Triggers
@@ -218,7 +244,7 @@ Both triggers live in `010_triggers.sql`.
 
 ### `trg_users_init_resources` (AFTER INSERT ON users)
 
-Creates the default pet (`blob` species, name `Kyndill`) and a corresponding `streaks` row for every new user. Runs `AFTER INSERT` because we need the user's PK to exist before we reference it.
+Creates the default pet (`star` species, name `Kyndill`) and a corresponding `streaks` row for every new user. New streak rows start with two streak freezes. Runs `AFTER INSERT` because we need the user's PK to exist before we reference it.
 
 ### `trg_pets_update_stage` (BEFORE UPDATE OF total_habits_completed ON pets)
 
@@ -245,7 +271,7 @@ Fires `BEFORE UPDATE` so the trigger can mutate `NEW.stage` in place. An `AFTER 
 Apply with:
 
 ```bash
-npm run db:migrate --workspace backend
+npm run migrate --workspace backend
 ```
 
 `backend/db/migrate.ts` records every applied file in a `schema_migrations` table. Each file runs inside a transaction; a failure rolls back cleanly and the file stays unapplied. Files are discovered alphabetically and applied in order.
@@ -270,4 +296,4 @@ Inserting `(a, b)` and `(b, a)` doubles row count but lets every "my friends" qu
 
 ### JSONB for sparse, optional structure
 
-`habits.days_of_week`, `notifications.metadata`, and `activity_events.metadata` use JSONB. The shape is app-defined and small, and we don't expect to index inside the JSON. If query patterns develop around specific keys, a `CREATE INDEX ... USING GIN ((metadata -> 'foo'))` migration is the appropriate next step.
+`habits.days_of_week`, `notifications.metadata`, `activity_events.metadata`, and `users.notification_prefs` use JSONB. The shape is app-defined and small, and we don't expect to index inside the JSON. If query patterns develop around specific keys, a `CREATE INDEX ... USING GIN ((metadata -> 'foo'))` migration is the appropriate next step.

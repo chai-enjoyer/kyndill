@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <defs>
+    <linearGradient id="bread-crust" x1="23" y1="24" x2="86" y2="91" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DDA15F"/>
+      <stop offset="1" stop-color="#A9673C"/>
+    </linearGradient>
+    <linearGradient id="bread-soft" x1="32" y1="39" x2="77" y2="84" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4D9A5"/>
+      <stop offset="1" stop-color="#D8A664"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="54" cy="91" rx="28" ry="6" fill="#34251F18"/>
+  <path d="M19 51c0-18 13-30 29-25 6-11 24-11 30 0 16-5 29 7 29 25v18c0 15-12 25-27 25H46c-15 0-27-10-27-25V51Z" fill="url(#bread-crust)"/>
+  <path d="M30 55c0-11 9-18 20-15 4-8 16-8 20 0 11-3 20 4 20 15v14c0 8-7 15-16 15H46c-9 0-16-7-16-15V55Z" fill="url(#bread-soft)"/>
+  <path d="M45 52c-4 5-5 12-4 18M60 49c-3 7-2 15 2 22M76 53c3 5 3 11 0 17" fill="none" stroke="#B97443" stroke-width="5" stroke-linecap="round" opacity=".65"/>
+</svg>

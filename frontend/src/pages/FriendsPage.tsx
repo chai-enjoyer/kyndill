@@ -1,8 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { AnimatedValue } from '../components/common/AnimatedValue';
 import { Button } from '../components/common/Button';
+import { FlameIcon } from '../components/common/FlameIcon';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
-import { PlaceholderPet } from '../components/common/PlaceholderPet';
+import { SpritePet } from '../components/common/SpritePet';
 import { useInventory, type InventoryEntry } from '../hooks/useInventory';
 import {
   useSocial,
@@ -19,6 +22,7 @@ export function FriendsPage() {
   const {
     friends,
     requests,
+    sentRequests,
     isLoading,
     error,
     searchUsers,
@@ -34,17 +38,21 @@ export function FriendsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [giftFriend, setGiftFriend] = useState<Friend | null>(null);
   const [profile, setProfile] = useState<FriendProfile | null>(null);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   const filtered = friends.filter((friend) =>
     `${friend.display_name} ${friend.username}`.toLowerCase().includes(query.toLowerCase()),
   );
 
   async function handleRespond(requestId: string, action: 'accept' | 'reject') {
+    setRespondingId(requestId);
     try {
       await respondRequest(requestId, action);
       showToast(action === 'accept' ? 'Friend request accepted.' : 'Friend request rejected.', 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
+    } finally {
+      setRespondingId(null);
     }
   }
 
@@ -77,9 +85,13 @@ export function FriendsPage() {
             />
           </div>
 
-          {requests.length > 0 && (
-            <section className="pending-panel" aria-label="Pending requests">
-              <h2>Pending requests</h2>
+          <section className="pending-panel" aria-label="Received friend requests">
+            <h2>Received requests</h2>
+            {isLoading ? (
+              <LoadingSkeleton width="100%" height={72} />
+            ) : requests.length === 0 ? (
+              <div className="friends-empty">No incoming requests.</div>
+            ) : (
               <div className="pending-list">
                 {requests.map((request) => (
                   <article key={request.id} className="request-card">
@@ -89,14 +101,36 @@ export function FriendsPage() {
                       <span>@{request.from_username}</span>
                     </div>
                     <div className="request-card__actions">
-                      <Button size="sm" variant="primary" onClick={() => handleRespond(request.id, 'accept')}>Accept</Button>
-                      <Button size="sm" variant="ghost" onClick={() => handleRespond(request.id, 'reject')}>Reject</Button>
+                      <Button size="sm" variant="primary" disabled={respondingId === request.id} onClick={() => handleRespond(request.id, 'accept')}>Accept</Button>
+                      <Button size="sm" variant="ghost" disabled={respondingId === request.id} onClick={() => handleRespond(request.id, 'reject')}>Reject</Button>
                     </div>
                   </article>
                 ))}
               </div>
-            </section>
-          )}
+            )}
+          </section>
+
+          <section className="pending-panel" aria-label="Sent friend requests">
+            <h2>Sent requests</h2>
+            {isLoading ? (
+              <LoadingSkeleton width="100%" height={72} />
+            ) : sentRequests.length === 0 ? (
+              <div className="friends-empty">No sent requests waiting.</div>
+            ) : (
+              <div className="pending-list">
+                {sentRequests.map((request) => (
+                  <article key={request.id} className="request-card request-card--sent">
+                    <Avatar name={request.to_display_name} url={request.to_avatar_url} />
+                    <div>
+                      <strong>{request.to_display_name}</strong>
+                      <span>@{request.to_username}</span>
+                    </div>
+                    <span className="owned-badge">Pending</span>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
 
           {error ? (
             <div className="friends-empty" role="alert">{error}</div>
@@ -105,7 +139,7 @@ export function FriendsPage() {
               {[0, 1, 2].map((i) => <LoadingSkeleton key={i} width="100%" height={96} />)}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="friends-empty">No friends match that search.</div>
+            <div className="friends-empty">{query.trim() ? 'No friends match that search.' : 'No friends yet. Add someone by username to start.'}</div>
           ) : (
             <div className="friend-list">
               {filtered.map((friend) => (
@@ -117,8 +151,16 @@ export function FriendsPage() {
                       <span>@{friend.username}</span>
                     </div>
                     <div className="friend-card__meta">
-                      <span className="level-chip">L{friend.level}</span>
-                      <span>{friend.streak_current === null ? 'Private streak' : `${friend.streak_current} day streak`}</span>
+                      <span className="level-chip">Level {friend.level}</span>
+                      {friend.streak_current === null ? (
+                        <span>Private streak</span>
+                      ) : (
+                        <span className="friend-card__streak">
+                          <FlameIcon size={15} />
+                          <AnimatedValue value={friend.streak_current} />
+                          <span>day streak</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="friend-card__actions">
@@ -132,7 +174,12 @@ export function FriendsPage() {
         </section>
 
         <aside className="friends-leaderboard">
-          <h2>Friends leaderboard</h2>
+          <div className="friends-leaderboard__header">
+            <h2>Friends leaderboard</h2>
+            <Link to="/leaderboard" className="btn btn--secondary btn--sm">
+              View all
+            </Link>
+          </div>
           {leaderboardLoading ? (
             <LoadingSkeleton width="100%" height={180} />
           ) : entries.length === 0 ? (
@@ -142,7 +189,7 @@ export function FriendsPage() {
               <div key={entry.id} className="mini-rank-row">
                 <span>{entry.rank}</span>
                 <strong>{entry.display_name}</strong>
-                <em>L{entry.level}</em>
+                <em>Level {entry.level}</em>
               </div>
             ))
           )}
@@ -246,7 +293,7 @@ function AddFriendModal({
                 <Avatar name={user.display_name} url={user.avatar_url} />
                 <div>
                   <strong>{user.display_name}</strong>
-                  <span>@{user.username} - L{user.level}</span>
+                  <span>@{user.username} - Level {user.level}</span>
                 </div>
                 <Button size="sm" variant="primary" disabled={sending === user.username} onClick={() => request(user.username)}>
                   {sending === user.username ? 'Sending...' : 'Send Request'}
@@ -324,12 +371,25 @@ function FriendProfileModal({ profile, onClose }: { profile: FriendProfile; onCl
     <Modal isOpen onClose={onClose} title={profile.display_name}>
       <div className="friend-profile-modal">
         {profile.pet && (
-          <PlaceholderPet species={profile.pet.species} mood={mood} size={180} />
+          <SpritePet species={profile.pet.species} mood={mood} size={180} />
         )}
         <dl>
-          <div><dt>Level</dt><dd>{profile.level ?? 'Private'}</dd></div>
+          <div><dt>Level</dt><dd>{profile.level}</dd></div>
           <div><dt>Total habits</dt><dd>{profile.total_habits_completed ?? 'Private'}</dd></div>
-          <div><dt>Streak</dt><dd>{profile.streak_current === null ? 'Private' : `${profile.streak_current} days`}</dd></div>
+          <div>
+            <dt>Streak</dt>
+            <dd>
+              {profile.streak_current === null ? (
+                'Private'
+              ) : (
+                <span className="friend-profile-modal__streak">
+                  <FlameIcon size={17} />
+                  <AnimatedValue value={profile.streak_current} />
+                  <span>{profile.streak_current === 1 ? 'day' : 'days'}</span>
+                </span>
+              )}
+            </dd>
+          </div>
         </dl>
       </div>
     </Modal>

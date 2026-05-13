@@ -1,37 +1,79 @@
-import { useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { AxiosError } from 'axios';
+import { Button } from '../components/common/Button';
+import { CosmeticPreview } from '../components/common/CosmeticPreview';
+import { InfoTip } from '../components/common/InfoTip';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
-import { PlaceholderPet } from '../components/common/PlaceholderPet';
+import { SpritePet } from '../components/common/SpritePet';
+import { StatIcon, type StatIconName } from '../components/common/StatIcon';
 import { useToastContext } from '../context/ToastContext';
 import { useInventory, type InventoryEntry } from '../hooks/useInventory';
-import { usePet, type EquipSlot } from '../hooks/usePet';
+import { usePet, type EquipSlot, type PetFullState } from '../hooks/usePet';
 import { getItemPlaceholder } from '../lib/utils';
 
-const STATS = [
-  { key: 'health', label: 'Health', icon: 'M12 21s-7-4.5-7-10a5 5 0 0 1 9-3 5 5 0 0 1 9 3c0 5.5-7 10-7 10z' },
-  { key: 'happiness', label: 'Happiness', icon: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0zM8.5 14.5a4 4 0 0 0 7 0' },
-  { key: 'hunger', label: 'Hunger', icon: 'M7 4v8a3 3 0 0 0 3 3 3 3 0 0 0 0-6V4M17 4c-1 1-1 5 0 8 .8 1.6 3 1.6 3-1V4' },
-  { key: 'energy', label: 'Energy', icon: 'M13 2 4 14h6l-1 8 11-12h-7l0-8z' },
-  { key: 'cleanliness', label: 'Cleanliness', icon: 'M12 3c-3 4-5 7-5 10a5 5 0 0 0 10 0c0-3-2-6-5-10z' },
-] as const;
+const STATS: Array<{
+  key: 'health' | 'happiness' | 'hunger' | 'energy' | 'cleanliness';
+  label: string;
+  icon: StatIconName;
+  info: string;
+}> = [
+  {
+    key: 'health',
+    label: 'Health',
+    icon: 'health',
+    info: 'Health combines care stats and streak momentum. Strong stats keep your pet well; streaks add consistency, but there is no guaranteed base.',
+  },
+  {
+    key: 'happiness',
+    label: 'Happiness',
+    icon: 'happiness',
+    info: 'Happiness rises from completing habits, especially social and wellness habits.',
+  },
+  {
+    key: 'hunger',
+    label: 'Hunger',
+    icon: 'hunger',
+    info: 'Hunger is your pet food meter. Completing habits spends a little hunger; consumable food restores it.',
+  },
+  {
+    key: 'energy',
+    label: 'Energy',
+    icon: 'energy',
+    info: 'Energy is spent by effort-heavy habits. Some consumables restore it.',
+  },
+  {
+    key: 'cleanliness',
+    label: 'Cleanliness',
+    icon: 'cleanliness',
+    info: 'Cleanliness changes with habit activity. Health habits can improve it; most completions use a little.',
+  },
+];
 
 const SLOTS: { slot: EquipSlot; label: string }[] = [
   { slot: 'hat', label: 'Hat' },
   { slot: 'accessory', label: 'Accessory' },
-  { slot: 'background', label: 'Background' },
   { slot: 'glasses', label: 'Glasses' },
-  { slot: 'scarf', label: 'Scarf' },
+  { slot: 'scarf', label: 'Bow tie' },
   { slot: 'badge', label: 'Badge' },
   { slot: 'charm', label: 'Charm' },
 ];
 
 export function PetPage() {
-  const { pet, isLoading, equip, refetch } = usePet();
+  const { pet, isLoading, equip, unequip, rename, refetch } = usePet();
   const { cosmetics, refetch: refetchInventory } = useInventory();
   const { showToast } = useToastContext();
   const [slot, setSlot] = useState<EquipSlot | null>(null);
   const [equippingId, setEquippingId] = useState<string | null>(null);
+  const [unequippingSlot, setUnequippingSlot] = useState<EquipSlot | null>(null);
+  const [petName, setPetName] = useState('');
+  const [editingName, setEditingName] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+
+  useEffect(() => {
+    if (!pet) return;
+    setPetName(pet.name);
+  }, [pet]);
 
   async function handleEquip(item: InventoryEntry) {
     setEquippingId(item.id);
@@ -44,6 +86,39 @@ export function PetPage() {
       showToast(extractMessage(err), 'error');
     } finally {
       setEquippingId(null);
+    }
+  }
+
+  async function handleUnequip(slotToClear: EquipSlot) {
+    setUnequippingSlot(slotToClear);
+    try {
+      await unequip(slotToClear);
+      await refetchInventory();
+      showToast('Cosmetic unequipped.', 'success');
+      setSlot(null);
+    } catch (err) {
+      showToast(extractMessage(err, 'Could not unequip that item.'), 'error');
+    } finally {
+      setUnequippingSlot(null);
+    }
+  }
+
+  async function handleRename(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = petName.trim();
+    if (!trimmed || trimmed === pet?.name || renaming) {
+      setEditingName(false);
+      return;
+    }
+    setRenaming(true);
+    try {
+      await rename(trimmed);
+      showToast('Pet renamed.', 'success');
+      setEditingName(false);
+    } catch (err) {
+      showToast(extractMessage(err, 'Could not rename your companion.'), 'error');
+    } finally {
+      setRenaming(false);
     }
   }
 
@@ -71,15 +146,53 @@ export function PetPage() {
       <header className="page__header pet-page__header">
         <div>
           <p className="page__eyebrow">Companion</p>
-          <h1>{pet.name}</h1>
+          {editingName ? (
+            <form className="pet-page__rename" onSubmit={handleRename}>
+              <input
+                className="input"
+                value={petName}
+                onChange={(event) => setPetName(event.target.value.slice(0, 20))}
+                maxLength={20}
+                autoFocus
+                aria-label="Pet name"
+              />
+              <Button variant="primary" type="submit" disabled={renaming || !petName.trim()}>
+                {renaming ? 'Saving...' : 'Save'}
+              </Button>
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => {
+                  setPetName(pet.name);
+                  setEditingName(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </form>
+          ) : (
+            <div className="pet-page__title-row">
+              <h1>{pet.name}</h1>
+              <Button variant="secondary" type="button" onClick={() => setEditingName(true)}>
+                Rename
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
       <div className="pet-page__layout">
         <section className="pet-page__hero" aria-label="Pet overview">
           <div className="pet-page__pet-art">
-            {/* PLACEHOLDER: Replace with final pet display art when delivered. */}
-            <PlaceholderPet species={pet.species} mood={pet.health > 60 ? 'happy' : pet.health > 30 ? 'neutral' : 'sad'} size={300} className="pet-breathing" />
+            {/* PLACEHOLDER: Replace with final pet display artist asset when delivered. */}
+            <SpritePet
+              species={pet.species}
+              mood={pet.health > 60 ? 'happy' : pet.health > 30 ? 'neutral' : 'sad'}
+              size={430}
+              equipped={pet.equipped}
+              className="pet-breathing"
+              style={{ width: '100%', height: '100%' }}
+            />
           </div>
           <div className="pet-page__stage">
             <div className="pet-page__stage-head">
@@ -92,11 +205,11 @@ export function PetPage() {
           </div>
         </section>
 
-        <section className="pet-page__panel" aria-label="Pet stats">
+        <section className="pet-page__panel pet-page__stats-panel" aria-label="Pet stats">
           <h2>Stats</h2>
           <div className="pet-page__stats">
             {STATS.map((stat) => (
-              <PetStat key={stat.key} label={stat.label} value={pet[stat.key]} icon={stat.icon} />
+              <PetStat key={stat.key} label={stat.label} value={pet[stat.key]} icon={stat.icon} info={stat.info} />
             ))}
           </div>
         </section>
@@ -107,16 +220,25 @@ export function PetPage() {
             {SLOTS.map((item) => {
               const equipped = pet.equipped[item.slot];
               return (
-                <button key={item.slot} type="button" className="slot-card" onClick={() => setSlot(item.slot)}>
-                  <span className="slot-card__circle">
+                <button
+                  key={item.slot}
+                  type="button"
+                  className="slot-card"
+                  aria-label={`${item.label} slot${equipped ? ', equipped' : ', empty'}`}
+                  onClick={() => setSlot(item.slot)}
+                >
+                  <span className={`slot-card__circle ${equipped ? 'slot-card__circle--filled' : ''}`}>
                     {equipped ? (
-                      <span className="slot-card__image" style={{ backgroundImage: `url("${getItemPlaceholder(equipped.name)}")` }} />
+                      <span
+                        className="slot-card__item"
+                        aria-hidden="true"
+                        style={{ backgroundImage: `url("${getItemPlaceholder(equipped.name)}")` }}
+                      />
                     ) : (
                       <span className="slot-card__empty" />
                     )}
                   </span>
                   <span className="slot-card__label">{item.label}</span>
-                  <span className="slot-card__item">{equipped?.name ?? 'Empty'}</span>
                 </button>
               );
             })}
@@ -141,26 +263,29 @@ export function PetPage() {
       {slot && (
         <EquipModal
           slot={slot}
+          slotLabel={SLOTS.find((item) => item.slot === slot)?.label ?? slot}
           items={cosmetics.filter((item) => item.category === slot)}
+          pet={pet}
           onClose={() => setSlot(null)}
           onEquip={handleEquip}
+          onUnequip={handleUnequip}
           equippingId={equippingId}
+          unequippingSlot={unequippingSlot}
         />
       )}
     </section>
   );
 }
 
-function PetStat({ label, value, icon }: { label: string; value: number; icon: string }) {
+function PetStat({ label, value, icon, info }: { label: string; value: number; icon: StatIconName; info: string }) {
   return (
     <div className="pet-stat">
       <div className="pet-stat__head">
-        <span aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <path d={icon} />
-          </svg>
+        <span className="pet-stat__icon" aria-hidden="true">
+          <StatIcon name={icon} size={20} />
         </span>
         <span>{label}</span>
+        <InfoTip label={`${label} info`} text={info} />
         <strong>{Math.round(value)}</strong>
       </div>
       <div className="pet-stat__track" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value)}>
@@ -172,28 +297,63 @@ function PetStat({ label, value, icon }: { label: string; value: number; icon: s
 
 function EquipModal({
   slot,
+  slotLabel,
   items,
+  pet,
   onClose,
   onEquip,
+  onUnequip,
   equippingId,
+  unequippingSlot,
 }: {
   slot: EquipSlot;
+  slotLabel: string;
   items: InventoryEntry[];
+  pet: PetFullState;
   onClose: () => void;
   onEquip: (item: InventoryEntry) => void;
+  onUnequip: (slot: EquipSlot) => void;
   equippingId: string | null;
+  unequippingSlot: EquipSlot | null;
 }) {
-  const title = `Equip ${slot}`;
+  const title = `Equip ${slotLabel}`;
+  const mood = getMood(pet.health, pet.is_fainted);
+  const equipped = pet.equipped[slot];
+  const isBusy = equippingId !== null || unequippingSlot !== null;
   return (
     <Modal isOpen onClose={onClose} title={title}>
+      {equipped && (
+        <div className="equip-current">
+          <div>
+            <span className="text-muted">Currently equipped</span>
+            <strong>{equipped.name}</strong>
+          </div>
+          <Button
+            variant="secondary"
+            type="button"
+            disabled={isBusy}
+            onClick={() => onUnequip(slot)}
+          >
+            {unequippingSlot === slot ? 'Unequipping...' : 'Unequip'}
+          </Button>
+        </div>
+      )}
       {items.length === 0 ? (
         <p className="pet-page__empty">No owned cosmetics for this slot.</p>
       ) : (
         <ul className="equip-list" role="list">
           {items.map((item) => (
             <li key={item.id}>
-              <button type="button" className="equip-item" disabled={equippingId !== null} onClick={() => onEquip(item)}>
-                <span className="equip-item__image" style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }} />
+              <button type="button" className="equip-item" disabled={isBusy} onClick={() => onEquip(item)}>
+                <CosmeticPreview
+                  name={item.name}
+                  category={item.category}
+                  size={72}
+                  compact
+                  species={pet.species}
+                  mood={mood}
+                  equipped={pet.equipped}
+                />
                 <span className="equip-item__name">{item.name}</span>
                 <span className={`rarity-badge rarity-badge--${item.rarity}`}>
                   {equippingId === item.id ? 'Equipping' : item.rarity}
@@ -205,6 +365,13 @@ function EquipModal({
       )}
     </Modal>
   );
+}
+
+function getMood(health: number, isFainted: boolean) {
+  if (isFainted) return 'sad';
+  if (health > 60) return 'happy';
+  if (health > 30) return 'neutral';
+  return 'sad';
 }
 
 function getStage(stage: number, totalCompleted = 0) {
@@ -231,10 +398,10 @@ function getDaysAlive(createdAt: string): number {
   return Math.max(1, Math.floor((Date.now() - created) / 86_400_000) + 1);
 }
 
-function extractMessage(err: unknown): string {
+function extractMessage(err: unknown, fallback = 'Could not equip that item.'): string {
   if (err instanceof AxiosError) {
     const data = err.response?.data as { error?: { message?: string } } | undefined;
-    return data?.error?.message ?? 'Could not equip that item.';
+    return data?.error?.message ?? fallback;
   }
-  return 'Could not equip that item.';
+  return fallback;
 }

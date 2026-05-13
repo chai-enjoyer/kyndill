@@ -1,12 +1,12 @@
--- 1. Auto-create a pet (default blob species) and streaks record for every new user.
+-- 1. Auto-create a pet (default star species) and streaks record for every new user.
 CREATE OR REPLACE FUNCTION fn_init_user_resources()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO pets (user_id, species, name)
-  VALUES (NEW.id, 'blob', 'Kyndill');
+  VALUES (NEW.id, 'star', 'Kyndill');
 
-  INSERT INTO streaks (user_id)
-  VALUES (NEW.id);
+  INSERT INTO streaks (user_id, freeze_count)
+  VALUES (NEW.id, 2);
 
   RETURN NEW;
 END;

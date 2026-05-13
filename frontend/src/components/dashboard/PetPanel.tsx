@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../common/Button';
-import { PlaceholderPet, type PetSpecies } from '../common/PlaceholderPet';
+import { type PetSpecies } from '../common/PlaceholderPet';
+import { SpritePet } from '../common/SpritePet';
 import { StatBar } from './StatBar';
+import { deriveStreakHealth } from '../../lib/utils';
 
 export interface PetPanelData {
   species: PetSpecies;
@@ -13,6 +15,7 @@ export interface PetPanelData {
   cleanliness: number;
   stage: number;
   is_fainted: boolean;
+  equipped?: Partial<Record<'hat' | 'accessory' | 'glasses' | 'scarf' | 'badge' | 'charm', { name: string }>>;
 }
 
 interface PetPanelProps {
@@ -22,33 +25,42 @@ interface PetPanelProps {
 }
 
 const SPECIES_LABEL: Record<PetSpecies, string> = {
-  blob: 'Blob',
+  star: 'Star',
   cube: 'Cube',
   sphere: 'Sphere',
   pyramid: 'Pyramid',
 };
 
+const STAT_INFO = {
+  health: 'Health combines care stats and streak momentum. Strong stats keep your pet well; streaks add consistency, but there is no guaranteed base.',
+  happiness: 'Happiness rises when you complete habits, especially social and wellness habits. It helps show how encouraged your pet feels.',
+  hunger: 'Hunger is your pet food meter. Completing habits spends a little hunger; consumable food restores it.',
+  energy: 'Energy is spent by focused effort and productivity or learning habits. Restorative consumables can bring it back up.',
+  cleanliness: 'Cleanliness slowly changes through habit activity. Health habits can improve it, while most completions use a little.',
+};
+
 export function PetPanel({ pet, userStreak, onOpenFeed }: PetPanelProps) {
-  const streakHealth = Math.min(100, userStreak * 5);
+  const petHealth = deriveStreakHealth(userStreak, pet);
   const mood = pet.is_fainted
     ? 'sad'
-    : pet.health > 60
+    : petHealth > 60
       ? 'happy'
-      : pet.health > 30
+      : petHealth > 30
         ? 'neutral'
         : 'sad';
 
   const healthHint = pet.is_fainted
     ? 'Resting. Light a habit to wake them.'
-    : `Streak x 5 = ${streakHealth}`;
+    : `Care stats + streak momentum = ${petHealth}`;
 
   return (
     <div className="pet-panel">
       <div className="pet-panel__art">
-        <PlaceholderPet
+        <SpritePet
           species={pet.species}
           mood={mood}
           size={240}
+          equipped={pet.equipped}
           className={pet.is_fainted ? '' : 'pet-breathing'}
         />
       </div>
@@ -59,11 +71,11 @@ export function PetPanel({ pet, userStreak, onOpenFeed }: PetPanelProps) {
       </div>
 
       <div className="pet-panel__stats">
-        <StatBar label="Health" value={streakHealth} icon="health" derived={healthHint} />
-        <StatBar label="Happiness" value={pet.happiness} icon="happiness" />
-        <StatBar label="Hunger" value={pet.hunger} icon="hunger" />
-        <StatBar label="Energy" value={pet.energy} icon="energy" />
-        <StatBar label="Cleanliness" value={pet.cleanliness} icon="cleanliness" />
+        <StatBar label="Health" value={petHealth} icon="health" derived={healthHint} info={STAT_INFO.health} />
+        <StatBar label="Happiness" value={pet.happiness} icon="happiness" info={STAT_INFO.happiness} />
+        <StatBar label="Hunger" value={pet.hunger} icon="hunger" info={STAT_INFO.hunger} />
+        <StatBar label="Energy" value={pet.energy} icon="energy" info={STAT_INFO.energy} />
+        <StatBar label="Cleanliness" value={pet.cleanliness} icon="cleanliness" info={STAT_INFO.cleanliness} />
       </div>
 
       <div className="pet-panel__actions">
