@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import dns from 'node:dns/promises';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client, type TokenPayload } from 'google-auth-library';
@@ -67,6 +68,7 @@ export interface MeUserDto extends AuthUserDto {
   streak_longest: number;
   avatar_url: string | null;
   visibility: 'public' | 'friends' | 'private';
+  research_consent: boolean;
 }
 
 interface UserRow {
@@ -140,6 +142,40 @@ async function generateAvailableUsername(email: string, displayName: string): Pr
   throw new HttpError(500, 'USERNAME_GENERATION_FAILED', 'Could not allocate a unique username');
 }
 
+async function ensureEmailDomainCanReceiveMail(email: string): Promise<void> {
+  if (process.env.SKIP_EMAIL_DOMAIN_CHECK === 'true') return;
+
+  const domain = email.split('@')[1];
+  if (!domain) {
+    throw new HttpError(400, 'INVALID_EMAIL_DOMAIN', 'Enter a valid email address');
+  }
+
+  try {
+    const mx = await dns.resolveMx(domain);
+    if (mx.length > 0) return;
+  } catch {
+    // Some valid domains accept mail at the bare A/AAAA record without MX.
+  }
+
+  try {
+    const [ipv4, ipv6] = await Promise.allSettled([dns.resolve4(domain), dns.resolve6(domain)]);
+    if (
+      (ipv4.status === 'fulfilled' && ipv4.value.length > 0) ||
+      (ipv6.status === 'fulfilled' && ipv6.value.length > 0)
+    ) {
+      return;
+    }
+  } catch {
+    // Promise.allSettled should not throw, but keep this deliberately defensive.
+  }
+
+  throw new HttpError(
+    400,
+    'EMAIL_DOMAIN_UNREACHABLE',
+    'That email domain does not appear to receive mail',
+  );
+}
+
 let googleClient: OAuth2Client | null = null;
 function getGoogleClient(): OAuth2Client {
   if (googleClient) return googleClient;
@@ -167,6 +203,8 @@ export async function register(input: {
   if (existing) {
     throw new HttpError(409, 'EMAIL_TAKEN', 'An account with this email already exists');
   }
+
+  await ensureEmailDomainCanReceiveMail(email);
 
   const passwordHash = await hashPassword(input.password);
   const username = await generateAvailableUsername(email, displayName);
@@ -353,7 +391,7 @@ export async function googleSignIn(credential: string): Promise<AuthResult> {
 export async function getCurrentUser(userId: string): Promise<MeUserDto> {
   const { rows } = await pool.query<MeUserDto>(
     `SELECT id, email, display_name, username, level, xp, coins,
-            streak_current, streak_longest, avatar_url, visibility
+            streak_current, streak_longest, avatar_url, visibility, research_consent
        FROM users
       WHERE id = $1`,
     [userId],

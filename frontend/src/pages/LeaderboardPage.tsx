@@ -39,7 +39,10 @@ export function LeaderboardPage() {
             {rest.map((entry) => (
               <div key={entry.id} className={`leaderboard-row ${entry.id === user?.id ? 'leaderboard-row--current' : ''}`} role="row">
                 <span>{entry.rank}</span>
-                <span>{entry.display_name}</span>
+                <span className="leaderboard-row__user">
+                  <LeaderboardAvatar entry={entry} />
+                  <span>{entry.display_name}</span>
+                </span>
                 <span>{entry.level}</span>
                 <span>{entry.xp}</span>
               </div>
@@ -56,6 +59,7 @@ function RankCard({ entry, current }: { entry: LeaderboardEntry; current: boolea
   return (
     <article className={`rank-card rank-card--${tone} ${current ? 'rank-card--current' : ''}`}>
       <span className="rank-card__badge">#{entry.rank}</span>
+      <LeaderboardAvatar entry={entry} large />
       <h2>{entry.display_name}</h2>
       <p>@{entry.username}</p>
       <dl>
@@ -63,5 +67,13 @@ function RankCard({ entry, current }: { entry: LeaderboardEntry; current: boolea
         <div><dt>XP</dt><dd>{entry.xp}</dd></div>
       </dl>
     </article>
+  );
+}
+
+function LeaderboardAvatar({ entry, large = false }: { entry: LeaderboardEntry; large?: boolean }) {
+  return (
+    <span className={`leaderboard-avatar ${large ? 'leaderboard-avatar--lg' : ''}`} aria-hidden="true">
+      {entry.avatar_url ? <img src={entry.avatar_url} alt="" /> : entry.display_name.slice(0, 1).toUpperCase()}
+    </span>
   );
 }

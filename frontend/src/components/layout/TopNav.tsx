@@ -67,6 +67,9 @@ export function TopNav() {
           </span>
 
           <Link to="/profile" className="top-nav__level" aria-label={`Level ${user.level}, profile`}>
+            <span className="top-nav__avatar" aria-hidden="true">
+              {user.avatar_url ? <img src={user.avatar_url} alt="" /> : user.display_name.slice(0, 1).toUpperCase()}
+            </span>
             <span aria-hidden="true">
               Level <AnimatedValue value={user.level} className="top-nav__level-value" />
             </span>

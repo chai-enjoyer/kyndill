@@ -13,6 +13,7 @@ export interface AuthUser {
   streak_longest: number;
   avatar_url: string | null;
   visibility: 'public' | 'friends' | 'private';
+  research_consent: boolean;
 }
 
 interface AuthContextValue {

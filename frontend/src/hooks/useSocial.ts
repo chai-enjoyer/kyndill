@@ -67,6 +67,11 @@ export interface FriendProfile {
     species: PetSpecies;
     name: string;
     health: number;
+    happiness: number;
+    hunger: number;
+    energy: number;
+    cleanliness: number;
+    total_habits_completed: number;
     is_fainted: boolean;
   } | null;
 }
@@ -144,6 +149,14 @@ export function useSocial() {
     [],
   );
 
+  const removeFriend = useCallback(
+    async (friendId: string): Promise<void> => {
+      await api.delete(`/api/social/friends/${friendId}`);
+      await refetch();
+    },
+    [refetch],
+  );
+
   const acceptGift = useCallback(
     async (giftId: string): Promise<void> => {
       await api.post(`/api/social/gifts/${giftId}/accept`);
@@ -169,6 +182,7 @@ export function useSocial() {
     sendRequest,
     respondRequest,
     sendGift,
+    removeFriend,
     acceptGift,
     getFriendProfile,
   };

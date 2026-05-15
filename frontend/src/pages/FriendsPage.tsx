@@ -30,6 +30,7 @@ export function FriendsPage() {
     sendRequest,
     respondRequest,
     sendGift,
+    removeFriend,
     acceptGift,
     getFriendProfile,
   } = useSocial();
@@ -77,6 +78,16 @@ export function FriendsPage() {
       showToast(extractMessage(err), 'error');
     } finally {
       setAcceptingGiftId(null);
+    }
+  }
+
+  async function handleRemoveFriend(friend: Friend) {
+    if (!window.confirm(`Remove ${friend.display_name} from your friends?`)) return;
+    try {
+      await removeFriend(friend.id);
+      showToast('Friend removed.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err), 'error');
     }
   }
 
@@ -218,6 +229,7 @@ export function FriendsPage() {
                   <div className="friend-card__actions">
                     <Button size="sm" variant="secondary" onClick={() => setGiftFriend(friend)}>Send Gift</Button>
                     <Button size="sm" variant="ghost" onClick={() => openProfile(friend)}>View Profile</Button>
+                    <Button size="sm" variant="ghost" onClick={() => handleRemoveFriend(friend)}>Remove</Button>
                   </div>
                 </article>
               ))}
@@ -240,6 +252,7 @@ export function FriendsPage() {
             entries.slice(0, 8).map((entry) => (
               <div key={entry.id} className="mini-rank-row">
                 <span>{entry.rank}</span>
+                <Avatar name={entry.display_name} url={entry.avatar_url} />
                 <strong>{entry.display_name}</strong>
                 <em>Level {entry.level}</em>
               </div>
@@ -422,8 +435,22 @@ function FriendProfileModal({ profile, onClose }: { profile: FriendProfile; onCl
   return (
     <Modal isOpen onClose={onClose} title={profile.display_name}>
       <div className="friend-profile-modal">
+        <header className="friend-profile-modal__header">
+          <Avatar name={profile.display_name} url={profile.avatar_url} />
+          <div>
+            <strong>{profile.display_name}</strong>
+            <span>@{profile.username}</span>
+          </div>
+        </header>
         {profile.pet && (
-          <SpritePet species={profile.pet.species} mood={mood} size={180} />
+          <section className="friend-profile-modal__pet">
+            <SpritePet species={profile.pet.species} mood={mood} size={180} />
+            <div>
+              <span className="text-muted">Companion</span>
+              <strong>{profile.pet.name}</strong>
+              <em>{profile.pet.species}</em>
+            </div>
+          </section>
         )}
         <dl>
           <div><dt>Level</dt><dd>{profile.level}</dd></div>
@@ -442,6 +469,13 @@ function FriendProfileModal({ profile, onClose }: { profile: FriendProfile; onCl
               )}
             </dd>
           </div>
+          {profile.pet && (
+            <>
+              <div><dt>Health</dt><dd>{profile.pet.health}</dd></div>
+              <div><dt>Happiness</dt><dd>{profile.pet.happiness}</dd></div>
+              <div><dt>Care stats</dt><dd>{Math.round((profile.pet.hunger + profile.pet.energy + profile.pet.cleanliness) / 3)}</dd></div>
+            </>
+          )}
         </dl>
       </div>
     </Modal>

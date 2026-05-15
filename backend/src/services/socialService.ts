@@ -130,6 +130,17 @@ export async function sendFriendRequest(
     throw new HttpError(409, 'ALREADY_FRIENDS', 'You are already friends');
   }
 
+  await pool.query(
+    `DELETE FROM friend_requests
+      WHERE status = 'rejected'
+        AND (
+          (from_user_id = $1 AND to_user_id = $2)
+          OR
+          (from_user_id = $2 AND to_user_id = $1)
+        )`,
+    [fromUserId, toUserId],
+  );
+
   const { rows: pendingOut } = await pool.query(
     `SELECT 1 FROM friend_requests
       WHERE from_user_id = $1 AND to_user_id = $2 AND status = 'pending'`,

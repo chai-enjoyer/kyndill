@@ -279,15 +279,28 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
     }
 
     const stat = inv.effect_stat as PetStat;
-    let { rows: petRows } = await client.query<PetRow>(
-      // Safe interpolation: `stat` is validated against the hardcoded whitelist above.
-      `UPDATE pets
-          SET ${stat} = LEAST(${stat} + $1, 100),
-              last_decay_at = NOW()
-        WHERE user_id = $2
-        RETURNING ${PET_COLUMNS}`,
-      [inv.effect_amount, userId],
-    );
+    const happinessBonus = stat === 'happiness' ? 0 : Math.max(1, Math.round(inv.effect_amount * 0.12));
+    const petUpdate =
+      stat === 'happiness'
+        ? await client.query<PetRow>(
+            `UPDATE pets
+                SET happiness = LEAST(happiness + $1, 100),
+                    last_decay_at = NOW()
+              WHERE user_id = $2
+              RETURNING ${PET_COLUMNS}`,
+            [inv.effect_amount, userId],
+          )
+        : await client.query<PetRow>(
+            // Safe interpolation: `stat` is validated against the hardcoded whitelist above.
+            `UPDATE pets
+                SET ${stat} = LEAST(${stat} + $1, 100),
+                    happiness = LEAST(happiness + $3, 100),
+                    last_decay_at = NOW()
+              WHERE user_id = $2
+              RETURNING ${PET_COLUMNS}`,
+            [inv.effect_amount, userId, happinessBonus],
+          );
+    let { rows: petRows } = petUpdate;
     if (petRows.length === 0) {
       throw new Error(`Pet not found for user ${userId}`);
     }
@@ -459,18 +472,18 @@ async function getCurrentStreak(userId: string, client: PoolClient | typeof pool
 }
 
 function completionStatDeltas(category: string): Record<Exclude<PetStat, 'health'>, number> {
-  const base = { happiness: 4, hunger: -5, energy: -4, cleanliness: -3 };
+  const base = { happiness: 6, hunger: -5, energy: -4, cleanliness: -3 };
   switch (category) {
     case 'Health':
-      return { ...base, energy: -2, cleanliness: 1 };
+      return { ...base, happiness: 7, energy: -2, cleanliness: 1 };
     case 'Productivity':
-      return { ...base, happiness: 5, energy: -6 };
+      return { ...base, happiness: 7, energy: -6 };
     case 'Social':
-      return { ...base, happiness: 9, hunger: -6 };
+      return { ...base, happiness: 12, hunger: -6 };
     case 'Learning':
-      return { ...base, happiness: 6, energy: -6 };
+      return { ...base, happiness: 8, energy: -6 };
     case 'Wellness':
-      return { ...base, happiness: 7, energy: 0, cleanliness: 0 };
+      return { ...base, happiness: 10, energy: 0, cleanliness: 0 };
     default:
       return base;
   }

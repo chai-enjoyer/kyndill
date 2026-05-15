@@ -51,6 +51,11 @@ export interface PublicFriendProfile {
     species: PetSpecies;
     name: string;
     health: number;
+    happiness: number;
+    hunger: number;
+    energy: number;
+    cleanliness: number;
+    total_habits_completed: number;
     is_fainted: boolean;
   } | null;
 }
@@ -230,6 +235,11 @@ export async function getFriendProfile(userId: string, friendId: string): Promis
           species: row.species,
           name: row.pet_name,
           health: derivePetHealth(row.streak_current, row),
+          happiness: row.happiness,
+          hunger: row.hunger,
+          energy: row.energy,
+          cleanliness: row.cleanliness,
+          total_habits_completed: row.total_habits_completed,
           is_fainted: row.is_fainted,
         }
       : null,

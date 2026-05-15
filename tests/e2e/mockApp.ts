@@ -26,6 +26,7 @@ export const mockUser = {
   streak_longest: 18,
   avatar_url: null,
   visibility: 'friends',
+  research_consent: true,
 };
 
 const mockProfile = {
@@ -416,12 +417,27 @@ export async function mockAuthenticatedApp(page: Page): Promise<void> {
         level: 3,
         streak_current: 5,
         total_habits_completed: 31,
-        pet: { species: 'sphere', name: 'Pebble', health: 78, is_fainted: false },
+        pet: {
+          species: 'sphere',
+          name: 'Pebble',
+          health: 78,
+          happiness: 76,
+          hunger: 68,
+          energy: 72,
+          cleanliness: 84,
+          total_habits_completed: 31,
+          is_fainted: false,
+        },
       });
     }
     if (method === 'POST' && pathname === '/api/social/friends/request') return json(route, { id: REQUEST_ID }, 201);
     if (method === 'PUT' && pathname.startsWith('/api/social/friends/request/')) return json(route, { ok: true });
+    if (method === 'DELETE' && pathname.startsWith('/api/social/friends/')) return empty(route);
+    if (method === 'GET' && pathname === '/api/social/gifts/received') return json(route, { gifts: [] });
     if (method === 'POST' && pathname === '/api/social/gifts/send') return json(route, { ok: true }, 201);
+    if (method === 'POST' && pathname.startsWith('/api/social/gifts/') && pathname.endsWith('/accept')) {
+      return json(route, { ok: true });
+    }
 
     if (method === 'GET' && pathname.startsWith('/api/leaderboard/')) return json(route, { entries: leaderboard });
     if (method === 'GET' && pathname === '/api/progress/summary') return json(route, progressSummary);

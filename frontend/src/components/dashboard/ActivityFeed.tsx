@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { Button } from '../common/Button';
 import { LoadingSkeleton } from '../common/LoadingSkeleton';
+import { Modal } from '../common/Modal';
 import type { ActivityEntry } from '../../hooks/useActivityFeed';
 
 export function ActivityFeed({
@@ -13,6 +15,8 @@ export function ActivityFeed({
   error: string | null;
   onRetry: () => void;
 }) {
+  const [selected, setSelected] = useState<ActivityEntry | null>(null);
+
   return (
     <section className="activity-feed" aria-labelledby="activity-feed-heading">
       <header className="activity-feed__header">
@@ -57,20 +61,58 @@ export function ActivityFeed({
                 key={entry.id}
                 className={`activity-feed__item ${entry.is_current_user ? 'activity-feed__item--self' : ''}`}
               >
-                <span className={`activity-feed__icon activity-feed__icon--${iconTone(entry.type)}`} aria-hidden="true">
-                  <ActivityIcon type={entry.type} />
-                </span>
-                <div className="activity-feed__copy">
-                  <strong>{message.title}</strong>
-                  <span>{message.detail}</span>
-                </div>
-                <time dateTime={entry.created_at}>{relativeTime(entry.created_at)}</time>
+                <button type="button" className="activity-feed__button" onClick={() => setSelected(entry)}>
+                  <span className={`activity-feed__icon activity-feed__icon--${iconTone(entry.type)}`} aria-hidden="true">
+                    <ActivityIcon type={entry.type} />
+                  </span>
+                  <div className="activity-feed__copy">
+                    <strong>{message.title}</strong>
+                    <span>{message.detail}</span>
+                  </div>
+                  <time dateTime={entry.created_at}>{relativeTime(entry.created_at)}</time>
+                </button>
               </li>
             );
           })}
         </ol>
       )}
+
+      {selected && (
+        <ActivityDetailsModal entry={selected} onClose={() => setSelected(null)} />
+      )}
     </section>
+  );
+}
+
+function ActivityDetailsModal({ entry, onClose }: { entry: ActivityEntry; onClose: () => void }) {
+  const message = getActivityMessage(entry);
+  const details = getActivityDetails(entry);
+  return (
+    <Modal isOpen onClose={onClose} title="Activity details">
+      <div className="activity-details">
+        <div className="activity-details__summary">
+          <span className={`activity-feed__icon activity-feed__icon--${iconTone(entry.type)}`} aria-hidden="true">
+            <ActivityIcon type={entry.type} />
+          </span>
+          <div>
+            <strong>{message.title}</strong>
+            <span>{message.detail || entry.type.split('_').join(' ')}</span>
+          </div>
+        </div>
+        <dl>
+          <div><dt>Who</dt><dd>{entry.is_current_user ? 'You' : entry.user_display_name}</dd></div>
+          <div><dt>Username</dt><dd>@{entry.user_username}</dd></div>
+          <div><dt>When</dt><dd>{formatAbsolute(entry.created_at)}</dd></div>
+          <div><dt>Type</dt><dd>{entry.type.split('_').join(' ')}</dd></div>
+          {details.map((detail) => (
+            <div key={detail.label}>
+              <dt>{detail.label}</dt>
+              <dd>{detail.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </Modal>
   );
 }
 
@@ -135,6 +177,57 @@ function getActivityMessage(entry: ActivityEntry): { title: string; detail: stri
         detail: entry.type.split('_').join(' '),
       };
   }
+}
+
+function getActivityDetails(entry: ActivityEntry): Array<{ label: string; value: string }> {
+  const metadata = entry.metadata;
+  const details: Array<{ label: string; value: string }> = [];
+  const add = (label: string, value: string | number | null) => {
+    if (value === null || value === '') return;
+    details.push({ label, value: String(value) });
+  };
+
+  switch (entry.type) {
+    case 'habit_completed':
+      add('Habit', entry.is_current_user ? textValue(metadata.habit_name) : 'Private habit');
+      add('Category', textValue(metadata.category));
+      add('Completed', completionLabel(metadata.completed_count, metadata.target_count));
+      add('Coins', numberValue(metadata.coins_earned));
+      add('XP', numberValue(metadata.xp_earned));
+      add('Streak', numberValue(metadata.new_streak));
+      break;
+    case 'purchase':
+      add('Item', textValue(metadata.item_name));
+      add('Price', numberValue(metadata.price));
+      break;
+    case 'friendship':
+      add('Friend', textValue(metadata.friend_display_name));
+      add('Friend username', textValue(metadata.friend_username));
+      break;
+    case 'level_up':
+      add('New level', numberValue(metadata.new_level));
+      add('Total XP', numberValue(metadata.xp));
+      break;
+    case 'gift_sent':
+      add('Item', textValue(metadata.item_name));
+      break;
+    default:
+      break;
+  }
+
+  const itemDrop = objectValue(metadata.item_dropped);
+  if (itemDrop) {
+    add('Found item', textValue(itemDrop.item_name));
+    add('Rarity', textValue(itemDrop.rarity));
+  }
+  return details;
+}
+
+function completionLabel(completed: unknown, target: unknown): string | null {
+  const completedCount = numberValue(completed);
+  const targetCount = numberValue(target);
+  if (completedCount === null || targetCount === null) return null;
+  return targetCount > 1 ? `${completedCount}/${targetCount}` : 'Done';
 }
 
 function ActivityIcon({ type }: { type: string }) {
@@ -217,4 +310,13 @@ function relativeTime(value: string): string {
     }
   }
   return 'now';
+}
+
+function formatAbsolute(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return '';
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(timestamp);
 }

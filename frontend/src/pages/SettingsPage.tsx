@@ -58,7 +58,7 @@ const FAQ_ITEMS = [
 
 export function SettingsPage() {
   const { profile, isLoading, save, changePassword, deleteAccount } = useProfile();
-  const { logout } = useAuthContext();
+  const { logout, mergeUser } = useAuthContext();
   const { showToast } = useToastContext();
   const push = usePushNotifications();
   const [theme, setTheme] = useState<Theme>(getStoredTheme());
@@ -157,7 +157,8 @@ export function SettingsPage() {
   async function updateResearchConsent(value: boolean) {
     setResearchConsent(value);
     try {
-      await save({ research_consent: value });
+      const updated = await save({ research_consent: value });
+      mergeUser({ research_consent: updated.research_consent });
     } catch (err) {
       setResearchConsent(!value);
       showToast(extractMessage(err, 'Could not save consent setting.'), 'error');

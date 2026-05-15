@@ -91,8 +91,10 @@ export function DashboardPage() {
       if (result.completed_today) {
         void refetchShop();
         void refetchActivity();
-        const habit = habits.find((h) => h.id === habitId);
-        setFeedbackHabit({ id: habitId, name: habit?.name ?? 'habit' });
+        if (user?.research_consent) {
+          const habit = habits.find((h) => h.id === habitId);
+          setFeedbackHabit({ id: habitId, name: habit?.name ?? 'habit' });
+        }
       }
       return result;
     } catch (err) {

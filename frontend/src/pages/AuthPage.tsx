@@ -318,7 +318,11 @@ function GoogleSection({ mode }: { mode: 'login' | 'register' }) {
           showToast(extractMessage(err, mode === 'register'), 'error');
         }
       },
-      { text: mode === 'register' ? 'signup_with' : 'signin_with' },
+      {
+        text: 'continue_with',
+        shape: 'pill',
+        width: 360,
+      },
     )
       .then(() => {
         if (!canceled) setStatus('configured');
@@ -348,7 +352,10 @@ function GoogleSection({ mode }: { mode: 'login' | 'register' }) {
           Google sign-in could not load.
         </p>
       ) : (
-        <div ref={containerRef} className="auth-google__button" aria-busy={status === 'loading'} />
+        <div className="auth-google__button-wrap">
+          {status === 'loading' && <span className="auth-google__loading">Loading Google sign-in...</span>}
+          <div ref={containerRef} className="auth-google__button" aria-busy={status === 'loading'} />
+        </div>
       )}
     </div>
   );
@@ -364,6 +371,7 @@ function extractMessage(err: unknown, isRegister: boolean): string {
     const firstIssue = data?.error?.issues?.find((issue) => issue.message)?.message;
     if (code === 'INVALID_CREDENTIALS') return 'That email and password do not match.';
     if (code === 'EMAIL_TAKEN') return 'An account with this email already exists.';
+    if (code === 'EMAIL_DOMAIN_UNREACHABLE') return 'That email domain does not appear to receive mail.';
     if (code === 'INVALID_GOOGLE_TOKEN') return 'Google sign-in could not be verified.';
     if (code === 'VALIDATION_FAILED') return firstIssue ?? 'Please check the form and try again.';
     if (message) return message;
