@@ -77,11 +77,14 @@ Stored in `focus_sessions`.
 
 ### Notifications
 
-Stored in `notifications`.
+Stored in `notifications` and, when browser push is enabled, `push_subscriptions`.
 
 - Notifications are user-specific records with type, readable content, JSON metadata, read state, and timestamp.
 - Examples include friend requests, friend request responses, gifts, item drops, and level-ups.
 - Notification preferences are stored in `users.notification_prefs` and are applied when unread notifications are listed.
+- Browser push subscriptions store the push endpoint, browser-provided subscription keys, optional expiry, and user-agent hint for the signed-in device. They do not store notification content; content is generated when sending.
+- Push subscriptions are deleted when the user disables push on a browser, when the push service reports an expired subscription, or when the account is deleted.
+- Browser push delivery is skipped while the user has an active Socket.IO web session, avoiding duplicate alerts when the user is already on the website.
 
 ## Activity And Feedback Logs
 

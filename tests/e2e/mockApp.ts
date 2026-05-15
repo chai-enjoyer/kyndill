@@ -442,6 +442,15 @@ export async function mockAuthenticatedApp(page: Page): Promise<void> {
         ],
       });
     }
+    if (method === 'GET' && pathname === '/api/notifications/push/public-key') {
+      return json(route, { enabled: false, public_key: null });
+    }
+    if (method === 'GET' && pathname === '/api/notifications/push/status') {
+      return json(route, { enabled: false, subscription_count: 0 });
+    }
+    if (method === 'POST' && pathname === '/api/notifications/push/subscribe') return json(route, { ok: true }, 201);
+    if (method === 'POST' && pathname === '/api/notifications/push/unsubscribe') return empty(route);
+    if (method === 'POST' && pathname === '/api/notifications/push/test') return json(route, { ok: true }, 202);
     if (method === 'PUT' && pathname === '/api/notifications/read') return empty(route);
 
     if (method === 'GET' && pathname === '/api/user/profile') return json(route, mockProfile);

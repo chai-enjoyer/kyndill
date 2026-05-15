@@ -2,6 +2,7 @@ import { pool } from '../db/pool';
 import { HttpError } from '../middleware/errorHandler';
 import { emitToUser } from '../socket/socketHandler';
 import { emitActivityUpdated, recordActivity } from './activityService';
+import { sendNotificationPush } from './notificationsService';
 import { applyHabitCompletionEffects } from './petService';
 import { rollItemDrop, type DroppedItem } from './rewardService';
 import type { PoolClient } from 'pg';
@@ -614,13 +615,14 @@ export async function complete(userId: string, habitId: string): Promise<Complet
 
     const pet = await applyHabitCompletionEffects(client, userId, newStreak, habit.category);
 
+    const itemDropContent = itemDropped ? `You found ${itemDropped.name}` : null;
     if (itemDropped) {
       await client.query(
         `INSERT INTO notifications (user_id, type, content, metadata)
          VALUES ($1, 'item_drop', $2, $3::jsonb)`,
         [
           userId,
-          `You found ${itemDropped.name}`,
+          itemDropContent,
           JSON.stringify({
             item_id: itemDropped.id,
             item_name: itemDropped.name,
@@ -631,13 +633,14 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       );
     }
 
+    const levelUpContent = leveledUp ? `You reached Level ${newLevel}` : null;
     if (leveledUp) {
       await client.query(
         `INSERT INTO notifications (user_id, type, content, metadata)
          VALUES ($1, 'level_up', $2, $3::jsonb)`,
         [
           userId,
-          `You reached Level ${newLevel}`,
+          levelUpContent,
           JSON.stringify({ new_level: newLevel }),
         ],
       );
@@ -679,12 +682,18 @@ export async function complete(userId: string, habitId: string): Promise<Complet
 
     if (leveledUp) {
       emitToUser(userId, 'level_up', { new_level: newLevel });
+      void sendNotificationPush(userId, 'level_up', levelUpContent ?? `You reached Level ${newLevel}`).catch((err) => {
+        console.error('level_up push failed:', err);
+      });
     }
     if (itemDropped) {
       emitToUser(userId, 'item_dropped', {
         item_id: itemDropped.id,
         item_name: itemDropped.name,
         rarity: itemDropped.rarity,
+      });
+      void sendNotificationPush(userId, 'item_drop', itemDropContent ?? `You found ${itemDropped.name}`).catch((err) => {
+        console.error('item_drop push failed:', err);
       });
     }
 

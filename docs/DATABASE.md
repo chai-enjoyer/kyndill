@@ -194,6 +194,22 @@ Materialized friendship edges. The app layer is responsible for inserting two ro
 | is_read    | BOOLEAN     | Default false                                                 |
 | created_at | TIMESTAMPTZ |                                                               |
 
+### `push_subscriptions`
+
+Browser Web Push subscriptions for signed-in user devices.
+
+| Column          | Type        | Notes                                      |
+| --------------- | ----------- | ------------------------------------------ |
+| id              | UUID PK     |                                            |
+| user_id         | UUID        | FK -> users; cascades on account deletion  |
+| endpoint        | TEXT        | Browser push endpoint, unique              |
+| p256dh          | TEXT        | Subscription public key                    |
+| auth            | TEXT        | Subscription auth secret                   |
+| expiration_time | TIMESTAMPTZ | Optional browser-provided expiry           |
+| user_agent      | TEXT        | Browser/device hint                        |
+| created_at      | TIMESTAMPTZ |                                            |
+| updated_at      | TIMESTAMPTZ | Last subscription refresh                  |
+
 ### `activity_events`
 
 Append-only event log; never updated, never deleted by the app.
@@ -233,6 +249,7 @@ users * --- * users (via friends and friend_requests)
 users 1 --- * gifts * --- 1 items
 users 1 --- * focus_sessions
 users 1 --- * notifications
+users 1 --- * push_subscriptions
 users 1 --- * activity_events
 users 1 --- * feedback_events
 habits 1 --- * feedback_events (optional)

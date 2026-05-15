@@ -6,6 +6,7 @@ import { PasswordRequirements } from '../components/common/PasswordRequirements'
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useProfile } from '../hooks/useProfile';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { extractMessage } from '../hooks/useSocial';
 import { api } from '../lib/api';
 import { getPasswordValidationMessage, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../lib/credentials';
@@ -59,6 +60,7 @@ export function SettingsPage() {
   const { profile, isLoading, save, changePassword, deleteAccount } = useProfile();
   const { logout } = useAuthContext();
   const { showToast } = useToastContext();
+  const push = usePushNotifications();
   const [theme, setTheme] = useState<Theme>(getStoredTheme());
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
   const [researchConsent, setResearchConsent] = useState(false);
@@ -162,6 +164,33 @@ export function SettingsPage() {
     }
   }
 
+  async function enablePushNotifications() {
+    try {
+      await push.enable();
+      showToast('Push notifications enabled for this browser.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err, 'Could not enable push notifications.'), 'error');
+    }
+  }
+
+  async function disablePushNotifications() {
+    try {
+      await push.disable();
+      showToast('Push notifications disabled for this browser.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err, 'Could not disable push notifications.'), 'error');
+    }
+  }
+
+  async function sendTestPush() {
+    try {
+      await push.sendTest();
+      showToast('Test push sent.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err, 'Could not send a test notification.'), 'error');
+    }
+  }
+
   if (isLoading || !profile) {
     return <section className="page settings-page"><LoadingSkeleton width="100%" height={420} /></section>;
   }
@@ -176,117 +205,165 @@ export function SettingsPage() {
     <section className="page settings-page">
       <header className="page__header"><div><p className="page__eyebrow">Preferences</p><h1>Settings</h1></div></header>
       <div className="settings-stack">
-        <section className="settings-card">
-          <h2>Appearance</h2>
-          <label className="switch settings-switch">
-            <input type="checkbox" checked={theme === 'dark'} onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')} />
-            <span className="switch__track" aria-hidden="true" />
-            <span className="switch__label">Dark mode</span>
-          </label>
-        </section>
-        <section className="settings-card">
-          <h2>Account</h2>
-          <p className="text-muted">Signed in as {profile.email}.</p>
-          <Button variant="secondary" type="button" onClick={logout}>Sign out</Button>
-        </section>
-        <section className="settings-card settings-card--notifications">
-          <h2>Notifications</h2>
-          {(['friendRequests', 'gifts', 'focusReminders'] as const).map((key) => (
-            <label key={key} className="switch settings-switch">
-              <input type="checkbox" checked={prefs[key]} onChange={(e) => updateNotificationPref(key, e.target.checked)} />
+        <div className="settings-stack__main">
+          <section className="settings-card settings-card--notifications">
+            <h2>Notifications</h2>
+            {(['friendRequests', 'gifts', 'focusReminders'] as const).map((key) => (
+              <label key={key} className="switch settings-switch">
+                <input type="checkbox" checked={prefs[key]} onChange={(e) => updateNotificationPref(key, e.target.checked)} />
+                <span className="switch__track" aria-hidden="true" />
+                <span className="switch__label">{labelPref(key)}</span>
+              </label>
+            ))}
+            <div className="push-settings">
+              <div>
+                <h3>Browser push</h3>
+                <p className="text-muted">{pushStatus(push)}</p>
+                {push.error && <p className="field__error">{push.error}</p>}
+              </div>
+              <div className="push-settings__actions">
+                {push.isSubscribed ? (
+                  <>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      disabled={push.isSaving}
+                      onClick={sendTestPush}
+                    >
+                      Send test
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      disabled={push.isSaving}
+                      onClick={disablePushNotifications}
+                    >
+                      Disable
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    variant="primary"
+                    type="button"
+                    disabled={
+                      push.isLoading ||
+                      push.isSaving ||
+                      !push.supported ||
+                      !push.isConfigured ||
+                      push.permission === 'denied'
+                    }
+                    onClick={enablePushNotifications}
+                  >
+                    {push.isSaving ? 'Enabling...' : 'Enable push'}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </section>
+          <section className="settings-card settings-card--feedback">
+            <h2>Research and feedback</h2>
+            <p className="text-muted">Kyndill uses anonymized interaction records and optional feedback to evaluate engagement, usability, and motivational impact.</p>
+            <label className="switch settings-switch">
+              <input type="checkbox" checked={researchConsent} onChange={(e) => updateResearchConsent(e.target.checked)} />
               <span className="switch__track" aria-hidden="true" />
-              <span className="switch__label">{labelPref(key)}</span>
+              <span className="switch__label">Participate in anonymized evaluation</span>
             </label>
-          ))}
-        </section>
-        <section className="settings-card settings-card--feedback">
-          <h2>Research and feedback</h2>
-          <p className="text-muted">Kyndill uses anonymized interaction records and optional feedback to evaluate engagement, usability, and motivational impact.</p>
-          <label className="switch settings-switch">
-            <input type="checkbox" checked={researchConsent} onChange={(e) => updateResearchConsent(e.target.checked)} />
-            <span className="switch__track" aria-hidden="true" />
-            <span className="switch__label">Participate in anonymized evaluation</span>
-          </label>
-          <form className="settings-feedback" onSubmit={submitFeedback}>
-            <textarea className="textarea" maxLength={1000} placeholder="Share feedback about Kyndill" value={feedbackNote} onChange={(e) => setFeedbackNote(e.target.value)} />
-            <Button variant="secondary" type="submit" disabled={feedbackSaving || !feedbackNote.trim()}>
-              {feedbackSaving ? 'Sending...' : 'Send feedback'}
-            </Button>
-          </form>
-        </section>
-        {profile.auth_provider === 'email' && (
-          <section className="settings-card settings-card--password">
-            <h2>Change password</h2>
-            <form className="settings-form settings-form--password" onSubmit={submitPassword} noValidate>
-              <div className={`field ${passwordErrors.current ? 'field--error' : ''}`}>
-                <label className="field__label" htmlFor="settings-current-password">Current password</label>
-                <input
-                  id="settings-current-password"
-                  className="input"
-                  type="password"
-                  autoComplete="current-password"
-                  value={currentPassword}
-                  onChange={(e) => {
-                    setCurrentPassword(e.target.value);
-                    setPasswordErrors({});
-                  }}
-                  aria-describedby={passwordErrors.current ? currentPasswordErrorId : undefined}
-                  aria-invalid={Boolean(passwordErrors.current) || undefined}
-                  required
-                />
-                {passwordErrors.current && (
-                  <p className="field__error" id={currentPasswordErrorId} role="alert">
-                    {passwordErrors.current}
-                  </p>
-                )}
-              </div>
-              <div className={`field ${passwordErrors.next ? 'field--error' : ''}`}>
-                <label className="field__label" htmlFor="settings-new-password">New password</label>
-                <input
-                  id="settings-new-password"
-                  className="input"
-                  type="password"
-                  autoComplete="new-password"
-                  value={newPassword}
-                  onChange={(e) => {
-                    setNewPassword(e.target.value);
-                    setPasswordErrors({});
-                  }}
-                  aria-describedby={`${passwordRequirementsId}${passwordErrors.next ? ` ${newPasswordErrorId}` : ''}`}
-                  aria-invalid={Boolean(passwordErrors.next) || undefined}
-                  minLength={PASSWORD_MIN_LENGTH}
-                  maxLength={PASSWORD_MAX_LENGTH}
-                  required
-                />
-                <PasswordRequirements id={passwordRequirementsId} password={newPassword} />
-                {passwordErrors.next && (
-                  <p className="field__error" id={newPasswordErrorId} role="alert">
-                    {passwordErrors.next}
-                  </p>
-                )}
-              </div>
-              <Button variant="primary" type="submit" disabled={passwordSaving || !canSubmitPassword}>
-                {passwordSaving ? 'Changing...' : 'Change password'}
+            <form className="settings-feedback" onSubmit={submitFeedback}>
+              <textarea className="textarea" maxLength={1000} placeholder="Share feedback about Kyndill" value={feedbackNote} onChange={(e) => setFeedbackNote(e.target.value)} />
+              <Button variant="secondary" type="submit" disabled={feedbackSaving || !feedbackNote.trim()}>
+                {feedbackSaving ? 'Sending...' : 'Send feedback'}
               </Button>
             </form>
           </section>
-        )}
-        <section className="settings-card settings-card--faq">
-          <h2>FAQ</h2>
-          <div className="faq-list">
-            {FAQ_ITEMS.map((item) => (
-              <details key={item.question} className="faq-item">
-                <summary>{item.question}</summary>
-                <p>{item.answer}</p>
-              </details>
-            ))}
-          </div>
-        </section>
-        <section className="settings-card settings-card--danger">
-          <h2>Danger zone</h2>
-          <p className="text-muted">Delete your account and all Kyndill data.</p>
-          <Button variant="secondary" onClick={() => setDeleteOpen(true)}>Delete Account</Button>
-        </section>
+          <section className="settings-card settings-card--faq">
+            <h2>FAQ</h2>
+            <div className="faq-list">
+              {FAQ_ITEMS.map((item) => (
+                <details key={item.question} className="faq-item">
+                  <summary>{item.question}</summary>
+                  <p>{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        </div>
+        <div className="settings-stack__side">
+          <section className="settings-card">
+            <h2>Appearance</h2>
+            <label className="switch settings-switch">
+              <input type="checkbox" checked={theme === 'dark'} onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')} />
+              <span className="switch__track" aria-hidden="true" />
+              <span className="switch__label">Dark mode</span>
+            </label>
+          </section>
+          <section className="settings-card">
+            <h2>Account</h2>
+            <p className="text-muted">Signed in as {profile.email}.</p>
+            <Button variant="secondary" type="button" onClick={logout}>Sign out</Button>
+          </section>
+          {profile.auth_provider === 'email' && (
+            <section className="settings-card settings-card--password">
+              <h2>Change password</h2>
+              <form className="settings-form settings-form--password" onSubmit={submitPassword} noValidate>
+                <div className={`field ${passwordErrors.current ? 'field--error' : ''}`}>
+                  <label className="field__label" htmlFor="settings-current-password">Current password</label>
+                  <input
+                    id="settings-current-password"
+                    className="input"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={(e) => {
+                      setCurrentPassword(e.target.value);
+                      setPasswordErrors({});
+                    }}
+                    aria-describedby={passwordErrors.current ? currentPasswordErrorId : undefined}
+                    aria-invalid={Boolean(passwordErrors.current) || undefined}
+                    required
+                  />
+                  {passwordErrors.current && (
+                    <p className="field__error" id={currentPasswordErrorId} role="alert">
+                      {passwordErrors.current}
+                    </p>
+                  )}
+                </div>
+                <div className={`field ${passwordErrors.next ? 'field--error' : ''}`}>
+                  <label className="field__label" htmlFor="settings-new-password">New password</label>
+                  <input
+                    id="settings-new-password"
+                    className="input"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      setPasswordErrors({});
+                    }}
+                    aria-describedby={`${passwordRequirementsId}${passwordErrors.next ? ` ${newPasswordErrorId}` : ''}`}
+                    aria-invalid={Boolean(passwordErrors.next) || undefined}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    maxLength={PASSWORD_MAX_LENGTH}
+                    required
+                  />
+                  <PasswordRequirements id={passwordRequirementsId} password={newPassword} />
+                  {passwordErrors.next && (
+                    <p className="field__error" id={newPasswordErrorId} role="alert">
+                      {passwordErrors.next}
+                    </p>
+                  )}
+                </div>
+                <Button variant="primary" type="submit" disabled={passwordSaving || !canSubmitPassword}>
+                  {passwordSaving ? 'Changing...' : 'Change password'}
+                </Button>
+              </form>
+            </section>
+          )}
+          <section className="settings-card settings-card--danger">
+            <h2>Danger zone</h2>
+            <p className="text-muted">Delete your account and all Kyndill data.</p>
+            <Button variant="secondary" onClick={() => setDeleteOpen(true)}>Delete Account</Button>
+          </section>
+        </div>
       </div>
       {deleteOpen && (
         <Modal isOpen onClose={() => setDeleteOpen(false)} title="Delete account">
@@ -310,4 +387,13 @@ function labelPref(key: 'friendRequests' | 'gifts' | 'focusReminders'): string {
     gifts: 'Gifts',
     focusReminders: 'Focus reminders',
   }[key];
+}
+
+function pushStatus(push: ReturnType<typeof usePushNotifications>): string {
+  if (!push.supported) return 'This browser does not support Web Push notifications.';
+  if (!push.isConfigured) return 'Server push keys are not configured yet.';
+  if (push.permission === 'denied') return 'Notifications are blocked in browser settings.';
+  if (push.isSubscribed) return 'Enabled for this browser.';
+  if (push.permission === 'granted') return 'Permission is granted, but this browser is not subscribed.';
+  return 'Get reward, gift, and friend updates even when Kyndill is not open.';
 }

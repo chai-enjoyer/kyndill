@@ -1,4 +1,5 @@
 import { pool } from '../db/pool';
+import { sendPushToUser } from './pushService';
 
 export interface NotificationRow {
   id: string;
@@ -35,4 +36,52 @@ export async function markAllRead(userId: string): Promise<void> {
       WHERE user_id = $1 AND is_read = FALSE`,
     [userId],
   );
+}
+
+export async function sendNotificationPush(
+  userId: string,
+  type: string,
+  content: string,
+): Promise<void> {
+  await sendPushToUser(
+    userId,
+    {
+      title: notificationTitle(type),
+      body: content,
+      url: notificationUrl(type),
+      tag: type,
+    },
+    type,
+  );
+}
+
+function notificationTitle(type: string): string {
+  switch (type) {
+    case 'friend_request':
+      return 'New friend request';
+    case 'friend_request_response':
+      return 'Friend request update';
+    case 'gift_received':
+      return 'Gift received';
+    case 'item_drop':
+      return 'Item found';
+    case 'level_up':
+      return 'Level up!';
+    default:
+      return 'Kyndill';
+  }
+}
+
+function notificationUrl(type: string): string {
+  switch (type) {
+    case 'friend_request':
+    case 'friend_request_response':
+    case 'gift_received':
+      return '/friends';
+    case 'item_drop':
+    case 'level_up':
+      return '/';
+    default:
+      return '/';
+  }
 }

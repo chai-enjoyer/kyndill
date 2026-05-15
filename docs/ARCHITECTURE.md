@@ -104,7 +104,7 @@ The intended deployment is:
 - Caddy or nginx in front of Node for TLS termination on the API VM.
 - Daily `pg_dump` backups to a Cloud Storage bucket.
 
-Deployment details should be verified against the final VM/Firebase configuration before thesis submission. No production deployment config is currently committed in the repository.
+Deployment templates and the command-by-command runbook live in `docs/DEPLOYMENT.md` and `deploy/`. Final domains, project IDs, VM settings, and DNS should still be verified against the live environment before thesis submission.
 
 ## Local Development
 

@@ -433,6 +433,49 @@ Notification types currently written include friend requests, friend request res
 
 Marks all unread notifications for the caller as read. Returns `204 No Content`.
 
+### GET `/push/public-key`
+
+Returns browser Web Push configuration for the current backend:
+
+```json
+{ "enabled": true, "public_key": "<VAPID public key>" }
+```
+
+If VAPID keys are missing, `enabled` is `false` and `public_key` is `null`.
+
+### GET `/push/status`
+
+Returns whether push is configured and how many push subscriptions the current user has stored.
+
+### POST `/push/subscribe`
+
+Body is the browser `PushSubscription` JSON:
+
+```json
+{
+  "endpoint": "https://push.example/subscription",
+  "expirationTime": null,
+  "keys": {
+    "p256dh": "...",
+    "auth": "..."
+  }
+}
+```
+
+Stores or updates this browser subscription for the authenticated user. Returns `{ "ok": true }`.
+
+### POST `/push/unsubscribe`
+
+Body: `{ "endpoint": "https://push.example/subscription" }`.
+
+Removes this browser subscription. Returns `204 No Content`.
+
+### POST `/push/test`
+
+Sends a test browser push notification to the current user’s stored subscriptions. Returns `202 Accepted`.
+
+Push delivery is suppressed while the user has an active Kyndill web session connected over Socket.IO, so the in-app notification bell/toast handles visible-session updates without duplicate browser pushes.
+
 ## User (`/api/user`)
 
 ### GET `/search?q=...`

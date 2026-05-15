@@ -96,6 +96,7 @@ The frontend serves on `http://localhost:5173`. The backend serves on `http://lo
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): system overview and deployment topology.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): Google Cloud and Firebase deployment runbook.
 - [`docs/DECISIONS.md`](docs/DECISIONS.md): architecture decision log.
 - [`docs/API.md`](docs/API.md): HTTP and WebSocket API reference.
 - [`docs/DATABASE.md`](docs/DATABASE.md): PostgreSQL schema and migration workflow.

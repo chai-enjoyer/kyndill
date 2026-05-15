@@ -9,6 +9,7 @@ import {
 } from './activityService';
 import { listForUser as listInventory } from './inventoryService';
 import type { InventoryListing } from './inventoryService';
+import { sendNotificationPush } from './notificationsService';
 
 // ============================================================
 // DTOs
@@ -167,13 +168,14 @@ export async function sendFriendRequest(
     [fromUserId],
   );
   const sender = senderRows[0] ?? { username: '', display_name: '', avatar_url: null };
+  const requestContent = `${sender.display_name || sender.username} sent you a friend request`;
 
   await pool.query(
     `INSERT INTO notifications (user_id, type, content, metadata)
      VALUES ($1, 'friend_request', $2, $3::jsonb)`,
     [
       toUserId,
-      `${sender.display_name || sender.username} sent you a friend request`,
+      requestContent,
       JSON.stringify({
         request_id: requestRow.id,
         from_user_id: fromUserId,
@@ -189,6 +191,9 @@ export async function sendFriendRequest(
     from_username: sender.username,
     from_display_name: sender.display_name,
     from_avatar_url: sender.avatar_url,
+  });
+  void sendNotificationPush(toUserId, 'friend_request', requestContent).catch((err) => {
+    console.error('friend_request push failed:', err);
   });
 
   return {
@@ -325,13 +330,14 @@ export async function respondToFriendRequest(
     [userId],
   );
   const responder = responderRows[0] ?? { username: '', display_name: '' };
+  const responseContent = `${responder.display_name || responder.username} ${newStatus} your friend request`;
 
   await pool.query(
     `INSERT INTO notifications (user_id, type, content, metadata)
      VALUES ($1, 'friend_request_response', $2, $3::jsonb)`,
     [
       reqRow.from_user_id,
-      `${responder.display_name || responder.username} ${newStatus} your friend request`,
+      responseContent,
       JSON.stringify({
         request_id: requestId,
         status: newStatus,
@@ -348,6 +354,9 @@ export async function respondToFriendRequest(
     responder_id: userId,
     responder_username: responder.username,
     responder_display_name: responder.display_name,
+  });
+  void sendNotificationPush(reqRow.from_user_id, 'friend_request_response', responseContent).catch((err) => {
+    console.error('friend_request_response push failed:', err);
   });
 
   if (action === 'accept') {
@@ -435,6 +444,7 @@ export async function sendGift(
 
   const client = await pool.connect();
   let gift: GiftDto;
+  const giftContent = `You received ${itemInfo.name} as a gift`;
   try {
     await client.query('BEGIN');
 
@@ -464,7 +474,7 @@ export async function sendGift(
        VALUES ($1, 'gift_received', $2, $3::jsonb)`,
       [
         toUserId,
-        `You received ${itemInfo.name} as a gift`,
+        giftContent,
         JSON.stringify({
           gift_id: gift.id,
           item_id: itemId,
@@ -510,6 +520,9 @@ export async function sendGift(
     item_name: itemInfo.name,
     item_image_url: itemInfo.image_url,
     message: message ?? null,
+  });
+  void sendNotificationPush(toUserId, 'gift_received', giftContent).catch((err) => {
+    console.error('gift_received push failed:', err);
   });
 
   return {

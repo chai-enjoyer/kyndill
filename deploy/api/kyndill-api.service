@@ -1,0 +1,18 @@
+[Unit]
+Description=Kyndill API
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=kyndill
+Group=kyndill
+WorkingDirectory=/srv/kyndill
+EnvironmentFile=/etc/kyndill/backend.env
+ExecStart=/usr/bin/node /srv/kyndill/backend/dist/server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+[Unit]
+Description=Back up Kyndill PostgreSQL database to Cloud Storage
+After=network.target postgresql.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/kyndill/backup.env
+ExecStart=/usr/bin/env bash /srv/kyndill/deploy/api/backup-postgres.sh
