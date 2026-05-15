@@ -104,6 +104,15 @@ router.post(
   },
 );
 
+router.get('/gifts/received', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const gifts = await socialService.listReceivedGifts(req.userId!);
+    res.status(200).json({ gifts });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post(
   '/gifts/:id/accept',
   validate(idParam, 'params'),

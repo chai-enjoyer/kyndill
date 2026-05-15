@@ -32,6 +32,20 @@ export interface SentFriendRequest {
   created_at: string;
 }
 
+export interface ReceivedGift {
+  id: string;
+  from_user_id: string;
+  from_username: string;
+  from_display_name: string;
+  from_avatar_url: string | null;
+  item_id: string;
+  item_name: string;
+  item_image_url: string | null;
+  message: string | null;
+  is_accepted: boolean;
+  sent_at: string;
+}
+
 export interface UserSearchResult {
   id: string;
   display_name: string;
@@ -61,20 +75,28 @@ export function useSocial() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<SentFriendRequest[]>([]);
+  const [receivedGifts, setReceivedGifts] = useState<ReceivedGift[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [{ data: friendsRes }, { data: requestsRes }, { data: sentRequestsRes }] = await Promise.all([
+      const [
+        { data: friendsRes },
+        { data: requestsRes },
+        { data: sentRequestsRes },
+        { data: giftsRes },
+      ] = await Promise.all([
         api.get<{ friends: Friend[] }>('/api/social/friends'),
         api.get<{ requests: FriendRequest[] }>('/api/social/friends/requests'),
         api.get<{ requests: SentFriendRequest[] }>('/api/social/friends/requests/sent'),
+        api.get<{ gifts: ReceivedGift[] }>('/api/social/gifts/received'),
       ]);
       setFriends(friendsRes.friends);
       setRequests(requestsRes.requests);
       setSentRequests(sentRequestsRes.requests);
+      setReceivedGifts(giftsRes.gifts);
       setError(null);
     } catch (err) {
       setError(extractMessage(err));
@@ -122,6 +144,14 @@ export function useSocial() {
     [],
   );
 
+  const acceptGift = useCallback(
+    async (giftId: string): Promise<void> => {
+      await api.post(`/api/social/gifts/${giftId}/accept`);
+      await refetch();
+    },
+    [refetch],
+  );
+
   const getFriendProfile = useCallback(async (friendId: string): Promise<FriendProfile> => {
     const { data } = await api.get<FriendProfile>(`/api/user/friends/${friendId}/profile`);
     return data;
@@ -131,6 +161,7 @@ export function useSocial() {
     friends,
     requests,
     sentRequests,
+    receivedGifts,
     isLoading,
     error,
     refetch,
@@ -138,6 +169,7 @@ export function useSocial() {
     sendRequest,
     respondRequest,
     sendGift,
+    acceptGift,
     getFriendProfile,
   };
 }

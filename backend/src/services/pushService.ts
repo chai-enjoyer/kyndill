@@ -1,6 +1,5 @@
 import webPush from 'web-push';
 import { pool } from '../db/pool';
-import { isUserConnected } from '../socket/socketHandler';
 
 export interface BrowserPushSubscription {
   endpoint: string;
@@ -97,7 +96,6 @@ export async function sendPushToUser(
   notificationType = 'general',
 ): Promise<void> {
   if (!isConfigured()) return;
-  if (isUserConnected(userId)) return;
   if (!(await shouldSendPush(userId, notificationType))) return;
 
   const { rows } = await pool.query<PushSubscriptionRow>(

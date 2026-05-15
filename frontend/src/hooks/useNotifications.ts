@@ -68,8 +68,9 @@ export function useNotifications() {
       void refetch();
     };
 
-    const handleGift = (payload: { from_display_name?: string; item_name?: string }) => {
-      const content = `${payload.from_display_name ?? 'A friend'} sent you ${payload.item_name ?? 'a gift'}.`;
+    const handleGift = (payload: { from_display_name?: string; item_name?: string; message?: string | null }) => {
+      const base = `${payload.from_display_name ?? 'A friend'} sent you ${payload.item_name ?? 'a gift'}.`;
+      const content = payload.message ? `${base} "${payload.message}"` : base;
       addRealtimeNotification('gift_received', content);
       showToast(content, 'success');
       void refetch();

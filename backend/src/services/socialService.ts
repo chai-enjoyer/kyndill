@@ -54,6 +54,14 @@ export interface GiftDto {
   sent_at: string;
 }
 
+export interface ReceivedGiftDto extends GiftDto {
+  from_username: string;
+  from_display_name: string;
+  from_avatar_url: string | null;
+  item_name: string;
+  item_image_url: string | null;
+}
+
 export interface SendGiftResult {
   gift: GiftDto;
   item: { id: string; name: string; image_url: string | null };
@@ -427,6 +435,17 @@ export async function sendGift(
   }
   const itemInfo = invRows[0];
 
+  const { rows: senderRows } = await pool.query<{
+    username: string;
+    display_name: string;
+  }>(
+    `SELECT username, display_name FROM users WHERE id = $1`,
+    [fromUserId],
+  );
+  const sender = senderRows[0] ?? { username: '', display_name: '' };
+  const senderName = sender.display_name || sender.username || 'A friend';
+  const cleanMessage = message?.trim() || null;
+
   const { rows: existing } = await pool.query(
     `SELECT 1 FROM gifts
       WHERE from_user_id = $1
@@ -444,7 +463,9 @@ export async function sendGift(
 
   const client = await pool.connect();
   let gift: GiftDto;
-  const giftContent = `You received ${itemInfo.name} as a gift`;
+  const giftContent = cleanMessage
+    ? `${senderName} sent you ${itemInfo.name} as a gift: ${cleanMessage}`
+    : `${senderName} sent you ${itemInfo.name} as a gift`;
   try {
     await client.query('BEGIN');
 
@@ -465,7 +486,7 @@ export async function sendGift(
       `INSERT INTO gifts (from_user_id, to_user_id, item_id, message)
        VALUES ($1, $2, $3, $4)
        RETURNING id, from_user_id, to_user_id, item_id, message, is_accepted, sent_at`,
-      [fromUserId, toUserId, itemId, message ?? null],
+      [fromUserId, toUserId, itemId, cleanMessage],
     );
     gift = giftRows[0];
 
@@ -480,7 +501,9 @@ export async function sendGift(
           item_id: itemId,
           item_name: itemInfo.name,
           from_user_id: fromUserId,
-          message: message ?? null,
+          from_username: sender.username,
+          from_display_name: sender.display_name,
+          message: cleanMessage,
         }),
       ],
     );
@@ -502,15 +525,6 @@ export async function sendGift(
     client.release();
   }
 
-  const { rows: senderRows } = await pool.query<{
-    username: string;
-    display_name: string;
-  }>(
-    `SELECT username, display_name FROM users WHERE id = $1`,
-    [fromUserId],
-  );
-  const sender = senderRows[0] ?? { username: '', display_name: '' };
-
   emitToUser(toUserId, 'gift_received', {
     gift_id: gift.id,
     from_user_id: fromUserId,
@@ -519,7 +533,7 @@ export async function sendGift(
     item_id: itemId,
     item_name: itemInfo.name,
     item_image_url: itemInfo.image_url,
-    message: message ?? null,
+    message: cleanMessage,
   });
   void sendNotificationPush(toUserId, 'gift_received', giftContent).catch((err) => {
     console.error('gift_received push failed:', err);
@@ -529,6 +543,31 @@ export async function sendGift(
     gift,
     item: { id: itemId, name: itemInfo.name, image_url: itemInfo.image_url },
   };
+}
+
+export async function listReceivedGifts(userId: string): Promise<ReceivedGiftDto[]> {
+  const { rows } = await pool.query<ReceivedGiftDto>(
+    `SELECT g.id,
+            g.from_user_id,
+            g.to_user_id,
+            g.item_id,
+            g.message,
+            g.is_accepted,
+            g.sent_at,
+            u.username AS from_username,
+            u.display_name AS from_display_name,
+            u.avatar_url AS from_avatar_url,
+            i.name AS item_name,
+            i.image_url AS item_image_url
+       FROM gifts g
+       JOIN users u ON u.id = g.from_user_id
+       JOIN items i ON i.id = g.item_id
+      WHERE g.to_user_id = $1
+        AND g.is_accepted = FALSE
+      ORDER BY g.sent_at DESC`,
+    [userId],
+  );
+  return rows;
 }
 
 export async function acceptGift(userId: string, giftId: string): Promise<AcceptGiftResult> {

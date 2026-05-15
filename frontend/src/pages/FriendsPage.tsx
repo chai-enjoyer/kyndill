@@ -23,12 +23,14 @@ export function FriendsPage() {
     friends,
     requests,
     sentRequests,
+    receivedGifts,
     isLoading,
     error,
     searchUsers,
     sendRequest,
     respondRequest,
     sendGift,
+    acceptGift,
     getFriendProfile,
   } = useSocial();
   const { entries, isLoading: leaderboardLoading } = useLeaderboard('friends');
@@ -39,6 +41,7 @@ export function FriendsPage() {
   const [giftFriend, setGiftFriend] = useState<Friend | null>(null);
   const [profile, setProfile] = useState<FriendProfile | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [acceptingGiftId, setAcceptingGiftId] = useState<string | null>(null);
 
   const filtered = friends.filter((friend) =>
     `${friend.display_name} ${friend.username}`.toLowerCase().includes(query.toLowerCase()),
@@ -61,6 +64,19 @@ export function FriendsPage() {
       setProfile(await getFriendProfile(friend.id));
     } catch (err) {
       showToast(extractMessage(err), 'error');
+    }
+  }
+
+  async function handleAcceptGift(giftId: string) {
+    setAcceptingGiftId(giftId);
+    try {
+      await acceptGift(giftId);
+      await refetchInventory();
+      showToast('Gift added to your inventory.', 'success');
+    } catch (err) {
+      showToast(extractMessage(err), 'error');
+    } finally {
+      setAcceptingGiftId(null);
     }
   }
 
@@ -126,6 +142,42 @@ export function FriendsPage() {
                       <span>@{request.to_username}</span>
                     </div>
                     <span className="owned-badge">Pending</span>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="pending-panel" aria-label="Received gifts">
+            <h2>Received gifts</h2>
+            {isLoading ? (
+              <LoadingSkeleton width="100%" height={72} />
+            ) : receivedGifts.length === 0 ? (
+              <div className="friends-empty">No gifts waiting.</div>
+            ) : (
+              <div className="pending-list">
+                {receivedGifts.map((gift) => (
+                  <article key={gift.id} className="request-card gift-card">
+                    <span
+                      className="gift-option__image"
+                      style={{ backgroundImage: `url("${getItemPlaceholder(gift.item_name)}")` }}
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <strong>{gift.item_name}</strong>
+                      <span>From @{gift.from_username}</span>
+                      {gift.message && <p>{gift.message}</p>}
+                    </div>
+                    <div className="request-card__actions">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        disabled={acceptingGiftId === gift.id}
+                        onClick={() => handleAcceptGift(gift.id)}
+                      >
+                        {acceptingGiftId === gift.id ? 'Adding...' : 'Accept'}
+                      </Button>
+                    </div>
                   </article>
                 ))}
               </div>
