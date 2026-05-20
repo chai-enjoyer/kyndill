@@ -143,7 +143,14 @@ export function createPortalApp(): Express {
   // Static UI. Plain HTML + vanilla JS — smaller attack surface than React.
   const publicDir = path.join(__dirname, '..', 'public');
   app.use(express.static(publicDir, { extensions: ['html'] }));
-  app.get('*', (_req: Request, res: Response) => {
+  // SPA fallback for actual page routes only. Anything that looks like an
+  // asset (has a dot in the path) returns a real 404 — never lies about its
+  // content type by sending index.html.
+  app.get('*', (req: Request, res: Response) => {
+    if (req.path.includes('.')) {
+      res.status(404).end();
+      return;
+    }
     res.sendFile(path.join(publicDir, 'index.html'));
   });
 
