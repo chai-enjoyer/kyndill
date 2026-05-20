@@ -42,22 +42,39 @@ export function createPortalApp(): Express {
   const app = express();
 
   app.disable('x-powered-by');
+
+  // Helmet handles the security headers we don't customize, but we set CSP
+  // ourselves below — Helmet's directive merge was producing `default-src
+  // 'none'` in some environments which broke even the page's own scripts.
   app.use(
     helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:'],
-          connectSrc: ["'self'"],
-          objectSrc: ["'none'"],
-          frameAncestors: ["'none'"],
-        },
-      },
+      contentSecurityPolicy: false,
       crossOriginEmbedderPolicy: false,
     }),
   );
+
+  const CSP = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join('; ');
+
+  app.use((_req, res, next) => {
+    res.setHeader('Content-Security-Policy', CSP);
+    next();
+  });
+
+  // Firefox auto-fetches /favicon.ico in addition to whatever <link> tags
+  // specify. Return 204 so it doesn't surface as an error.
+  app.get('/favicon.ico', (_req, res) => res.status(204).end());
+
   // No CORS with the main app. The portal is self-contained.
   app.use(cors({ origin: false }));
   app.use(express.json({ limit: '64kb' }));
