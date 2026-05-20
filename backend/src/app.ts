@@ -15,6 +15,9 @@ import { notificationsRouter } from './routes/notifications';
 import { feedbackRouter } from './routes/feedback';
 import { progressRouter } from './routes/progress';
 import { recoveryRouter } from './routes/recovery';
+import { analyticsRouter } from './routes/analytics';
+import { moodPingRouter } from './routes/moodPing';
+import { onboardingRouter } from './routes/onboarding';
 
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
@@ -52,6 +55,9 @@ export function createApp(): Express {
   app.use('/api/feedback', requireAuth, feedbackRouter);
   app.use('/api/progress', requireAuth, progressRouter);
   app.use('/api/recovery', requireAuth, recoveryRouter);
+  app.use('/api/analytics', requireAuth, analyticsRouter);
+  app.use('/api/mood-pings', requireAuth, moodPingRouter);
+  app.use('/api/onboarding', requireAuth, onboardingRouter);
 
   app.use(errorHandler);
   return app;

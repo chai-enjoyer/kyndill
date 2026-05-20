@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { api, TOKEN_STORAGE_KEY } from '../lib/api';
+import { clearProfileCache } from '../hooks/useProfile';
+import { flush as flushAnalytics, setAnalyticsConsent } from '../lib/analytics';
 
 export interface AuthUser {
   id: string;
@@ -57,11 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (userResult.status === 'fulfilled') {
       setUser(userResult.value.data);
+      setAnalyticsConsent(userResult.value.data.research_consent === true);
     } else {
       window.localStorage.removeItem(TOKEN_STORAGE_KEY);
       setToken(null);
       setUser(null);
       setPetInitialized(null);
+      setAnalyticsConsent(false);
       return;
     }
 
@@ -122,7 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    void flushAnalytics();
+    setAnalyticsConsent(false);
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
+    clearProfileCache();
     setToken(null);
     setUser(null);
     setPetInitialized(null);
@@ -139,7 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const mergeUser = useCallback((partial: Partial<AuthUser>) => {
-    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...partial };
+      if (partial.research_consent !== undefined) {
+        setAnalyticsConsent(next.research_consent === true);
+      }
+      return next;
+    });
   }, []);
 
   return (

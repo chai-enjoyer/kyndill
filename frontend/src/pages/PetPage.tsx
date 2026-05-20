@@ -11,6 +11,7 @@ import { useToastContext } from '../context/ToastContext';
 import { useInventory, type InventoryEntry } from '../hooks/useInventory';
 import { usePet, type EquipSlot, type PetFullState } from '../hooks/usePet';
 import { getItemPlaceholder } from '../lib/utils';
+import { trackEvent } from '../lib/analytics';
 
 const STATS: Array<{
   key: 'health' | 'happiness' | 'hunger' | 'energy' | 'cleanliness';
@@ -80,6 +81,7 @@ export function PetPage() {
     try {
       await equip(item.id);
       await Promise.all([refetch(), refetchInventory()]);
+      trackEvent('pet_item_equipped', { item_id: item.id });
       showToast(`${item.name} equipped.`, 'success');
       setSlot(null);
     } catch (err) {
@@ -94,7 +96,8 @@ export function PetPage() {
     try {
       await unequip(slotToClear);
       await refetchInventory();
-      showToast('Cosmetic unequipped.', 'success');
+      trackEvent('pet_item_unequipped', { slot: slotToClear });
+      showToast('Removed.', 'success');
       setSlot(null);
     } catch (err) {
       showToast(extractMessage(err, 'Could not unequip that item.'), 'error');
@@ -113,7 +116,10 @@ export function PetPage() {
     setRenaming(true);
     try {
       await rename(trimmed);
-      showToast('Pet renamed.', 'success');
+      // Length is the only thing we record. The chosen name itself is
+      // self-identifying and we don't want it in the research export.
+      trackEvent('pet_renamed', { name_length: trimmed.length });
+      showToast(`Say hi to ${trimmed}.`, 'success');
       setEditingName(false);
     } catch (err) {
       showToast(extractMessage(err, 'Could not rename your companion.'), 'error');

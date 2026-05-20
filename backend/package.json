@@ -11,7 +11,10 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "start": "node dist/server.js",
-    "migrate": "tsx db/migrate.ts"
+    "migrate": "tsx db/migrate.ts",
+    "research:dev": "tsx watch research-portal/src/server.ts",
+    "research:start": "tsx research-portal/src/server.ts",
+    "admin:create": "tsx research-portal/scripts/create-admin.ts"
   },
   "dependencies": {
     "@kyndill/shared": "*",

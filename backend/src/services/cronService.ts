@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { pool } from '../db/pool';
 import { derivePetHealth } from './petService';
+import { runHourlyReminderTick } from './reminderService';
 
 let started = false;
 
@@ -16,6 +17,19 @@ export function startCronJobs(): void {
     () => {
       runDailyRollover().catch((err) => {
         console.error('[cron] daily rollover failed:', err);
+      });
+    },
+    { timezone: 'UTC' },
+  );
+
+  // Reminder tick fires every hour at :00. The service computes each user's
+  // local-time hour and matches against their saved reminder_hour, so a single
+  // UTC-anchored job covers every timezone.
+  cron.schedule(
+    '0 * * * *',
+    () => {
+      runHourlyReminderTick().catch((err) => {
+        console.error('[cron] reminder tick failed:', err);
       });
     },
     { timezone: 'UTC' },

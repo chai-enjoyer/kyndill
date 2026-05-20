@@ -16,6 +16,8 @@ type NotificationPrefs = {
   friendRequests: boolean;
   gifts: boolean;
   focusReminders: boolean;
+  dailyReminder: boolean;
+  moodPing: boolean;
 };
 
 type PasswordFieldErrors = {
@@ -27,7 +29,17 @@ const DEFAULT_PREFS: NotificationPrefs = {
   friendRequests: true,
   gifts: true,
   focusReminders: true,
+  dailyReminder: true,
+  moodPing: false,
 };
+
+function detectTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
 
 const FAQ_ITEMS = [
   {
@@ -63,6 +75,7 @@ export function SettingsPage() {
   const push = usePushNotifications();
   const [theme, setTheme] = useState<Theme>(getStoredTheme());
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
+  const [reminderHour, setReminderHour] = useState<number | null>(19);
   const [researchConsent, setResearchConsent] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState('');
   const [feedbackSaving, setFeedbackSaving] = useState(false);
@@ -78,6 +91,7 @@ export function SettingsPage() {
     if (!profile) return;
     setPrefs({ ...DEFAULT_PREFS, ...profile.notification_prefs });
     setResearchConsent(profile.research_consent);
+    setReminderHour(profile.reminder_hour);
   }, [profile]);
 
   useEffect(() => {
@@ -135,7 +149,7 @@ export function SettingsPage() {
         note: feedbackNote.trim(),
       });
       setFeedbackNote('');
-      showToast('Feedback saved.', 'success');
+      showToast('Thanks — we read every one.', 'success');
     } catch (err) {
       showToast(extractMessage(err, 'Could not save feedback.'), 'error');
     } finally {
@@ -154,6 +168,20 @@ export function SettingsPage() {
     }
   }
 
+  async function updateReminderHour(value: number | null) {
+    const previous = reminderHour;
+    setReminderHour(value);
+    try {
+      await save({
+        reminder_hour: value,
+        reminder_timezone: detectTimezone(),
+      });
+    } catch (err) {
+      setReminderHour(previous);
+      showToast(extractMessage(err, 'Could not save reminder time.'), 'error');
+    }
+  }
+
   async function updateResearchConsent(value: boolean) {
     setResearchConsent(value);
     try {
@@ -168,7 +196,7 @@ export function SettingsPage() {
   async function enablePushNotifications() {
     try {
       await push.enable();
-      showToast('Push notifications enabled for this browser.', 'success');
+      showToast('Push enabled on this device.', 'success');
     } catch (err) {
       showToast(extractMessage(err, 'Could not enable push notifications.'), 'error');
     }
@@ -177,7 +205,7 @@ export function SettingsPage() {
   async function disablePushNotifications() {
     try {
       await push.disable();
-      showToast('Push notifications disabled for this browser.', 'success');
+      showToast('Push turned off here.', 'success');
     } catch (err) {
       showToast(extractMessage(err, 'Could not disable push notifications.'), 'error');
     }
@@ -186,7 +214,7 @@ export function SettingsPage() {
   async function sendTestPush() {
     try {
       await push.sendTest();
-      showToast('Test push sent.', 'success');
+      showToast('Test sent — watch for it.', 'success');
     } catch (err) {
       showToast(extractMessage(err, 'Could not send a test notification.'), 'error');
     }
@@ -209,13 +237,47 @@ export function SettingsPage() {
         <div className="settings-stack__main">
           <section className="settings-card settings-card--notifications">
             <h2>Notifications</h2>
-            {(['friendRequests', 'gifts', 'focusReminders'] as const).map((key) => (
+            {(['friendRequests', 'gifts', 'focusReminders', 'dailyReminder', 'moodPing'] as const).map((key) => (
               <label key={key} className="switch settings-switch">
-                <input type="checkbox" checked={prefs[key]} onChange={(e) => updateNotificationPref(key, e.target.checked)} />
+                <input
+                  type="checkbox"
+                  checked={prefs[key]}
+                  disabled={key === 'moodPing' && !researchConsent}
+                  onChange={(e) => updateNotificationPref(key, e.target.checked)}
+                />
                 <span className="switch__track" aria-hidden="true" />
                 <span className="switch__label">{labelPref(key)}</span>
               </label>
             ))}
+            {prefs.dailyReminder && (
+              <div className="reminder-time">
+                <div>
+                  <h3>Reminder time</h3>
+                  <p className="text-muted">
+                    {reminderHour === null
+                      ? 'Off. Pick any hour and Kyndill will send a quiet nudge if habits are still open.'
+                      : `Sent at ${formatHourLabel(reminderHour)} in your local time, only if habits are still pending.`}
+                  </p>
+                </div>
+                <div className="reminder-time__controls">
+                  <select
+                    className="input reminder-time__select"
+                    aria-label="Reminder time"
+                    value={reminderHour ?? ''}
+                    onChange={(e) =>
+                      updateReminderHour(e.target.value === '' ? null : Number(e.target.value))
+                    }
+                  >
+                    <option value="">Off</option>
+                    {Array.from({ length: 24 }, (_, hour) => (
+                      <option key={hour} value={hour}>
+                        {formatHourLabel(hour)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
             <div className="push-settings">
               <div>
                 <h3>Browser push</h3>
@@ -263,12 +325,23 @@ export function SettingsPage() {
           </section>
           <section className="settings-card settings-card--feedback">
             <h2>Research and feedback</h2>
-            <p className="text-muted">Kyndill uses anonymized interaction records and optional feedback to evaluate engagement, usability, and motivational impact.</p>
+            <p className="text-muted">
+              Kyndill is in research mode. With your consent we store anonymized habit,
+              focus, pet, social, and navigation events to evaluate engagement and motivational
+              impact. Identifying fields (email, name, username, avatar) are never included in
+              exports.
+            </p>
             <label className="switch settings-switch">
               <input type="checkbox" checked={researchConsent} onChange={(e) => updateResearchConsent(e.target.checked)} />
               <span className="switch__track" aria-hidden="true" />
               <span className="switch__label">Participate in anonymized evaluation</span>
             </label>
+            {!researchConsent && (
+              <p className="text-muted settings-card__hint">
+                Turning this off stops new data collection immediately. Existing rows stay until
+                you delete the account.
+              </p>
+            )}
             <form className="settings-feedback" onSubmit={submitFeedback}>
               <textarea className="textarea" maxLength={1000} placeholder="Share feedback about Kyndill" value={feedbackNote} onChange={(e) => setFeedbackNote(e.target.value)} />
               <Button variant="secondary" type="submit" disabled={feedbackSaving || !feedbackNote.trim()}>
@@ -382,16 +455,30 @@ export function SettingsPage() {
   );
 }
 
-function labelPref(key: 'friendRequests' | 'gifts' | 'focusReminders'): string {
+function labelPref(key: 'friendRequests' | 'gifts' | 'focusReminders' | 'dailyReminder' | 'moodPing'): string {
   return {
     friendRequests: 'Friend requests',
     gifts: 'Gifts',
     focusReminders: 'Focus reminders',
+    dailyReminder: 'Daily habit reminder',
+    moodPing: 'Weekly mood check-in',
   }[key];
+}
+
+function formatHourLabel(hour: number): string {
+  const date = new Date();
+  date.setHours(hour, 0, 0, 0);
+  try {
+    return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
+  } catch {
+    return `${hour.toString().padStart(2, '0')}:00`;
+  }
 }
 
 function pushStatus(push: ReturnType<typeof usePushNotifications>): string {
   if (!push.supported) return 'This browser does not support Web Push notifications.';
+  if (push.requiresPwa)
+    return 'On iOS, add Kyndill to your Home Screen first to receive push notifications.';
   if (!push.isConfigured) return 'Server push keys are not configured yet.';
   if (push.permission === 'denied') return 'Notifications are blocked in browser settings.';
   if (push.isSubscribed) return 'Enabled for this browser.';

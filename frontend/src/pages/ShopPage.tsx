@@ -10,6 +10,7 @@ import { useToastContext } from '../context/ToastContext';
 import { usePet } from '../hooks/usePet';
 import { useShop, type ShopCosmetic, type ShopItem } from '../hooks/useShop';
 import { getItemPlaceholder } from '../lib/utils';
+import { trackEvent } from '../lib/analytics';
 
 type ShopTab = 'cosmetics' | 'consumables';
 const STREAK_FREEZE_PRICE = 35;
@@ -40,7 +41,12 @@ export function ShopPage() {
     try {
       await purchase(item.id);
       mergeUser({ coins: coins - item.price });
-      showToast(`${item.name} purchased.`, 'success');
+      trackEvent('shop_purchase', {
+        item_id: item.id,
+        category: tab,
+        price: item.price,
+      });
+      showToast(`${item.name} is yours.`, 'success');
       setConfirming(null);
     } catch (err) {
       showToast(extractMessage(err), 'error');
@@ -54,7 +60,8 @@ export function ShopPage() {
     try {
       await buyStreakFreeze();
       mergeUser({ coins: coins - STREAK_FREEZE_PRICE });
-      showToast('Streak freeze added.', 'success');
+      trackEvent('streak_freeze_purchased', { price: STREAK_FREEZE_PRICE });
+      showToast('Streak freeze ready — one missed day on the house.', 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
     } finally {

@@ -62,11 +62,11 @@ function notificationTitle(type: string): string {
     case 'friend_request_response':
       return 'Friend request update';
     case 'gift_received':
-      return 'Gift received';
+      return 'A gift for you';
     case 'item_drop':
-      return 'Item found';
+      return 'New drop';
     case 'level_up':
-      return 'Level up!';
+      return 'Level up';
     default:
       return 'Kyndill';
   }

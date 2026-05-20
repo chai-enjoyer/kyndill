@@ -1,7 +1,8 @@
-import { type ReactNode } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from './context/AuthContext';
 import { ToastViewport } from './components/common/Toast';
+import { trackEvent } from './lib/analytics';
 import { AppShell } from './components/layout/AppShell';
 import { AuthPage } from './pages/AuthPage';
 import { OnboardingPage } from './pages/OnboardingPage';
@@ -46,9 +47,18 @@ function PublicOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function PageViewTracker() {
+  const location = useLocation();
+  useEffect(() => {
+    trackEvent('page_view', { path: location.pathname });
+  }, [location.pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <>
+      <PageViewTracker />
       <Routes>
         <Route
           path="/login"

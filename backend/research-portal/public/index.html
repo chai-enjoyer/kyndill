@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Kyndill research</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Kyndill <span>research</span></div>
+      <div id="session-info" hidden>
+        <span id="session-email"></span>
+        <button type="button" id="logout" class="link-btn">Sign out</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="login-view">
+        <form id="login-form" autocomplete="on">
+          <label>
+            <span>Email</span>
+            <input name="email" type="email" autocomplete="username" required autofocus />
+          </label>
+          <label>
+            <span>Password</span>
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Sign in</button>
+          <p id="login-error" class="error" role="alert" hidden></p>
+        </form>
+      </section>
+
+      <section id="dashboard-view" hidden>
+        <div class="filters">
+          <label>
+            <span>From</span>
+            <input type="date" id="filter-from" />
+          </label>
+          <label>
+            <span>To</span>
+            <input type="date" id="filter-to" />
+          </label>
+        </div>
+
+        <ul id="table-list" class="table-list"></ul>
+
+        <section id="preview-section" hidden>
+          <div class="preview-head">
+            <h2 id="preview-title"></h2>
+            <div>
+              <button type="button" id="download-csv">Download CSV</button>
+              <button type="button" id="close-preview" class="link-btn">Close</button>
+            </div>
+          </div>
+          <p id="preview-meta" class="error" role="alert" hidden></p>
+          <div class="preview-wrap">
+            <table id="preview-table"></table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

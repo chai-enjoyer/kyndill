@@ -1,0 +1,20 @@
+[Unit]
+Description=Kyndill Research Portal
+After=network.target postgresql.service kyndill-api.service
+
+[Service]
+Type=simple
+User=kyndill
+Group=kyndill
+WorkingDirectory=/srv/kyndill/backend
+EnvironmentFile=/etc/kyndill/backend.env
+# Portal runs via tsx (no separate build step). node_modules/.bin/tsx is
+# installed by the regular `npm ci` in /srv/kyndill.
+ExecStart=/srv/kyndill/node_modules/.bin/tsx /srv/kyndill/backend/research-portal/src/server.ts
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

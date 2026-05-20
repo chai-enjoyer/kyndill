@@ -54,32 +54,41 @@ export function useNotifications() {
     }
 
     const handleFriendRequest = (payload: { from_display_name?: string }) => {
-      const content = `${payload.from_display_name ?? 'Someone'} sent you a friend request.`;
+      const name = payload.from_display_name ?? 'Someone';
+      const content = `${name} wants to be friends.`;
       addRealtimeNotification('friend_request', content);
       showToast(content, 'info');
       void refetch();
     };
 
     const handleFriendResponse = (payload: { responder_display_name?: string; status?: string }) => {
-      const status = payload.status === 'accepted' ? 'accepted' : 'responded to';
-      const content = `${payload.responder_display_name ?? 'Someone'} ${status} your friend request.`;
+      const name = payload.responder_display_name ?? 'Someone';
+      const content =
+        payload.status === 'accepted'
+          ? `You and ${name} are friends.`
+          : `${name} passed on your friend request.`;
       addRealtimeNotification('friend_request_response', content);
-      showToast(content, 'info');
+      showToast(content, payload.status === 'accepted' ? 'success' : 'info');
       void refetch();
     };
 
     const handleGift = (payload: { from_display_name?: string; item_name?: string; message?: string | null }) => {
-      const base = `${payload.from_display_name ?? 'A friend'} sent you ${payload.item_name ?? 'a gift'}.`;
+      const name = payload.from_display_name ?? 'A friend';
+      const item = payload.item_name ?? 'a gift';
+      const base = `Gift from ${name}: ${item}.`;
       const content = payload.message ? `${base} "${payload.message}"` : base;
       addRealtimeNotification('gift_received', content);
       showToast(content, 'success');
       void refetch();
     };
 
+    // Item drops are surfaced by <ItemDropToast> on the dashboard (with image
+    // + rarity). Adding a second showToast here was the source of the stacked
+    // "Item found" + "You found X." pair. We still record the notification so
+    // it shows up in the bell history.
     const handleItemDrop = (payload: { item_name?: string }) => {
-      const content = `You found ${payload.item_name ?? 'an item'}.`;
+      const content = `New drop: ${payload.item_name ?? 'an item'}.`;
       addRealtimeNotification('item_drop', content);
-      showToast(content, 'success');
       void refetch();
     };
 

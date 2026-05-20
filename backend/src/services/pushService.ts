@@ -140,11 +140,13 @@ async function shouldSendPush(userId: string, notificationType: string): Promise
     friend_requests: boolean;
     gifts: boolean;
     focus_reminders: boolean;
+    daily_reminder: boolean;
   }>(
     `SELECT
         COALESCE((notification_prefs->>'friendRequests')::boolean, TRUE) AS friend_requests,
         COALESCE((notification_prefs->>'gifts')::boolean, TRUE) AS gifts,
-        COALESCE((notification_prefs->>'focusReminders')::boolean, TRUE) AS focus_reminders
+        COALESCE((notification_prefs->>'focusReminders')::boolean, TRUE) AS focus_reminders,
+        COALESCE((notification_prefs->>'dailyReminder')::boolean, TRUE) AS daily_reminder
        FROM users
       WHERE id = $1`,
     [userId],
@@ -159,6 +161,9 @@ async function shouldSendPush(userId: string, notificationType: string): Promise
   }
   if (notificationType === 'focus_reminder') {
     return prefs.focus_reminders;
+  }
+  if (notificationType === 'daily_reminder') {
+    return prefs.daily_reminder;
   }
   return true;
 }

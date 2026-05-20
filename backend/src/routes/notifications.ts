@@ -82,8 +82,8 @@ router.post('/push/test', async (req: Request, res: Response, next: NextFunction
     await pushService.sendPushToUser(
       req.userId!,
       {
-        title: 'Kyndill notifications are ready',
-        body: 'You will receive important habit, reward, and social updates here.',
+        title: 'Kyndill',
+        body: 'Push is working on this device.',
         url: '/settings',
         tag: 'push_test',
       },

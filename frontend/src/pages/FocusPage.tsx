@@ -5,6 +5,7 @@ import { Modal } from '../components/common/Modal';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { extractMessage } from '../hooks/useSocial';
+import { trackEvent } from '../lib/analytics';
 
 const PRESETS = [
   { key: 'pomodoro', label: 'Pomodoro', minutes: 25 },
@@ -99,6 +100,13 @@ export function FocusPage() {
       });
       mergeUser({ coins: (user?.coins ?? 0) + data.coins_earned });
       setComplete({ sessionId: data.session_id, coins: data.coins_earned, minutes });
+      trackEvent('focus_session_finished', {
+        preset,
+        duration_minutes: minutes,
+        ambient,
+        rating: rating ?? null,
+        coins_earned: data.coins_earned,
+      });
     } catch (err) {
       completedRef.current = false;
       showToast(extractMessage(err, 'Could not save focus session.'), 'error');
@@ -111,8 +119,14 @@ export function FocusPage() {
       if (next) {
         primeCompletionAudio(completionAudioRef);
         audioErrorShownRef.current = false;
+        trackEvent('focus_session_started', {
+          preset,
+          target_minutes: getMinutes(preset, customMinutes),
+          ambient,
+        });
       } else {
         stopAmbientAudio(ambientAudioRef);
+        trackEvent('focus_session_paused', { remaining_seconds: remaining });
       }
       return next;
     });
@@ -191,6 +205,7 @@ export function FocusPage() {
           onRate={async (rating) => {
             try {
               await api.patch(`/api/focus/${complete.sessionId}/rating`, { rating });
+              trackEvent('focus_session_rated', { session_id: complete.sessionId, rating });
               showToast('Rating saved.', 'success');
             } catch (err) {
               showToast(extractMessage(err, 'Could not save rating.'), 'error');
@@ -202,31 +217,65 @@ export function FocusPage() {
   );
 }
 
+const RATING_LABELS = ['Distracted', 'Scattered', 'Steady', 'Focused', 'In the zone'] as const;
+
 function CompletionModal({ coins, minutes, onClose, onRate }: { coins: number; minutes: number; onClose: () => void; onRate: (rating: number) => Promise<void> }) {
-  const [rated, setRated] = useState(false);
-  const [ratingPending, setRatingPending] = useState(false);
+  const [rating, setRating] = useState<number | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
+  const previewed = hover ?? rating;
+  const promptLabel = previewed ? RATING_LABELS[previewed - 1] : 'How did this session feel?';
+
+  async function handleDone() {
+    if (saving) return;
+    if (rating !== null) {
+      setSaving(true);
+      try {
+        await onRate(rating);
+      } finally {
+        setSaving(false);
+      }
+    }
+    onClose();
+  }
+
   return (
     <Modal isOpen onClose={onClose} title="Focus complete">
       <div className="focus-complete">
         <p>{minutes} minutes banked. You earned <strong>{coins}</strong> coins.</p>
-        <div className="rating-row" aria-label="Rate focus session">
-          {[1, 2, 3, 4, 5].map((rating) => (
-            <button
-              key={rating}
-              type="button"
-              disabled={rated || ratingPending}
-              onClick={async () => {
-                setRatingPending(true);
-                await onRate(rating);
-                setRated(true);
-                setRatingPending(false);
-              }}
-            >
-              {rating}
-            </button>
-          ))}
+        <div className="rating-row" role="radiogroup" aria-label="Rate focus session">
+          <span className="rating-row__prompt" aria-live="polite">{promptLabel}</span>
+          <div className="rating-row__stars" onMouseLeave={() => setHover(null)}>
+            {[1, 2, 3, 4, 5].map((value) => {
+              const filled = previewed !== null && value <= previewed;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={rating === value}
+                  aria-label={`${value} of 5 – ${RATING_LABELS[value - 1]}`}
+                  className={`rating-star${filled ? ' is-filled' : ''}${rating === value ? ' is-selected' : ''}`}
+                  onMouseEnter={() => setHover(value)}
+                  onFocus={() => setHover(value)}
+                  onBlur={() => setHover(null)}
+                  onClick={() => setRating((current) => (current === value ? null : value))}
+                  disabled={saving}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2.6l2.9 6.1 6.7.8-4.9 4.5 1.4 6.6L12 17.4l-6.1 3.2 1.4-6.6-4.9-4.5 6.7-.8z" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="modal-actions"><Button variant="primary" onClick={onClose}>Done</Button></div>
+        <div className="modal-actions">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Skip</Button>
+          <Button variant="primary" onClick={handleDone} disabled={saving}>
+            {saving ? 'Saving…' : rating === null ? 'Done' : 'Save rating'}
+          </Button>
+        </div>
       </div>
     </Modal>
   );

@@ -10,7 +10,18 @@ const notificationPrefsSchema = z.object({
   friendRequests: z.boolean(),
   gifts: z.boolean(),
   focusReminders: z.boolean(),
+  dailyReminder: z.boolean().optional(),
+  moodPing: z.boolean().optional(),
 });
+
+// IANA names like 'America/New_York' or 'UTC'. Loose check; bad names are
+// caught when we format times against the value.
+const timezoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z_+/0-9-]+$/, 'Invalid timezone');
 
 const avatarUrlSchema = z
   .string()
@@ -30,6 +41,8 @@ const profileSchema = z.object({
   avatar_url: avatarUrlSchema.nullable().optional(),
   notification_prefs: notificationPrefsSchema.optional(),
   research_consent: z.boolean().optional(),
+  reminder_hour: z.number().int().min(0).max(23).nullable().optional(),
+  reminder_timezone: timezoneSchema.optional(),
 });
 
 const passwordSchema = z.object({

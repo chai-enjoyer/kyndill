@@ -5,6 +5,7 @@ import { useInventory } from '../../hooks/useInventory';
 import { useToastContext } from '../../context/ToastContext';
 import { getItemPlaceholder } from '../../lib/utils';
 import { api } from '../../lib/api';
+import { trackEvent } from '../../lib/analytics';
 
 interface FeedModalProps {
   onClose: () => void;
@@ -18,7 +19,8 @@ export function FeedModal({ onClose, onFed }: FeedModalProps) {
   async function handleFeed(itemId: string, itemName: string) {
     try {
       await api.post('/api/pet/feed', { item_id: itemId });
-      showToast(`${itemName} is gone. They look brighter.`, 'success');
+      trackEvent('pet_fed', { item_id: itemId });
+      showToast(`Fed ${itemName} — your pet looks happier.`, 'success');
       await refetch();
       onFed?.();
     } catch (err) {

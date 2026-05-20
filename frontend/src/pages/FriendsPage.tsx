@@ -17,6 +17,7 @@ import {
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useToastContext } from '../context/ToastContext';
 import { getItemPlaceholder } from '../lib/utils';
+import { trackEvent } from '../lib/analytics';
 
 export function FriendsPage() {
   const {
@@ -52,7 +53,8 @@ export function FriendsPage() {
     setRespondingId(requestId);
     try {
       await respondRequest(requestId, action);
-      showToast(action === 'accept' ? 'Friend request accepted.' : 'Friend request rejected.', 'success');
+      trackEvent('friend_request_responded', { action });
+      showToast(action === 'accept' ? "You're now friends." : 'Request declined.', 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
     } finally {
@@ -73,7 +75,8 @@ export function FriendsPage() {
     try {
       await acceptGift(giftId);
       await refetchInventory();
-      showToast('Gift added to your inventory.', 'success');
+      trackEvent('gift_accepted', { gift_id: giftId });
+      showToast('Gift kept — find it in your inventory.', 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
     } finally {
@@ -85,7 +88,8 @@ export function FriendsPage() {
     if (!window.confirm(`Remove ${friend.display_name} from your friends?`)) return;
     try {
       await removeFriend(friend.id);
-      showToast('Friend removed.', 'success');
+      trackEvent('friend_removed', { friend_id: friend.id });
+      showToast(`${friend.display_name} removed from friends.`, 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
     }
@@ -276,6 +280,11 @@ export function FriendsPage() {
           onSend={async (itemId, message) => {
             await sendGift(giftFriend.id, itemId, message);
             await refetchInventory();
+            trackEvent('gift_sent', {
+              friend_id: giftFriend.id,
+              item_id: itemId,
+              has_message: Boolean(message && message.trim()),
+            });
             showToast('Gift sent.', 'success');
             setGiftFriend(null);
           }}
@@ -336,7 +345,8 @@ function AddFriendModal({
     setSending(username);
     try {
       await sendRequest(username);
-      showToast('Friend request sent.', 'success');
+      trackEvent('friend_request_sent', {});
+      showToast(`Request sent to ${username}.`, 'success');
       onClose();
     } catch (err) {
       showToast(extractMessage(err), 'error');

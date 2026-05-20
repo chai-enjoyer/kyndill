@@ -45,12 +45,14 @@ export function HabitFeedbackModal({ habitId, habitName, onClose }: HabitFeedbac
     <Modal isOpen onClose={onClose} title="How did that feel?">
       <form className="habit-feedback" onSubmit={submit}>
         <p className="text-muted">Optional feedback for "{habitName}" helps evaluate motivation and usability without recording personal identifiers.</p>
-        <div className="rating-row" aria-label="Habit completion feeling">
+        <div className="reflection-chips" role="radiogroup" aria-label="Habit completion feeling">
           {MOODS.map((item) => (
             <button
               key={item.value}
               type="button"
-              className={mood === item.value ? 'is-active' : ''}
+              role="radio"
+              aria-checked={mood === item.value}
+              className={`reflection-chip${mood === item.value ? ' is-active' : ''}`}
               onClick={() => setMood(item.value)}
             >
               {item.label}

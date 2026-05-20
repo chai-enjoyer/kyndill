@@ -5,9 +5,11 @@ import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useSocketContext } from '../context/SocketContext';
 import { useHabits, type CompleteResult, type DroppedItem } from '../hooks/useHabits';
+import { trackEvent } from '../lib/analytics';
 import { useActivityFeed } from '../hooks/useActivityFeed';
 import { usePet } from '../hooks/usePet';
 import { useRecoveryPrompt } from '../hooks/useRecovery';
+import { useMoodPing } from '../hooks/useMoodPing';
 import { useShop } from '../hooks/useShop';
 import { DashboardSidebar } from '../components/dashboard/DashboardSidebar';
 import { HabitListItem } from '../components/dashboard/HabitListItem';
@@ -17,6 +19,7 @@ import { FeedModal } from '../components/dashboard/FeedModal';
 import { ItemDropToast } from '../components/dashboard/ItemDropToast';
 import { HabitFeedbackModal } from '../components/dashboard/HabitFeedbackModal';
 import { RecoveryReflectionModal } from '../components/dashboard/RecoveryReflectionModal';
+import { MoodPingModal } from '../components/dashboard/MoodPingModal';
 import { AnimatedValue } from '../components/common/AnimatedValue';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 
@@ -38,6 +41,7 @@ export function DashboardPage() {
   } = useRecoveryPrompt();
   const { pet, isLoading: petLoading, applyCompletion, refetch: refetchPet } = usePet();
   const { freezeCount, refetch: refetchShop } = useShop();
+  const moodPing = useMoodPing();
 
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [itemDrop, setItemDrop] = useState<DroppedItem | null>(null);
@@ -54,8 +58,8 @@ export function DashboardPage() {
       habit_name?: string;
     }) => {
       const who = payload.from_display_name ?? 'A friend';
-      const what = payload.habit_name ?? 'a habit';
-      showToast(`${who} completed ${what}.`, 'info');
+      const what = payload.habit_name ?? 'their habit';
+      showToast(`${who} just finished ${what}.`, 'info');
     };
     socket.on('habit_completed', handler);
     return () => {
@@ -82,11 +86,34 @@ export function DashboardPage() {
         total_habits_completed: result.pet_total_habits_completed,
         is_fainted: result.pet_is_fainted,
       });
+      trackEvent('habit_completed', {
+        habit_id: habitId,
+        completed_count: result.completed_count,
+        target_count: result.target_count,
+        completed_today: result.completed_today,
+        xp_earned: result.xp_earned,
+        coins_earned: result.coins_earned,
+        new_streak: result.new_streak,
+        leveled_up: result.leveled_up,
+        item_dropped: result.item_dropped
+          ? {
+              id: result.item_dropped.id,
+              type: result.item_dropped.type,
+              rarity: result.item_dropped.rarity,
+            }
+          : null,
+      });
       if (result.item_dropped) {
         setItemDrop(result.item_dropped);
+        trackEvent('item_dropped', {
+          item_id: result.item_dropped.id,
+          type: result.item_dropped.type,
+          rarity: result.item_dropped.rarity,
+        });
       }
       if (result.leveled_up) {
         setLevelUp(result.new_level);
+        trackEvent('level_up', { new_level: result.new_level });
       }
       if (result.completed_today) {
         void refetchShop();
@@ -229,12 +256,17 @@ export function DashboardPage() {
           onClose={() => setFeedbackHabit(null)}
         />
       )}
-      {recoveryPrompt && !feedbackHabit && levelUp === null && (
+      {recoveryPrompt && !feedbackHabit && levelUp === null && !moodPing.isOpen && (
         <RecoveryReflectionModal
           prompt={recoveryPrompt}
           onSave={saveRecoveryReflection}
           onClose={dismissRecoveryPrompt}
+          freezeCount={freezeCount}
+          currentStreak={user?.streak_current ?? 0}
         />
+      )}
+      {moodPing.isOpen && !feedbackHabit && levelUp === null && (
+        <MoodPingModal onSubmit={moodPing.submit} onSnooze={moodPing.snooze} />
       )}
     </div>
   );

@@ -20,6 +20,7 @@ import {
   type HabitFrequency,
   type HabitWithStatus,
 } from '../hooks/useHabits';
+import { trackEvent } from '../lib/analytics';
 
 const CATEGORIES: HabitCategory[] = ['Health', 'Productivity', 'Social', 'Learning', 'Wellness'];
 const DAYS = [
@@ -50,7 +51,12 @@ export function HabitsPage() {
   async function handleToggle(habit: HabitWithStatus) {
     try {
       await update(habit.id, { is_active: !habit.is_active });
-      showToast(habit.is_active ? 'Habit paused.' : 'Habit reactivated.', 'success');
+      trackEvent(habit.is_active ? 'habit_paused' : 'habit_resumed', {
+        habit_id: habit.id,
+        category: habit.category,
+        frequency: habit.frequency,
+      });
+      showToast(habit.is_active ? `${habit.name} paused.` : `${habit.name} is back on the list.`, 'success');
     } catch (err) {
       showToast(extractMessage(err), 'error');
     }
@@ -60,7 +66,12 @@ export function HabitsPage() {
     if (!deleting) return;
     try {
       await archive(deleting.id);
-      showToast('Habit deleted.', 'success');
+      trackEvent('habit_deleted', {
+        habit_id: deleting.id,
+        category: deleting.category,
+        frequency: deleting.frequency,
+      });
+      showToast(`${deleting.name} removed.`, 'success');
       setDeleting(null);
     } catch (err) {
       showToast(extractMessage(err), 'error');
@@ -142,7 +153,13 @@ export function HabitsPage() {
           onClose={() => setCreateOpen(false)}
           onSubmit={async (input) => {
             await create(input);
-            showToast('Habit added.', 'success');
+            trackEvent('habit_created', {
+              source: 'custom',
+              category: input.category,
+              frequency: input.frequency,
+              target_count: input.target_count ?? 1,
+            });
+            showToast(`${input.name} is on the list.`, 'success');
             setCreateOpen(false);
           }}
         />
@@ -154,6 +171,12 @@ export function HabitsPage() {
           onClose={() => setTemplatesOpen(false)}
           onAdd={async (template) => {
             await create(templateToHabitInput(template));
+            trackEvent('habit_created', {
+              source: 'template',
+              template_id: template.id,
+              category: template.category,
+              frequency: template.frequency,
+            });
             showToast(`${template.name} added.`, 'success');
           }}
         />
@@ -166,7 +189,12 @@ export function HabitsPage() {
           onClose={() => setEditing(null)}
           onSubmit={async (input) => {
             await update(editing.id, input);
-            showToast('Habit updated.', 'success');
+            trackEvent('habit_updated', {
+              habit_id: editing.id,
+              category: input.category,
+              frequency: input.frequency,
+            });
+            showToast('Changes saved.', 'success');
             setEditing(null);
           }}
         />

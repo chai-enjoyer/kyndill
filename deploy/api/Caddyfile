@@ -1,4 +1,13 @@
+# Replace `api.example.com` and `research.example.com` with your real hosts.
+# When using sslip.io, that means e.g. `34.131.101.60.sslip.io` for the API
+# and `research.34.131.101.60.sslip.io` for the portal.
+
 api.example.com {
   encode zstd gzip
   reverse_proxy 127.0.0.1:3000
+}
+
+research.example.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:4001
 }

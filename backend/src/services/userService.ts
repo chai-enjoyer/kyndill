@@ -30,12 +30,15 @@ export interface ProfileDto {
   auth_provider: 'email' | 'google';
   notification_prefs: NotificationPrefs;
   research_consent: boolean;
+  reminder_hour: number | null;
+  reminder_timezone: string;
 }
 
 export interface NotificationPrefs {
   friendRequests: boolean;
   gifts: boolean;
   focusReminders: boolean;
+  dailyReminder?: boolean;
 }
 
 export interface PublicFriendProfile {
@@ -83,6 +86,8 @@ export async function getProfile(userId: string): Promise<ProfileDto> {
             CASE WHEN u.oauth_provider = 'google' THEN 'google' ELSE 'email' END AS auth_provider,
             u.notification_prefs,
             u.research_consent,
+            u.reminder_hour,
+            u.reminder_timezone,
             (SELECT COUNT(*)::int FROM habits h WHERE h.user_id = u.id) AS total_habits,
             (SELECT COALESCE(SUM(duration_minutes), 0)::int FROM focus_sessions fs WHERE fs.user_id = u.id) AS total_focus_minutes
        FROM users u
@@ -103,6 +108,8 @@ export async function updateProfile(
     avatar_url?: string | null;
     notification_prefs?: NotificationPrefs;
     research_consent?: boolean;
+    reminder_hour?: number | null;
+    reminder_timezone?: string;
   },
 ): Promise<ProfileDto> {
   const sets: string[] = [];
@@ -136,6 +143,14 @@ export async function updateProfile(
   if (input.research_consent !== undefined) {
     sets.push(`research_consent = $${i++}`);
     values.push(input.research_consent);
+  }
+  if (input.reminder_hour !== undefined) {
+    sets.push(`reminder_hour = $${i++}`);
+    values.push(input.reminder_hour);
+  }
+  if (input.reminder_timezone !== undefined) {
+    sets.push(`reminder_timezone = $${i++}`);
+    values.push(input.reminder_timezone);
   }
 
   if (sets.length > 0) {
