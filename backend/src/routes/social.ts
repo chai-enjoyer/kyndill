@@ -74,6 +74,19 @@ router.put(
 );
 
 router.delete(
+  '/friends/request/:id',
+  validate(idParam, 'params'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await socialService.cancelSentFriendRequest(req.userId!, req.params.id);
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
   '/friends/:friend_id',
   validate(friendIdParam, 'params'),
   async (req: Request, res: Response, next: NextFunction) => {

@@ -141,12 +141,14 @@ async function shouldSendPush(userId: string, notificationType: string): Promise
     gifts: boolean;
     focus_reminders: boolean;
     daily_reminder: boolean;
+    mood_ping: boolean;
   }>(
     `SELECT
         COALESCE((notification_prefs->>'friendRequests')::boolean, TRUE) AS friend_requests,
         COALESCE((notification_prefs->>'gifts')::boolean, TRUE) AS gifts,
         COALESCE((notification_prefs->>'focusReminders')::boolean, TRUE) AS focus_reminders,
-        COALESCE((notification_prefs->>'dailyReminder')::boolean, TRUE) AS daily_reminder
+        COALESCE((notification_prefs->>'dailyReminder')::boolean, TRUE) AS daily_reminder,
+        COALESCE((notification_prefs->>'moodPing')::boolean, FALSE) AS mood_ping
        FROM users
       WHERE id = $1`,
     [userId],
@@ -164,6 +166,9 @@ async function shouldSendPush(userId: string, notificationType: string): Promise
   }
   if (notificationType === 'daily_reminder') {
     return prefs.daily_reminder;
+  }
+  if (notificationType === 'mood_ping') {
+    return prefs.mood_ping;
   }
   return true;
 }

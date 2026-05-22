@@ -79,6 +79,33 @@ export async function searchUsers(userId: string, query: string): Promise<UserSe
   return rows;
 }
 
+// Default suggestions for the Add Friend modal — public profiles only, with
+// people the caller is already connected to (or has a pending request with)
+// filtered out. Sorted by level so familiar/active users surface first.
+export async function discoverPublicUsers(userId: string): Promise<UserSearchResult[]> {
+  const { rows } = await pool.query<UserSearchResult>(
+    `SELECT u.id, u.display_name, u.username, u.avatar_url, u.level
+       FROM users u
+      WHERE u.id <> $1
+        AND u.visibility = 'public'
+        AND NOT EXISTS (
+          SELECT 1 FROM friends f
+           WHERE (f.user_id = $1 AND f.friend_id = u.id)
+              OR (f.user_id = u.id AND f.friend_id = $1)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM friend_requests r
+           WHERE r.status = 'pending'
+             AND ((r.from_user_id = $1 AND r.to_user_id = u.id)
+                  OR (r.from_user_id = u.id AND r.to_user_id = $1))
+        )
+      ORDER BY u.level DESC, u.created_at DESC
+      LIMIT 12`,
+    [userId],
+  );
+  return rows;
+}
+
 export async function getProfile(userId: string): Promise<ProfileDto> {
   const { rows } = await pool.query<ProfileDto>(
     `SELECT u.id, u.email, u.display_name, u.username, u.bio, u.avatar_url,

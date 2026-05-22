@@ -154,6 +154,10 @@ export function OnboardingPage() {
 
   const trimmedName = name.trim();
   const isNameValid = trimmedName.length >= 1 && trimmedName.length <= NAME_MAX;
+  const quizPickedIds = useMemo(
+    () => new Set(quiz ? pickStarterTemplates(quiz) : []),
+    [quiz],
+  );
 
   // Group templates by category for a calmer scan in the habits step. Order
   // matches the brand surface (wellness/health first, then productivity, etc).
@@ -540,8 +544,12 @@ export function OnboardingPage() {
             <h1 id="onboarding-step-habits-heading">Start with one small promise.</h1>
             <p className="text-muted">
               {quiz
-                ? 'We pre-selected a few based on your answers. Adjust freely.'
+                ? 'We pre-selected a few based on your answers. Tick more, untick any, or add your own.'
                 : 'Pick ready-made habits, add your own, or do both. You can edit any of these later.'}
+            </p>
+            <p className="onboarding-habits-count" aria-live="polite">
+              <strong>{selectedStarterIds.length + validCustomHabits.length}</strong>{' '}
+              habit{selectedStarterIds.length + validCustomHabits.length === 1 ? '' : 's'} ready to start.
             </p>
           </header>
 
@@ -554,6 +562,7 @@ export function OnboardingPage() {
                     <div className="starter-habit-grid">
                       {groupedTemplates[category].map((habit) => {
                         const selected = selectedStarterIds.includes(habit.id);
+                        const recommended = quizPickedIds.has(habit.id);
                         return (
                           <label
                             key={habit.id}
@@ -565,7 +574,17 @@ export function OnboardingPage() {
                               onChange={() => toggleStarterHabit(habit.id)}
                             />
                             <span className="starter-habit__body">
-                              <strong>{habit.name}</strong>
+                              <span className="starter-habit__heading">
+                                <strong>{habit.name}</strong>
+                                {recommended && (
+                                  <span
+                                    className="starter-habit__badge"
+                                    title="Pre-selected based on your answers"
+                                  >
+                                    Pick for you
+                                  </span>
+                                )}
+                              </span>
                               <span>{habit.description}</span>
                               <em>{formatTemplateMeta(habit)}</em>
                             </span>
@@ -582,70 +601,108 @@ export function OnboardingPage() {
               <div className="onboarding-custom-habits__head">
                 <h2>Your own habits</h2>
                 <p className="text-muted">
-                  Add up to {MAX_CUSTOM_HABITS}. Daily by default — you can change frequency later.
+                  Add up to {MAX_CUSTOM_HABITS}. Daily by default — you can change frequency
+                  and timing later from the Habits page.
                 </p>
               </div>
               {customHabits.length === 0 ? (
                 <p className="text-muted onboarding-custom-habits__empty">
-                  Nothing here yet.
+                  Nothing here yet. Tap "Add habit" below to create your first one.
                 </p>
               ) : (
                 <ul className="custom-habit-list" role="list">
                   {customHabits.map((draft, index) => (
-                    <li key={draft.id} className="custom-habit-row">
-                      <input
-                        className="input custom-habit-row__name"
-                        type="text"
-                        value={draft.name}
-                        onChange={(event) =>
-                          updateCustomHabit(draft.id, { name: event.target.value.slice(0, 80) })
-                        }
-                        placeholder={`Habit ${index + 1}`}
-                        aria-label={`Habit name ${index + 1}`}
-                        autoComplete="off"
-                      />
-                      <select
-                        className="input custom-habit-row__category"
-                        value={draft.category}
-                        onChange={(event) =>
-                          updateCustomHabit(draft.id, {
-                            category: event.target.value as HabitCategory,
-                          })
-                        }
-                        aria-label={`Category for habit ${index + 1}`}
-                      >
-                        {HABIT_CATEGORIES.map((category) => (
-                          <option key={category} value={category}>
-                            {category}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        className="input custom-habit-row__target"
-                        type="number"
-                        min={1}
-                        max={12}
-                        value={draft.target_count}
-                        onChange={(event) =>
-                          updateCustomHabit(draft.id, {
-                            target_count: Math.max(
-                              1,
-                              Math.min(12, Number(event.target.value) || 1),
-                            ),
-                          })
-                        }
-                        aria-label={`Daily target for habit ${index + 1}`}
-                      />
-                      <button
-                        type="button"
-                        className="custom-habit-row__remove"
-                        aria-label={`Remove habit ${index + 1}`}
-                        onClick={() => removeCustomHabit(draft.id)}
-                      >
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                          <path d="M6 6l12 12M6 18 18 6" />
-                        </svg>
-                      </button>
+                    <li key={draft.id} className="custom-habit-card">
+                      <div className="custom-habit-card__head">
+                        <span className="custom-habit-card__index">Habit {index + 1}</span>
+                        <button
+                          type="button"
+                          className="custom-habit-card__remove"
+                          aria-label={`Remove habit ${index + 1}`}
+                          onClick={() => removeCustomHabit(draft.id)}
+                        >
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <path d="M6 6l12 12M6 18 18 6" />
+                          </svg>
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                      <div className="custom-habit-card__grid">
+                        <div className="field">
+                          <label
+                            className="field__label"
+                            htmlFor={`custom-habit-${draft.id}-name`}
+                          >
+                            What is the habit?
+                          </label>
+                          <input
+                            id={`custom-habit-${draft.id}-name`}
+                            className="input"
+                            type="text"
+                            value={draft.name}
+                            onChange={(event) =>
+                              updateCustomHabit(draft.id, {
+                                name: event.target.value.slice(0, 80),
+                              })
+                            }
+                            placeholder="e.g. Read 10 pages"
+                            autoComplete="off"
+                          />
+                        </div>
+                        <div className="field">
+                          <label
+                            className="field__label"
+                            htmlFor={`custom-habit-${draft.id}-category`}
+                          >
+                            Category
+                          </label>
+                          <select
+                            id={`custom-habit-${draft.id}-category`}
+                            className="input"
+                            value={draft.category}
+                            onChange={(event) =>
+                              updateCustomHabit(draft.id, {
+                                category: event.target.value as HabitCategory,
+                              })
+                            }
+                          >
+                            {HABIT_CATEGORIES.map((category) => (
+                              <option key={category} value={category}>
+                                {category}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="field__help">Used for grouping and colour only.</p>
+                        </div>
+                        <div className="field">
+                          <label
+                            className="field__label"
+                            htmlFor={`custom-habit-${draft.id}-target`}
+                          >
+                            How many times per day?
+                          </label>
+                          <input
+                            id={`custom-habit-${draft.id}-target`}
+                            className="input"
+                            type="number"
+                            min={1}
+                            max={12}
+                            value={draft.target_count}
+                            onChange={(event) =>
+                              updateCustomHabit(draft.id, {
+                                target_count: Math.max(
+                                  1,
+                                  Math.min(12, Number(event.target.value) || 1),
+                                ),
+                              })
+                            }
+                          />
+                          <p className="field__help">
+                            Use 1 for a once-a-day habit, or higher for repeatable things like
+                            drinking water.
+                          </p>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>

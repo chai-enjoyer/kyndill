@@ -28,8 +28,10 @@ export function FriendsPage() {
     isLoading,
     error,
     searchUsers,
+    discoverUsers,
     sendRequest,
     respondRequest,
+    cancelRequest,
     sendGift,
     removeFriend,
     acceptGift,
@@ -43,6 +45,7 @@ export function FriendsPage() {
   const [giftFriend, setGiftFriend] = useState<Friend | null>(null);
   const [profile, setProfile] = useState<FriendProfile | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [acceptingGiftId, setAcceptingGiftId] = useState<string | null>(null);
 
   const filtered = friends.filter((friend) =>
@@ -59,6 +62,19 @@ export function FriendsPage() {
       showToast(extractMessage(err), 'error');
     } finally {
       setRespondingId(null);
+    }
+  }
+
+  async function handleCancelSentRequest(requestId: string, toName: string) {
+    setCancellingId(requestId);
+    try {
+      await cancelRequest(requestId);
+      trackEvent('friend_request_cancelled', {});
+      showToast(`Request to ${toName} cancelled.`, 'success');
+    } catch (err) {
+      showToast(extractMessage(err), 'error');
+    } finally {
+      setCancellingId(null);
     }
   }
 
@@ -156,7 +172,19 @@ export function FriendsPage() {
                       <strong>{request.to_display_name}</strong>
                       <span>@{request.to_username}</span>
                     </div>
-                    <span className="owned-badge">Pending</span>
+                    <div className="request-card__actions">
+                      <span className="owned-badge">Pending</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={cancellingId === request.id}
+                        onClick={() =>
+                          handleCancelSentRequest(request.id, request.to_display_name)
+                        }
+                      >
+                        {cancellingId === request.id ? 'Cancelling...' : 'Cancel'}
+                      </Button>
+                    </div>
                   </article>
                 ))}
               </div>
@@ -268,6 +296,7 @@ export function FriendsPage() {
       {addOpen && (
         <AddFriendModal
           searchUsers={searchUsers}
+          discoverUsers={discoverUsers}
           sendRequest={sendRequest}
           onClose={() => setAddOpen(false)}
         />
@@ -305,18 +334,41 @@ function Avatar({ name, url }: { name: string; url?: string | null }) {
 
 function AddFriendModal({
   searchUsers,
+  discoverUsers,
   sendRequest,
   onClose,
 }: {
   searchUsers: (query: string) => Promise<UserSearchResult[]>;
+  discoverUsers: () => Promise<UserSearchResult[]>;
   sendRequest: (username: string) => Promise<void>;
   onClose: () => void;
 }) {
   const { showToast } = useToastContext();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserSearchResult[]>([]);
+  const [suggested, setSuggested] = useState<UserSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [sending, setSending] = useState<string | null>(null);
+
+  // Pre-load a list of public profiles so the modal isn't empty before the user
+  // types anything. Public-only by design — private and friends-only accounts
+  // are filtered server-side.
+  useEffect(() => {
+    let alive = true;
+    setSuggestionsLoading(true);
+    discoverUsers()
+      .then((users) => {
+        if (alive) setSuggested(users);
+      })
+      .catch((err) => showToast(extractMessage(err), 'error'))
+      .finally(() => {
+        if (alive) setSuggestionsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [discoverUsers, showToast]);
 
   useEffect(() => {
     let alive = true;
@@ -355,15 +407,30 @@ function AddFriendModal({
     }
   }
 
+  const isSearching = query.trim().length >= 2;
+  const list = isSearching ? results : suggested;
+  const showLoading = isSearching ? loading : suggestionsLoading;
+
   return (
     <Modal isOpen onClose={onClose} title="Add Friend">
       <div className="add-friend-modal">
         <input className="input" placeholder="Search username" value={query} onChange={(event) => setQuery(event.target.value)} autoFocus />
-        {loading ? <LoadingSkeleton width="100%" height={64} /> : query.trim().length >= 2 && results.length === 0 ? (
-          <div className="friends-empty">No users found.</div>
+        <p className="add-friend-modal__hint text-muted">
+          {isSearching
+            ? `Showing users matching "${query.trim()}".`
+            : 'Suggested public profiles. Type a username to search by handle.'}
+        </p>
+        {showLoading ? (
+          <LoadingSkeleton width="100%" height={64} />
+        ) : list.length === 0 ? (
+          <div className="friends-empty">
+            {isSearching
+              ? 'No users found.'
+              : 'No public profiles to suggest right now. Try searching by username.'}
+          </div>
         ) : (
           <ul className="search-results" role="list">
-            {results.map((user) => (
+            {list.map((user) => (
               <li key={user.id}>
                 <Avatar name={user.display_name} url={user.avatar_url} />
                 <div>

@@ -70,6 +70,15 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+router.get('/discover', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const users = await userService.discoverPublicUsers(req.userId!);
+    res.status(200).json({ users });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/profile', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const profile = await userService.getProfile(req.userId!);

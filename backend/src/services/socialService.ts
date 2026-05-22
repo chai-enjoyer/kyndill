@@ -262,6 +262,54 @@ export async function listSentFriendRequests(userId: string): Promise<SentFriend
   return rows;
 }
 
+export async function cancelSentFriendRequest(
+  userId: string,
+  requestId: string,
+): Promise<void> {
+  const { rows } = await pool.query<{
+    id: string;
+    from_user_id: string;
+    to_user_id: string;
+    status: string;
+  }>(
+    `SELECT id, from_user_id, to_user_id, status FROM friend_requests WHERE id = $1`,
+    [requestId],
+  );
+  const row = rows[0];
+  if (!row || row.from_user_id !== userId) {
+    throw new HttpError(404, 'NOT_FOUND', 'Friend request not found');
+  }
+  if (row.status !== 'pending') {
+    throw new HttpError(409, 'ALREADY_RESPONDED', `Request was already ${row.status}`);
+  }
+
+  // Drop the request and any unread notification the recipient may still have
+  // open for it, so the cancellation feels symmetric on both sides.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`DELETE FROM friend_requests WHERE id = $1`, [requestId]);
+    await client.query(
+      `DELETE FROM notifications
+        WHERE user_id = $1
+          AND type = 'friend_request'
+          AND metadata->>'request_id' = $2`,
+      [row.to_user_id, requestId],
+    );
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+
+  emitToUser(row.to_user_id, 'friend_request_cancelled', {
+    request_id: requestId,
+    from_user_id: userId,
+  });
+}
+
 export interface RespondResult {
   id: string;
   status: 'accepted' | 'rejected';

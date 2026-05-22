@@ -242,13 +242,18 @@ export function SettingsPage() {
                 <input
                   type="checkbox"
                   checked={prefs[key]}
-                  disabled={key === 'moodPing' && !researchConsent}
                   onChange={(e) => updateNotificationPref(key, e.target.checked)}
                 />
                 <span className="switch__track" aria-hidden="true" />
                 <span className="switch__label">{labelPref(key)}</span>
               </label>
             ))}
+            {prefs.moodPing && (
+              <p className="text-muted settings-card__hint">
+                Weekly mood check-ins arrive on Monday mornings and start a week after sign-up. If
+                push is enabled, they also come through as a quiet notification.
+              </p>
+            )}
             {prefs.dailyReminder && (
               <div className="reminder-time">
                 <div>

@@ -60,8 +60,11 @@ export async function complete(
   }
 }
 
+// Roughly one coin every two minutes, capped at 45 for a long session. The
+// previous floor of 4 made every short session feel identical regardless of
+// time invested.
 function computeFocusCoins(durationMinutes: number): number {
-  return Math.min(36, Math.max(4, Math.round(durationMinutes / 3)));
+  return Math.min(45, Math.max(1, Math.round(durationMinutes / 2)));
 }
 
 export async function rateSession(userId: string, sessionId: string, rating: number): Promise<void> {

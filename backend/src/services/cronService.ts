@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { pool } from '../db/pool';
 import { derivePetHealth } from './petService';
 import { runHourlyReminderTick } from './reminderService';
+import { runHourlyMoodPingTick } from './moodPingReminderService';
 
 let started = false;
 
@@ -30,6 +31,18 @@ export function startCronJobs(): void {
     () => {
       runHourlyReminderTick().catch((err) => {
         console.error('[cron] reminder tick failed:', err);
+      });
+    },
+    { timezone: 'UTC' },
+  );
+
+  // Weekly mood-ping nudge. Same hourly cadence as the daily reminder so we
+  // can target each user's local Monday morning regardless of their timezone.
+  cron.schedule(
+    '0 * * * *',
+    () => {
+      runHourlyMoodPingTick().catch((err) => {
+        console.error('[cron] mood ping tick failed:', err);
       });
     },
     { timezone: 'UTC' },

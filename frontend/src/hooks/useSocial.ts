@@ -122,6 +122,11 @@ export function useSocial() {
     return data.users;
   }, []);
 
+  const discoverUsers = useCallback(async (): Promise<UserSearchResult[]> => {
+    const { data } = await api.get<{ users: UserSearchResult[] }>('/api/user/discover');
+    return data.users;
+  }, []);
+
   const sendRequest = useCallback(
     async (username: string): Promise<void> => {
       await api.post('/api/social/friends/request', { username });
@@ -133,6 +138,14 @@ export function useSocial() {
   const respondRequest = useCallback(
     async (requestId: string, action: 'accept' | 'reject'): Promise<void> => {
       await api.put(`/api/social/friends/request/${requestId}`, { action });
+      await refetch();
+    },
+    [refetch],
+  );
+
+  const cancelRequest = useCallback(
+    async (requestId: string): Promise<void> => {
+      await api.delete(`/api/social/friends/request/${requestId}`);
       await refetch();
     },
     [refetch],
@@ -179,8 +192,10 @@ export function useSocial() {
     error,
     refetch,
     searchUsers,
+    discoverUsers,
     sendRequest,
     respondRequest,
+    cancelRequest,
     sendGift,
     removeFriend,
     acceptGift,

@@ -11,17 +11,32 @@ export interface MoodPingInput {
   note?: string;
 }
 
+// Wait a full week after registration before the first mood check-in. Without
+// this, anyone who opts in during onboarding gets the modal popping the moment
+// they land on the dashboard.
+const FIRST_PING_DELAY_DAYS = 7;
+
 export async function getStatus(userId: string): Promise<MoodPingStatus> {
-  const consentRow = await pool.query<{ research_consent: boolean; mood_ping_opt: boolean }>(
+  const consentRow = await pool.query<{
+    research_consent: boolean;
+    mood_ping_opt: boolean;
+    created_at: Date;
+  }>(
     `SELECT u.research_consent,
-            COALESCE((u.notification_prefs->>'moodPing')::boolean, FALSE) AS mood_ping_opt
+            COALESCE((u.notification_prefs->>'moodPing')::boolean, FALSE) AS mood_ping_opt,
+            u.created_at
        FROM users u WHERE u.id = $1`,
     [userId],
   );
   const consent = consentRow.rows[0];
   const weekOf = isoWeekMondayUtc(new Date());
 
-  if (!consent?.research_consent || !consent.mood_ping_opt) {
+  if (!consent?.mood_ping_opt) {
+    return { due: false, week_of: weekOf, last_submitted_week: null };
+  }
+
+  const ageDays = (Date.now() - new Date(consent.created_at).getTime()) / 86_400_000;
+  if (ageDays < FIRST_PING_DELAY_DAYS) {
     return { due: false, week_of: weekOf, last_submitted_week: null };
   }
 
