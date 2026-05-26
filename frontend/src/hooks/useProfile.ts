@@ -20,6 +20,7 @@ export interface ProfileData {
   auth_provider: 'email' | 'google';
   notification_prefs: NotificationPrefs;
   research_consent: boolean;
+  share_text_consent: boolean;
   reminder_hour: number | null;
   reminder_timezone: string;
 }

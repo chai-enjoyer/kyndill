@@ -402,12 +402,56 @@ export type QuizPace = 'packed' | 'mixed' | 'spacious';
 export type QuizEnergy = 'low' | 'steady' | 'building';
 export type QuizBlocker = 'forgetting' | 'energy' | 'time' | 'all-or-nothing';
 
+export type QuizAgeBand =
+  | 'under_18'
+  | '18_24'
+  | '25_34'
+  | '35_44'
+  | '45_54'
+  | '55_64'
+  | '65_plus'
+  | 'prefer_not_say';
+
+export type QuizOccupation =
+  | 'student'
+  | 'employed_full'
+  | 'employed_part'
+  | 'self_employed'
+  | 'unemployed'
+  | 'retired'
+  | 'caregiver'
+  | 'other'
+  | 'prefer_not_say';
+
+export type QuizStudentLevel =
+  | 'high_school'
+  | 'undergrad'
+  | 'postgrad'
+  | 'not_student'
+  | 'prefer_not_say';
+
+export type QuizRegion =
+  | 'na'
+  | 'sa'
+  | 'eu'
+  | 'mena'
+  | 'ssa'
+  | 'sa_asia'
+  | 'ea_asia'
+  | 'se_asia'
+  | 'oceania'
+  | 'prefer_not_say';
+
 export interface QuizAnswers {
   intents: HabitIntent[];
   pace: QuizPace;
   times: HabitTimeOfDay[];
   energy: QuizEnergy;
   blocker: QuizBlocker;
+  age_band?: QuizAgeBand;
+  occupation?: QuizOccupation;
+  student_level?: QuizStudentLevel;
+  region?: QuizRegion;
 }
 
 const PACE_ORDER: Record<QuizPace, number> = { packed: 0, mixed: 1, spacious: 2 };

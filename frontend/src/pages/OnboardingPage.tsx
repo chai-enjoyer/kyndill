@@ -15,10 +15,14 @@ import {
   templateToHabitInput,
   type HabitIntent,
   type HabitTimeOfDay,
+  type QuizAgeBand,
   type QuizAnswers,
   type QuizBlocker,
   type QuizEnergy,
+  type QuizOccupation,
   type QuizPace,
+  type QuizRegion,
+  type QuizStudentLevel,
 } from '../lib/habitTemplates';
 import type { HabitCategory } from '../hooks/useHabits';
 import { useAuthContext } from '../context/AuthContext';
@@ -107,6 +111,53 @@ const BLOCKER_OPTIONS: { value: QuizBlocker; label: string; hint: string }[] = [
   { value: 'all-or-nothing', label: 'All-or-nothing brain', hint: 'Partial counts as progress.' },
 ];
 
+// Demographic buckets. Every option is broad enough that no row identifies an
+// individual on its own. "Prefer not to say" is always available and is the
+// implicit default (we don't pre-select anything).
+const AGE_BAND_OPTIONS: { value: QuizAgeBand; label: string }[] = [
+  { value: 'under_18', label: 'Under 18' },
+  { value: '18_24', label: '18–24' },
+  { value: '25_34', label: '25–34' },
+  { value: '35_44', label: '35–44' },
+  { value: '45_54', label: '45–54' },
+  { value: '55_64', label: '55–64' },
+  { value: '65_plus', label: '65+' },
+  { value: 'prefer_not_say', label: 'Prefer not to say' },
+];
+
+const OCCUPATION_OPTIONS: { value: QuizOccupation; label: string }[] = [
+  { value: 'student', label: 'Student' },
+  { value: 'employed_full', label: 'Employed (full time)' },
+  { value: 'employed_part', label: 'Employed (part time)' },
+  { value: 'self_employed', label: 'Self-employed' },
+  { value: 'unemployed', label: 'Between roles' },
+  { value: 'retired', label: 'Retired' },
+  { value: 'caregiver', label: 'Caregiver / home' },
+  { value: 'other', label: 'Other' },
+  { value: 'prefer_not_say', label: 'Prefer not to say' },
+];
+
+const STUDENT_LEVEL_OPTIONS: { value: QuizStudentLevel; label: string }[] = [
+  { value: 'high_school', label: 'High school' },
+  { value: 'undergrad', label: 'Undergraduate' },
+  { value: 'postgrad', label: 'Postgraduate' },
+  { value: 'not_student', label: 'Not currently a student' },
+  { value: 'prefer_not_say', label: 'Prefer not to say' },
+];
+
+const REGION_OPTIONS: { value: QuizRegion; label: string }[] = [
+  { value: 'na', label: 'North America' },
+  { value: 'sa', label: 'South America' },
+  { value: 'eu', label: 'Europe' },
+  { value: 'mena', label: 'Middle East / N. Africa' },
+  { value: 'ssa', label: 'Sub-Saharan Africa' },
+  { value: 'sa_asia', label: 'South Asia' },
+  { value: 'ea_asia', label: 'East Asia' },
+  { value: 'se_asia', label: 'Southeast Asia' },
+  { value: 'oceania', label: 'Oceania' },
+  { value: 'prefer_not_say', label: 'Prefer not to say' },
+];
+
 const HABIT_CATEGORIES: HabitCategory[] = ['Health', 'Productivity', 'Social', 'Learning', 'Wellness'];
 
 interface CustomHabitDraft {
@@ -145,6 +196,7 @@ export function OnboardingPage() {
   const [name, setName] = useState('');
   const [researchConsent, setResearchConsent] = useState(false);
   const [moodPingOptIn, setMoodPingOptIn] = useState(false);
+  const [shareTextConsent, setShareTextConsent] = useState(false);
   const [quiz, setQuiz] = useState<QuizAnswers | null>(null);
   const [selectedStarterIds, setSelectedStarterIds] = useState<string[]>([...DEFAULT_TEMPLATE_IDS]);
   const [customHabits, setCustomHabits] = useState<CustomHabitDraft[]>([]);
@@ -245,6 +297,7 @@ export function OnboardingPage() {
       void api
         .patch('/api/user/profile', {
           research_consent: researchConsent,
+          share_text_consent: researchConsent && shareTextConsent,
           notification_prefs: {
             friendRequests: true,
             gifts: true,
@@ -334,13 +387,18 @@ export function OnboardingPage() {
               <li>Focus sessions: start, duration, optional rating.</li>
               <li>Pet, shop, inventory, and friend interactions inside the app.</li>
               <li>Which screens you visit, and feature usage, to understand how Kyndill is used.</li>
-              <li>Reflections you write yourself: recovery notes, habit feelings, feedback messages.</li>
+              <li>The mood and rating you tag on reflections and feedback.</li>
             </ul>
 
             <h2>What never leaves your account</h2>
             <ul className="consent-card__list consent-card__list--negative">
               <li>Your email, name, username, avatar, and bio are stripped from any research export.</li>
               <li>Every export is keyed on a random research pseudonym, not your real ID.</li>
+              <li>
+                Habit names and the words inside your reflections, recovery notes, and feedback
+                stay with your account. Researchers see only the length of what you wrote
+                unless you opt in to text sharing below.
+              </li>
               <li>We do not record keystrokes, mouse movements, or anything outside Kyndill.</li>
             </ul>
 
@@ -361,13 +419,31 @@ export function OnboardingPage() {
                 onChange={(event) => {
                   const next = event.target.checked;
                   setResearchConsent(next);
-                  if (!next) setMoodPingOptIn(false);
+                  if (!next) {
+                    setMoodPingOptIn(false);
+                    setShareTextConsent(false);
+                  }
                 }}
               />
               <span>
                 <strong>Participate in evaluation.</strong> Required to use Kyndill while it is in
                 research mode. Anonymized interactions and self-reported feedback are stored as
                 described above.
+              </span>
+            </label>
+            <label
+              className={`consent-check consent-check--secondary${researchConsent ? '' : ' consent-check--disabled'}`}
+            >
+              <input
+                type="checkbox"
+                checked={shareTextConsent}
+                disabled={!researchConsent}
+                onChange={(event) => setShareTextConsent(event.target.checked)}
+              />
+              <span>
+                <strong>Share the text I write, not just its length.</strong> Lets researchers
+                read the actual words in habit names, reflections, and feedback. Helpful for
+                qualitative analysis. Off by default — you can switch this any time in Settings.
               </span>
             </label>
             <label
@@ -753,6 +829,16 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
   const [times, setTimes] = useState<HabitTimeOfDay[]>(initial.times);
   const [energy, setEnergy] = useState<QuizEnergy>(initial.energy);
   const [blocker, setBlocker] = useState<QuizBlocker>(initial.blocker);
+  // Demographics are collapsed by default so the first impression of this
+  // step stays on the five "what fits me" questions that drive the habit
+  // recommender. Nothing in here is required.
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [ageBand, setAgeBand] = useState<QuizAgeBand | ''>(initial.age_band ?? '');
+  const [occupation, setOccupation] = useState<QuizOccupation | ''>(initial.occupation ?? '');
+  const [studentLevel, setStudentLevel] = useState<QuizStudentLevel | ''>(
+    initial.student_level ?? '',
+  );
+  const [region, setRegion] = useState<QuizRegion | ''>(initial.region ?? '');
 
   const canContinue = intents.length > 0 && times.length > 0;
 
@@ -860,6 +946,48 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
         </QuizQuestion>
       </div>
 
+      <details
+        className="quiz-about"
+        open={aboutOpen}
+        onToggle={(event) => setAboutOpen((event.target as HTMLDetailsElement).open)}
+      >
+        <summary>
+          <span className="quiz-about__title">A little about you (optional)</span>
+          <span className="quiz-about__hint text-muted">
+            Helps researchers see which audiences Kyndill is reaching. Every question is skippable
+            and stays anonymous.
+          </span>
+        </summary>
+        <div className="quiz-about__grid">
+          <QuizSelect
+            label="Age range"
+            value={ageBand}
+            onChange={(value) => setAgeBand(value as QuizAgeBand | '')}
+            options={AGE_BAND_OPTIONS}
+          />
+          <QuizSelect
+            label="Current main activity"
+            value={occupation}
+            onChange={(value) => setOccupation(value as QuizOccupation | '')}
+            options={OCCUPATION_OPTIONS}
+          />
+          {occupation === 'student' && (
+            <QuizSelect
+              label="Study level"
+              value={studentLevel}
+              onChange={(value) => setStudentLevel(value as QuizStudentLevel | '')}
+              options={STUDENT_LEVEL_OPTIONS}
+            />
+          )}
+          <QuizSelect
+            label="Region"
+            value={region}
+            onChange={(value) => setRegion(value as QuizRegion | '')}
+            options={REGION_OPTIONS}
+          />
+        </div>
+      </details>
+
       <div className="onboarding-actions onboarding-actions--quiz">
         <Button variant="ghost" type="button" onClick={onBack}>Back</Button>
         <button type="button" className="quiz-skip" onClick={onSkip}>
@@ -869,13 +997,52 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
           variant="primary"
           size="lg"
           type="button"
-          onClick={() => onSubmit({ intents, pace, times, energy, blocker })}
+          onClick={() =>
+            onSubmit({
+              intents,
+              pace,
+              times,
+              energy,
+              blocker,
+              ...(ageBand ? { age_band: ageBand } : {}),
+              ...(occupation ? { occupation } : {}),
+              ...(occupation === 'student' && studentLevel ? { student_level: studentLevel } : {}),
+              ...(region ? { region } : {}),
+            })
+          }
           disabled={!canContinue}
         >
           Continue
         </Button>
       </div>
     </section>
+  );
+}
+
+interface QuizSelectProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}
+
+function QuizSelect({ label, value, onChange, options }: QuizSelectProps) {
+  return (
+    <label className="quiz-about__field">
+      <span className="quiz-about__label">{label}</span>
+      <select
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">—</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

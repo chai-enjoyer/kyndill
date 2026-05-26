@@ -41,6 +41,7 @@ const profileSchema = z.object({
   avatar_url: avatarUrlSchema.nullable().optional(),
   notification_prefs: notificationPrefsSchema.optional(),
   research_consent: z.boolean().optional(),
+  share_text_consent: z.boolean().optional(),
   reminder_hour: z.number().int().min(0).max(23).nullable().optional(),
   reminder_timezone: timezoneSchema.optional(),
 });

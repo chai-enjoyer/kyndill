@@ -20,6 +20,9 @@ const REASONS = [
   { value: 'low_energy', label: 'Low energy' },
   { value: 'forgot', label: 'Forgot' },
   { value: 'schedule_issue', label: 'Schedule shifted' },
+  { value: 'unwell', label: 'Unwell' },
+  { value: 'low_motivation', label: 'Low motivation' },
+  { value: 'travel', label: 'Travel / away' },
   { value: 'other', label: 'Something else' },
 ] as const;
 

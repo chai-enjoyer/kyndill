@@ -6,6 +6,10 @@ export interface OnboardingQuizAnswers {
   times: string[];
   energy: string;
   blocker: string;
+  age_band?: string;
+  occupation?: string;
+  student_level?: string;
+  region?: string;
 }
 
 export async function saveQuiz(userId: string, answers: OnboardingQuizAnswers): Promise<void> {

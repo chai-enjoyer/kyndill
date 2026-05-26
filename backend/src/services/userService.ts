@@ -30,6 +30,7 @@ export interface ProfileDto {
   auth_provider: 'email' | 'google';
   notification_prefs: NotificationPrefs;
   research_consent: boolean;
+  share_text_consent: boolean;
   reminder_hour: number | null;
   reminder_timezone: string;
 }
@@ -113,6 +114,7 @@ export async function getProfile(userId: string): Promise<ProfileDto> {
             CASE WHEN u.oauth_provider = 'google' THEN 'google' ELSE 'email' END AS auth_provider,
             u.notification_prefs,
             u.research_consent,
+            u.share_text_consent,
             u.reminder_hour,
             u.reminder_timezone,
             (SELECT COUNT(*)::int FROM habits h WHERE h.user_id = u.id) AS total_habits,
@@ -135,6 +137,7 @@ export async function updateProfile(
     avatar_url?: string | null;
     notification_prefs?: NotificationPrefs;
     research_consent?: boolean;
+    share_text_consent?: boolean;
     reminder_hour?: number | null;
     reminder_timezone?: string;
   },
@@ -170,6 +173,17 @@ export async function updateProfile(
   if (input.research_consent !== undefined) {
     sets.push(`research_consent = $${i++}`);
     values.push(input.research_consent);
+    // Text sharing implicitly turns off when the user opts out of research at
+    // all — there is no scenario in which "no research data" + "share my text"
+    // makes sense, and forgetting this would silently strand stale consent.
+    if (input.research_consent === false) {
+      sets.push(`share_text_consent = $${i++}`);
+      values.push(false);
+    }
+  }
+  if (input.share_text_consent !== undefined) {
+    sets.push(`share_text_consent = $${i++}`);
+    values.push(input.share_text_consent);
   }
   if (input.reminder_hour !== undefined) {
     sets.push(`reminder_hour = $${i++}`);

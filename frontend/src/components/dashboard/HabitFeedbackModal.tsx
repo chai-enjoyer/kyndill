@@ -10,10 +10,18 @@ interface HabitFeedbackModalProps {
   onClose: () => void;
 }
 
+// Two rows of three. Energized→Proud→Calm sit in the "positive lane";
+// Foggy→Tough→Drained span the "harder" lane. Keeping it to six caps the
+// cognitive load while still distinguishing "I did it joyfully" from
+// "I dragged myself through it" — both register as completions but have
+// very different research signals.
 const MOODS = [
   { value: 'energized', label: 'Energized' },
-  { value: 'steady', label: 'Steady' },
+  { value: 'proud', label: 'Proud' },
+  { value: 'calm', label: 'Calm' },
+  { value: 'foggy', label: 'Foggy' },
   { value: 'tough', label: 'Tough' },
+  { value: 'drained', label: 'Drained' },
 ];
 
 export function HabitFeedbackModal({ habitId, habitName, onClose }: HabitFeedbackModalProps) {

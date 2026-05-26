@@ -36,6 +36,7 @@ const ALL_TABLES: TableSpec[] = [
       'reminder_hour',
       'reminder_timezone',
       'research_consent',
+      'share_text_consent',
       'created_at',
     ],
     rowsSql: ({ from, to, limit, offset }) => ({
@@ -45,6 +46,7 @@ const ALL_TABLES: TableSpec[] = [
                streak_current, streak_longest,
                reminder_hour, reminder_timezone,
                research_consent,
+               share_text_consent,
                to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
           FROM users
          WHERE research_consent = TRUE
@@ -68,6 +70,7 @@ const ALL_TABLES: TableSpec[] = [
     columns: [
       'habit_id',
       'pseudonym',
+      'name',
       'name_length',
       'category',
       'frequency',
@@ -77,9 +80,13 @@ const ALL_TABLES: TableSpec[] = [
       'created_at',
     ],
     rowsSql: ({ from, to, limit, offset }) => ({
+      // `name` is only populated for users who opted into text sharing.
+      // `name_length` stays so length-only analysis still works across the
+      // whole consented cohort.
       text: `
         SELECT h.id::text          AS habit_id,
                u.research_pseudonym::text AS pseudonym,
+               CASE WHEN u.share_text_consent THEN h.name ELSE NULL END AS name,
                char_length(h.name) AS name_length,
                h.category,
                h.frequency,
@@ -113,7 +120,7 @@ const ALL_TABLES: TableSpec[] = [
       'completed_on',
       'completion_count',
       'target_count',
-      'created_at',
+      'completed_at',
     ],
     rowsSql: ({ from, to, limit, offset }) => ({
       text: `
@@ -122,13 +129,13 @@ const ALL_TABLES: TableSpec[] = [
                to_char(c.completed_on, 'YYYY-MM-DD') AS completed_on,
                c.completion_count,
                c.target_count,
-               to_char(c.created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
+               to_char(c.completed_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS completed_at
           FROM habit_completions c
           JOIN users u ON u.id = c.user_id
          WHERE u.research_consent = TRUE
-           AND ($1::timestamptz IS NULL OR c.created_at >= $1)
-           AND ($2::timestamptz IS NULL OR c.created_at <  $2)
-         ORDER BY c.created_at ASC
+           AND ($1::timestamptz IS NULL OR c.completed_at >= $1)
+           AND ($2::timestamptz IS NULL OR c.completed_at <  $2)
+         ORDER BY c.completed_at ASC
          LIMIT $3 OFFSET $4
       `,
       values: [from, to, limit, offset],
@@ -171,12 +178,14 @@ const ALL_TABLES: TableSpec[] = [
         FROM feedback_events f JOIN users u ON u.id = f.user_id
        WHERE u.research_consent = TRUE
     `,
-    columns: ['pseudonym', 'context', 'mood', 'note_length', 'habit_id', 'created_at'],
+    columns: ['pseudonym', 'context', 'mood', 'rating', 'note', 'note_length', 'habit_id', 'created_at'],
     rowsSql: ({ from, to, limit, offset }) => ({
       text: `
         SELECT u.research_pseudonym::text AS pseudonym,
                f.context,
                f.mood,
+               f.rating,
+               CASE WHEN u.share_text_consent THEN f.note ELSE NULL END AS note,
                char_length(COALESCE(f.note, '')) AS note_length,
                COALESCE(f.habit_id::text, '') AS habit_id,
                to_char(f.created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
@@ -227,12 +236,13 @@ const ALL_TABLES: TableSpec[] = [
         FROM mood_pings m JOIN users u ON u.id = m.user_id
        WHERE u.research_consent = TRUE
     `,
-    columns: ['pseudonym', 'week_of', 'rating', 'note_length', 'created_at'],
+    columns: ['pseudonym', 'week_of', 'rating', 'note', 'note_length', 'created_at'],
     rowsSql: ({ from, to, limit, offset }) => ({
       text: `
         SELECT u.research_pseudonym::text AS pseudonym,
                to_char(m.week_of, 'YYYY-MM-DD') AS week_of,
                m.rating,
+               CASE WHEN u.share_text_consent THEN m.note ELSE NULL END AS note,
                char_length(COALESCE(m.note, '')) AS note_length,
                to_char(m.created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
           FROM mood_pings m
