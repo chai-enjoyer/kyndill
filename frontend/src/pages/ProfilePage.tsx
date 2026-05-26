@@ -4,10 +4,13 @@ import { AnimatedValue } from '../components/common/AnimatedValue';
 import { Button } from '../components/common/Button';
 import { FlameIcon } from '../components/common/FlameIcon';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { JournalSection } from '../components/profile/JournalSection';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useProfile } from '../hooks/useProfile';
 import { extractMessage } from '../hooks/useSocial';
+
+type ProfileTab = 'account' | 'journal';
 
 export function ProfilePage() {
   const { profile, isLoading, save } = useProfile();
@@ -19,6 +22,7 @@ export function ProfilePage() {
   const [visibility, setVisibility] = useState<'public' | 'friends' | 'private'>('private');
   const [saving, setSaving] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
+  const [tab, setTab] = useState<ProfileTab>('account');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -105,6 +109,29 @@ export function ProfilePage() {
           <Button variant="secondary" type="button" onClick={logout}>Sign out</Button>
         </div>
       </header>
+      <nav className="profile-tabs" role="tablist" aria-label="Profile sections">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'account'}
+          className={`profile-tab${tab === 'account' ? ' is-active' : ''}`}
+          onClick={() => setTab('account')}
+        >
+          Account
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'journal'}
+          className={`profile-tab${tab === 'journal' ? ' is-active' : ''}`}
+          onClick={() => setTab('journal')}
+        >
+          Journal
+        </button>
+      </nav>
+      {tab === 'journal' ? (
+        <JournalSection />
+      ) : (
       <div className="profile-layout">
         <form className="profile-card" onSubmit={submit}>
           <div className="profile-avatar-row">
@@ -158,6 +185,7 @@ export function ProfilePage() {
           <Stat label="Focus time" value={`${profile.total_focus_minutes}m`} />
         </aside>
       </div>
+      )}
     </section>
   );
 }
