@@ -5,6 +5,7 @@ import { Button } from '../components/common/Button';
 import { FlameIcon } from '../components/common/FlameIcon';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { JournalSection } from '../components/profile/JournalSection';
+import { WishlistEditor } from '../components/profile/WishlistEditor';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useProfile } from '../hooks/useProfile';
@@ -132,6 +133,7 @@ export function ProfilePage() {
       {tab === 'journal' ? (
         <JournalSection />
       ) : (
+      <>
       <div className="profile-layout">
         <form className="profile-card" onSubmit={submit}>
           <div className="profile-avatar-row">
@@ -185,6 +187,8 @@ export function ProfilePage() {
           <Stat label="Focus time" value={`${profile.total_focus_minutes}m`} />
         </aside>
       </div>
+      <WishlistEditor />
+      </>
       )}
     </section>
   );

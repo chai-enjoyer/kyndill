@@ -10,6 +10,7 @@ import {
 import { listForUser as listInventory } from './inventoryService';
 import type { InventoryListing } from './inventoryService';
 import { sendNotificationPush } from './notificationsService';
+import { STREAK_FREEZE_MAX } from './shopService';
 
 // ============================================================
 // DTOs
@@ -474,25 +475,47 @@ export async function sendGift(
     throw new HttpError(404, 'NOT_FRIENDS', 'You are not friends with this user');
   }
 
-  const { rows: invRows } = await pool.query<{
-    quantity: number;
-    type: string;
+  // Look up the item itself first so we know whether to validate from
+  // inventory (consumable) or from streaks.freeze_count (streak_freeze).
+  const { rows: itemRows } = await pool.query<{
+    id: string;
+    type: 'consumable' | 'streak_freeze' | 'cosmetic';
     name: string;
     image_url: string | null;
-  }>(
-    `SELECT inv.quantity, i.type, i.name, i.image_url
-       FROM inventory inv
-       JOIN items i ON i.id = inv.item_id
-      WHERE inv.user_id = $1 AND inv.item_id = $2`,
-    [fromUserId, itemId],
-  );
-  if (invRows.length === 0 || invRows[0].quantity < 1) {
-    throw new HttpError(404, 'NOT_IN_INVENTORY', 'Item not in inventory');
+  }>(`SELECT id, type, name, image_url FROM items WHERE id = $1`, [itemId]);
+  if (itemRows.length === 0) {
+    throw new HttpError(404, 'ITEM_NOT_FOUND', 'Item does not exist');
   }
-  if (invRows[0].type !== 'consumable') {
-    throw new HttpError(400, 'NOT_GIFTABLE', 'Only consumables can be gifted');
+  const itemInfo = itemRows[0];
+
+  if (itemInfo.type === 'consumable') {
+    const { rows: invRows } = await pool.query<{ quantity: number }>(
+      `SELECT quantity FROM inventory WHERE user_id = $1 AND item_id = $2`,
+      [fromUserId, itemId],
+    );
+    if (invRows.length === 0 || invRows[0].quantity < 1) {
+      throw new HttpError(404, 'NOT_IN_INVENTORY', 'Item not in inventory');
+    }
+  } else if (itemInfo.type === 'streak_freeze') {
+    const { rows: streakRows } = await pool.query<{ freeze_count: number }>(
+      `SELECT freeze_count FROM streaks WHERE user_id = $1`,
+      [fromUserId],
+    );
+    if (!streakRows[0] || streakRows[0].freeze_count < 1) {
+      throw new HttpError(400, 'NO_FREEZE_TO_GIFT', 'You do not have a streak freeze to gift');
+    }
+    // Friendly upfront check; the accept path also enforces the cap in case
+    // the recipient bought one in the interim.
+    const { rows: recipRows } = await pool.query<{ freeze_count: number }>(
+      `SELECT freeze_count FROM streaks WHERE user_id = $1`,
+      [toUserId],
+    );
+    if (recipRows[0] && recipRows[0].freeze_count >= STREAK_FREEZE_MAX) {
+      throw new HttpError(409, 'RECIPIENT_FREEZE_FULL', 'Your friend already holds the max freezes');
+    }
+  } else {
+    throw new HttpError(400, 'NOT_GIFTABLE', 'Only consumables and streak freezes can be gifted');
   }
-  const itemInfo = invRows[0];
 
   const { rows: senderRows } = await pool.query<{
     username: string;
@@ -528,17 +551,33 @@ export async function sendGift(
   try {
     await client.query('BEGIN');
 
-    if (itemInfo.quantity === 1) {
-      await client.query(`DELETE FROM inventory WHERE user_id = $1 AND item_id = $2`, [
-        fromUserId,
-        itemId,
-      ]);
+    if (itemInfo.type === 'streak_freeze') {
+      // Atomic check-and-decrement on the sender's freeze count so two
+      // simultaneous sends can't both succeed when only one freeze is held.
+      const { rowCount } = await client.query(
+        `UPDATE streaks SET freeze_count = freeze_count - 1
+          WHERE user_id = $1 AND freeze_count >= 1`,
+        [fromUserId],
+      );
+      if (rowCount === 0) {
+        throw new HttpError(400, 'NO_FREEZE_TO_GIFT', 'You do not have a streak freeze to gift');
+      }
     } else {
-      await client.query(
-        `UPDATE inventory SET quantity = quantity - 1
-          WHERE user_id = $1 AND item_id = $2`,
+      const { rowCount: invDeleted } = await client.query(
+        `DELETE FROM inventory
+          WHERE user_id = $1 AND item_id = $2 AND quantity = 1`,
         [fromUserId, itemId],
       );
+      if (invDeleted === 0) {
+        const { rowCount: invDecremented } = await client.query(
+          `UPDATE inventory SET quantity = quantity - 1
+            WHERE user_id = $1 AND item_id = $2 AND quantity >= 1`,
+          [fromUserId, itemId],
+        );
+        if (invDecremented === 0) {
+          throw new HttpError(404, 'NOT_IN_INVENTORY', 'Item not in inventory');
+        }
+      }
     }
 
     const { rows: giftRows } = await client.query<GiftDto>(
@@ -643,18 +682,38 @@ export async function acceptGift(userId: string, giftId: string): Promise<Accept
   }
   const giftRow = gifts[0];
 
+  const { rows: itemRows } = await pool.query<{ type: 'consumable' | 'streak_freeze' | 'cosmetic' }>(
+    `SELECT type FROM items WHERE id = $1`,
+    [giftRow.item_id],
+  );
+  const itemType = itemRows[0]?.type ?? 'consumable';
+
   const client = await pool.connect();
   let updated: GiftDto;
   try {
     await client.query('BEGIN');
 
-    await client.query(
-      `INSERT INTO inventory (user_id, item_id, quantity)
-       VALUES ($1, $2, 1)
-       ON CONFLICT (user_id, item_id)
-       DO UPDATE SET quantity = inventory.quantity + 1`,
-      [userId, giftRow.item_id],
-    );
+    if (itemType === 'streak_freeze') {
+      // Guarded increment: if the recipient already filled their freeze slot
+      // since the gift was sent, refuse rather than silently dropping.
+      const { rowCount } = await client.query(
+        `UPDATE streaks
+            SET freeze_count = freeze_count + 1
+          WHERE user_id = $1 AND freeze_count < $2`,
+        [userId, STREAK_FREEZE_MAX],
+      );
+      if (rowCount === 0) {
+        throw new HttpError(409, 'FREEZE_FULL', 'You already hold the max streak freezes');
+      }
+    } else {
+      await client.query(
+        `INSERT INTO inventory (user_id, item_id, quantity)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (user_id, item_id)
+         DO UPDATE SET quantity = inventory.quantity + 1`,
+        [userId, giftRow.item_id],
+      );
+    }
 
     const { rows: updatedRows } = await client.query<GiftDto>(
       `UPDATE gifts SET is_accepted = TRUE WHERE id = $1

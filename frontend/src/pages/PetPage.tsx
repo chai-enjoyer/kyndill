@@ -7,11 +7,13 @@ import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
 import { SpritePet } from '../components/common/SpritePet';
 import { StatIcon, type StatIconName } from '../components/common/StatIcon';
+import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useInventory, type InventoryEntry } from '../hooks/useInventory';
 import { usePet, type EquipSlot, type PetFullState } from '../hooks/usePet';
 import { getItemPlaceholder } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
+import { deriveHealthBreakdown } from '../lib/petHealth';
 
 const STATS: Array<{
   key: 'health' | 'happiness' | 'hunger' | 'energy' | 'cleanliness';
@@ -23,31 +25,31 @@ const STATS: Array<{
     key: 'health',
     label: 'Health',
     icon: 'health',
-    info: 'Health combines care stats and streak momentum. Strong stats keep your pet well; streaks add consistency, but there is no guaranteed base.',
+    info: 'Health = care-stat average × 55% + streak score × 35% + a consistency bonus capped at 12. See the breakdown below.',
   },
   {
     key: 'happiness',
     label: 'Happiness',
     icon: 'happiness',
-    info: 'Happiness rises from completing habits, especially social and wellness habits.',
+    info: 'Rises by 6–12 with each completion (Social and Wellness give the most) and drifts down ~3/day between visits.',
   },
   {
     key: 'hunger',
     label: 'Hunger',
     icon: 'hunger',
-    info: 'Hunger is your pet food meter. Completing habits spends a little hunger; consumable food restores it.',
+    info: 'Drops ~6/day between visits and ~5 per completion. Food consumables restore it.',
   },
   {
     key: 'energy',
     label: 'Energy',
     icon: 'energy',
-    info: 'Energy is spent by effort-heavy habits. Some consumables restore it.',
+    info: 'Drops ~5/day between visits and 4–6 per completion (Productivity costs the most). Energy consumables restore it.',
   },
   {
     key: 'cleanliness',
     label: 'Cleanliness',
     icon: 'cleanliness',
-    info: 'Cleanliness changes with habit activity. Health habits can improve it; most completions use a little.',
+    info: 'Drifts down ~4/day between visits and ~3 per completion. Health habits add a small bump; Wellness leaves it alone.',
   },
 ];
 
@@ -64,6 +66,7 @@ export function PetPage() {
   const { pet, isLoading, equip, unequip, rename, refetch } = usePet();
   const { cosmetics, refetch: refetchInventory } = useInventory();
   const { showToast } = useToastContext();
+  const { user } = useAuthContext();
   const [slot, setSlot] = useState<EquipSlot | null>(null);
   const [equippingId, setEquippingId] = useState<string | null>(null);
   const [unequippingSlot, setUnequippingSlot] = useState<EquipSlot | null>(null);
@@ -218,6 +221,10 @@ export function PetPage() {
               <PetStat key={stat.key} label={stat.label} value={pet[stat.key]} icon={stat.icon} info={stat.info} />
             ))}
           </div>
+          <HealthBreakdown
+            pet={pet}
+            streak={user?.streak_current ?? 0}
+          />
         </section>
 
         <section className="pet-page__panel pet-page__cosmetics" aria-label="Equipped cosmetics">
@@ -280,6 +287,51 @@ export function PetPage() {
         />
       )}
     </section>
+  );
+}
+
+function HealthBreakdown({ pet, streak }: { pet: PetFullState; streak: number }) {
+  const breakdown = deriveHealthBreakdown(streak, pet);
+  const carePoints = Math.round(breakdown.careAverage * breakdown.weights.care);
+  const streakPoints = Math.round(breakdown.streakScore * breakdown.weights.streak);
+  return (
+    <details className="health-breakdown" open>
+      <summary>
+        <span>How health adds up</span>
+        <strong>{breakdown.health}/100</strong>
+      </summary>
+      <ul className="health-breakdown__rows">
+        <li>
+          <span>Care average</span>
+          <span className="health-breakdown__sub">
+            ({pet.happiness}+{pet.hunger}+{pet.energy}+{pet.cleanliness}) ÷ 4 ={' '}
+            {breakdown.careAverage}
+          </span>
+          <strong>+{carePoints}</strong>
+        </li>
+        <li>
+          <span>Streak momentum</span>
+          <span className="health-breakdown__sub">
+            {streak} day{streak === 1 ? '' : 's'} × 12, capped at 100
+          </span>
+          <strong>+{streakPoints}</strong>
+        </li>
+        <li>
+          <span>Consistency bonus</span>
+          <span className="health-breakdown__sub">2 per streak day, capped at 12</span>
+          <strong>+{breakdown.consistencyBonus}</strong>
+        </li>
+        <li className="health-breakdown__total">
+          <span>Health</span>
+          <span className="health-breakdown__sub">capped at 100</span>
+          <strong>{breakdown.health}</strong>
+        </li>
+      </ul>
+      <p className="health-breakdown__note text-muted">
+        Care stats drift down between visits (hunger and energy fastest, cleanliness and
+        happiness slower). Completing habits and feeding consumables push them back up.
+      </p>
+    </details>
   );
 }
 

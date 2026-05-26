@@ -98,23 +98,35 @@ export async function getFullState(userId: string): Promise<PetFullState> {
   return { ...pets[0], health, equipped: await getEquipped(userId) };
 }
 
-export async function applyPassiveDecay(userId: string): Promise<void> {
-  const { rows } = await pool.query<{ elapsed_days: number }>(
-    `SELECT FLOOR(EXTRACT(EPOCH FROM (NOW() - last_decay_at)) / 86400)::int AS elapsed_days
+export async function applyPassiveDecay(
+  userId: string,
+  executor: PoolClient | typeof pool = pool,
+): Promise<void> {
+  const { rows } = await executor.query<{ elapsed_hours: number }>(
+    // Per-hour granularity so daily-active users still feel decay between
+    // sessions. The previous per-day floor meant any user who interacted
+    // even once a day never saw stats move — last_decay_at was reset on
+    // every completion, so the day counter could never tick over.
+    `SELECT FLOOR(EXTRACT(EPOCH FROM (NOW() - last_decay_at)) / 3600)::int AS elapsed_hours
        FROM pets
       WHERE user_id = $1`,
     [userId],
   );
-  const elapsedDays = rows[0]?.elapsed_days ?? 0;
-  if (elapsedDays <= 0) return;
+  const elapsedHours = rows[0]?.elapsed_hours ?? 0;
+  if (elapsedHours <= 0) return;
 
-  const days = Math.min(elapsedDays, 7);
-  const hungerDrop = days * 6;
-  const energyDrop = days * 5;
-  const cleanlinessDrop = days * 4;
-  const happinessDrop = days * 3;
+  const hours = Math.min(elapsedHours, 24 * 7);
+  // Per-day rates kept the same shape; just divided by 24 for hourly accrual.
+  const hungerDrop = Math.round((hours / 24) * 6);
+  const energyDrop = Math.round((hours / 24) * 5);
+  const cleanlinessDrop = Math.round((hours / 24) * 4);
+  const happinessDrop = Math.round((hours / 24) * 3);
 
-  const { rows: updatedRows } = await pool.query<PetRow>(
+  if (hungerDrop === 0 && energyDrop === 0 && cleanlinessDrop === 0 && happinessDrop === 0) {
+    return;
+  }
+
+  const { rows: updatedRows } = await executor.query<PetRow>(
     `UPDATE pets
         SET hunger = GREATEST(0, hunger - $2),
             energy = GREATEST(0, energy - $3),
@@ -131,9 +143,9 @@ export async function applyPassiveDecay(userId: string): Promise<void> {
   );
   if (updatedRows.length === 0) return;
 
-  const streak = await getCurrentStreak(userId);
+  const streak = await getCurrentStreak(userId, executor);
   const health = derivePetHealth(streak, updatedRows[0]);
-  await pool.query(
+  await executor.query(
     `UPDATE pets
         SET health = $2,
             is_fainted = CASE
@@ -239,11 +251,13 @@ export async function rename(userId: string, name: string): Promise<PetRow> {
 // ============================================================
 
 export async function feed(userId: string, itemId: string): Promise<PetRow> {
-  await applyPassiveDecay(userId);
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    // Decay inside the transaction so the bonus is applied to a row that
+    // already accounts for elapsed time — and so a feed cannot race with a
+    // habit completion to overwrite the other's decay accrual.
+    await applyPassiveDecay(userId, client);
 
     const { rows: invRows } = await client.query<{
       quantity: number;
@@ -280,12 +294,15 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
 
     const stat = inv.effect_stat as PetStat;
     const happinessBonus = stat === 'happiness' ? 0 : Math.max(1, Math.round(inv.effect_amount * 0.12));
+    // last_decay_at is intentionally NOT reset here. applyPassiveDecay was
+    // called at the top of this function and already updated it; resetting
+    // again would break the per-hour decay clock for any user who feeds
+    // frequently.
     const petUpdate =
       stat === 'happiness'
         ? await client.query<PetRow>(
             `UPDATE pets
-                SET happiness = LEAST(happiness + $1, 100),
-                    last_decay_at = NOW()
+                SET happiness = LEAST(happiness + $1, 100)
               WHERE user_id = $2
               RETURNING ${PET_COLUMNS}`,
             [inv.effect_amount, userId],
@@ -294,8 +311,7 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
             // Safe interpolation: `stat` is validated against the hardcoded whitelist above.
             `UPDATE pets
                 SET ${stat} = LEAST(${stat} + $1, 100),
-                    happiness = LEAST(happiness + $3, 100),
-                    last_decay_at = NOW()
+                    happiness = LEAST(happiness + $3, 100)
               WHERE user_id = $2
               RETURNING ${PET_COLUMNS}`,
             [inv.effect_amount, userId, happinessBonus],
@@ -411,6 +427,11 @@ export async function applyHabitCompletionEffects(
   currentStreak: number,
   habitCategory: string,
 ): Promise<PetCompletionEffect> {
+  // Decay must run BEFORE the completion bump. Without this, the previous
+  // version pinned last_decay_at to the latest completion, so a daily-active
+  // user's hunger/cleanliness never accrued — making the care economy moot.
+  // Decay sets last_decay_at = NOW() internally; we don't touch it again here.
+  await applyPassiveDecay(userId, client);
   const deltas = completionStatDeltas(habitCategory);
 
   const { rows } = await client.query<PetCompletionEffect>(
@@ -419,8 +440,7 @@ export async function applyHabitCompletionEffects(
             happiness = LEAST(100, GREATEST(0, happiness + $2)),
             hunger = LEAST(100, GREATEST(0, hunger + $3)),
             energy = LEAST(100, GREATEST(0, energy + $4)),
-            cleanliness = LEAST(100, GREATEST(0, cleanliness + $5)),
-            last_decay_at = NOW()
+            cleanliness = LEAST(100, GREATEST(0, cleanliness + $5))
       WHERE user_id = $1
       RETURNING total_habits_completed, health, happiness, hunger, energy, cleanliness, stage, is_fainted`,
     [userId, deltas.happiness, deltas.hunger, deltas.energy, deltas.cleanliness],

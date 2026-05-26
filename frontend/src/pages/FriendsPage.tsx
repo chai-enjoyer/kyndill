@@ -14,10 +14,13 @@ import {
   type FriendProfile,
   type UserSearchResult,
 } from '../hooks/useSocial';
+import { useShop, type ShopItem } from '../hooks/useShop';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useToastContext } from '../context/ToastContext';
 import { getItemPlaceholder } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
+import { WishlistView } from '../components/profile/WishlistEditor';
+import { fetchFriendWishlist, type WishlistEntry } from '../hooks/useWishlist';
 
 export function FriendsPage() {
   const {
@@ -39,6 +42,10 @@ export function FriendsPage() {
   } = useSocial();
   const { entries, isLoading: leaderboardLoading } = useLeaderboard('friends');
   const { consumables, refetch: refetchInventory } = useInventory();
+  const { freezeCount, streakFreezes, refetch: refetchShop } = useShop();
+  // The shop seeds a single streak_freeze item; surface the first one as the
+  // canonical "gift a freeze" choice.
+  const freezeItem: ShopItem | null = streakFreezes[0] ?? null;
   const { showToast } = useToastContext();
   const [query, setQuery] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -305,10 +312,12 @@ export function FriendsPage() {
         <SendGiftModal
           friend={giftFriend}
           items={consumables}
+          freezeItem={freezeItem}
+          freezeCount={freezeCount}
           onClose={() => setGiftFriend(null)}
           onSend={async (itemId, message) => {
             await sendGift(giftFriend.id, itemId, message);
-            await refetchInventory();
+            await Promise.all([refetchInventory(), refetchShop()]);
             trackEvent('gift_sent', {
               friend_id: giftFriend.id,
               item_id: itemId,
@@ -452,11 +461,15 @@ function AddFriendModal({
 function SendGiftModal({
   friend,
   items,
+  freezeItem,
+  freezeCount,
   onClose,
   onSend,
 }: {
   friend: Friend;
   items: InventoryEntry[];
+  freezeItem: ShopItem | null;
+  freezeCount: number;
   onClose: () => void;
   onSend: (itemId: string, message?: string) => Promise<void>;
 }) {
@@ -478,13 +491,40 @@ function SendGiftModal({
     }
   }
 
+  const noOptions = items.length === 0 && (!freezeItem || freezeCount < 1);
+
   return (
     <Modal isOpen onClose={onClose} title={`Send gift to ${friend.display_name}`}>
       <form className="gift-form" onSubmit={submit}>
-        {items.length === 0 ? (
-          <p className="friends-empty">No consumables available to gift.</p>
+        {noOptions ? (
+          <p className="friends-empty">Nothing to gift right now — consumables and unused streak freezes can both be sent.</p>
         ) : (
           <div className="gift-list">
+            {freezeItem && (
+              <label
+                className={`gift-option gift-option--freeze${freezeCount < 1 ? ' is-disabled' : ''}`}
+              >
+                <input
+                  type="radio"
+                  name="gift"
+                  value={freezeItem.id}
+                  checked={selected === freezeItem.id}
+                  onChange={() => setSelected(freezeItem.id)}
+                  disabled={freezeCount < 1}
+                />
+                <span
+                  className="gift-option__image"
+                  style={{ backgroundImage: `url("${getItemPlaceholder(freezeItem.name)}")` }}
+                />
+                <span>
+                  {freezeItem.name}
+                  <small className="gift-option__hint text-muted">
+                    Sends one of your streak freezes
+                  </small>
+                </span>
+                <em>{freezeCount < 1 ? 'None to send' : `x${freezeCount}`}</em>
+              </label>
+            )}
             {items.map((item) => (
               <label key={item.id} className="gift-option">
                 <input type="radio" name="gift" value={item.id} checked={selected === item.id} onChange={() => setSelected(item.id)} />
@@ -509,6 +549,23 @@ function SendGiftModal({
 
 function FriendProfileModal({ profile, onClose }: { profile: FriendProfile; onClose: () => void }) {
   const mood = profile.pet?.is_fainted ? 'sad' : (profile.pet?.health ?? 0) > 60 ? 'happy' : 'neutral';
+  const [wishlist, setWishlist] = useState<WishlistEntry[]>([]);
+  const [wishlistLoaded, setWishlistLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchFriendWishlist(profile.id)
+      .then((items) => {
+        if (!cancelled) setWishlist(items);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setWishlistLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.id]);
   return (
     <Modal isOpen onClose={onClose} title={profile.display_name}>
       <div className="friend-profile-modal">
@@ -554,6 +611,12 @@ function FriendProfileModal({ profile, onClose }: { profile: FriendProfile; onCl
             </>
           )}
         </dl>
+        {wishlistLoaded && wishlist.length > 0 && (
+          <section className="friend-profile-modal__wishlist" aria-label="Wishlist">
+            <h3>Wishlist</h3>
+            <WishlistView items={wishlist} />
+          </section>
+        )}
       </div>
     </Modal>
   );

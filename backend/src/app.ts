@@ -19,6 +19,7 @@ import { analyticsRouter } from './routes/analytics';
 import { moodPingRouter } from './routes/moodPing';
 import { onboardingRouter } from './routes/onboarding';
 import { journalRouter } from './routes/journal';
+import { wishlistRouter } from './routes/wishlist';
 
 import { requireAuth } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
@@ -60,6 +61,7 @@ export function createApp(): Express {
   app.use('/api/mood-pings', requireAuth, moodPingRouter);
   app.use('/api/onboarding', requireAuth, onboardingRouter);
   app.use('/api/journal', requireAuth, journalRouter);
+  app.use('/api/wishlist', requireAuth, wishlistRouter);
 
   app.use(errorHandler);
   return app;

@@ -21,6 +21,7 @@ describe('protected route boundaries', () => {
     ['get', '/api/progress/summary'],
     ['get', '/api/recovery/prompt'],
     ['get', '/api/journal/entries'],
+    ['get', '/api/wishlist'],
   ];
 
   it.each(protectedRoutes)('rejects %s %s without a bearer token', async (method, path) => {
