@@ -6,6 +6,7 @@ import { FlameIcon } from '../components/common/FlameIcon';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
 import { CategoryPill } from '../components/dashboard/CategoryPill';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useToastContext } from '../context/ToastContext';
 import {
   HABIT_TEMPLATES,
@@ -96,6 +97,7 @@ export function HabitsPage() {
 
   return (
     <section className="page habits-page">
+      <MobilePageHeader title="Habits" />
       <header className="page__header habits-page__header">
         <div>
           <p className="page__eyebrow">Habit library</p>

@@ -2,6 +2,7 @@ import { useId, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 import { Button } from '../components/common/Button';
+import { HabitCheckbox } from '../components/dashboard/HabitCheckbox';
 // PLACEHOLDER: Replace with final onboarding pet artist assets when delivered.
 import { type PetSpecies } from '../components/common/PlaceholderPet';
 import { SpritePet } from '../components/common/SpritePet';
@@ -196,7 +197,6 @@ export function OnboardingPage() {
   const [name, setName] = useState('');
   const [researchConsent, setResearchConsent] = useState(false);
   const [moodPingOptIn, setMoodPingOptIn] = useState(false);
-  const [shareTextConsent, setShareTextConsent] = useState(false);
   const [quiz, setQuiz] = useState<QuizAnswers | null>(null);
   const [selectedStarterIds, setSelectedStarterIds] = useState<string[]>([...DEFAULT_TEMPLATE_IDS]);
   const [customHabits, setCustomHabits] = useState<CustomHabitDraft[]>([]);
@@ -297,7 +297,10 @@ export function OnboardingPage() {
       void api
         .patch('/api/user/profile', {
           research_consent: researchConsent,
-          share_text_consent: researchConsent && shareTextConsent,
+          /* Single research toggle governs text sharing too — opting in
+           * shares the actual words alongside the rest of the anonymized
+           * data; opting out turns everything off. */
+          share_text_consent: researchConsent,
           notification_prefs: {
             friendRequests: true,
             gifts: true,
@@ -396,8 +399,7 @@ export function OnboardingPage() {
               <li>Every export is keyed on a random research pseudonym, not your real ID.</li>
               <li>
                 Habit names and the words inside your reflections, recovery notes, and feedback
-                stay with your account. Researchers see only the length of what you wrote
-                unless you opt in to text sharing below.
+                are stored alongside the rest of your anonymized data.
               </li>
               <li>We do not record keystrokes, mouse movements, or anything outside Kyndill.</li>
             </ul>
@@ -412,55 +414,32 @@ export function OnboardingPage() {
 
           <fieldset className="consent-choices">
             <legend className="visually-hidden">Data collection choices</legend>
-            <label className="consent-check">
-              <input
-                type="checkbox"
-                checked={researchConsent}
-                onChange={(event) => {
-                  const next = event.target.checked;
-                  setResearchConsent(next);
-                  if (!next) {
-                    setMoodPingOptIn(false);
-                    setShareTextConsent(false);
-                  }
-                }}
-              />
-              <span>
-                <strong>Participate in evaluation.</strong> Required to use Kyndill while it is in
-                research mode. Anonymized interactions and self-reported feedback are stored as
-                described above.
-              </span>
-            </label>
-            <label
-              className={`consent-check consent-check--secondary${researchConsent ? '' : ' consent-check--disabled'}`}
+            <ConsentRow
+              checked={researchConsent}
+              onToggle={() => {
+                const next = !researchConsent;
+                setResearchConsent(next);
+                if (!next) setMoodPingOptIn(false);
+              }}
+              label="Participate in evaluation"
             >
-              <input
-                type="checkbox"
-                checked={shareTextConsent}
-                disabled={!researchConsent}
-                onChange={(event) => setShareTextConsent(event.target.checked)}
-              />
-              <span>
-                <strong>Share the text I write, not just its length.</strong> Lets researchers
-                read the actual words in habit names, reflections, and feedback. Helpful for
-                qualitative analysis. Off by default — you can switch this any time in Settings.
-              </span>
-            </label>
-            <label
-              className={`consent-check consent-check--secondary${researchConsent ? '' : ' consent-check--disabled'}`}
+              <strong>Participate in evaluation.</strong> Required to use Kyndill while it is in
+              research mode. Anonymized interactions and self-reported feedback are stored as
+              described above.
+            </ConsentRow>
+            <ConsentRow
+              checked={moodPingOptIn}
+              disabled={!researchConsent}
+              onToggle={() => {
+                if (!researchConsent) return;
+                setMoodPingOptIn((value) => !value);
+              }}
+              label="Send me a weekly mood check-in"
+              modifier="secondary"
             >
-              <input
-                type="checkbox"
-                checked={moodPingOptIn}
-                disabled={!researchConsent}
-                onChange={(event) => setMoodPingOptIn(event.target.checked)}
-              />
-              <span>
-                <strong>Send me a weekly mood check-in.</strong> One short question, once a
-                week, asking how the week felt. Optional, snoozable, and only sent if you've
-                opted in here.
-              </span>
-            </label>
+              <strong>Send me a weekly mood check-in.</strong> One short question, once a week,
+              asking how the week felt. Optional, snoozable, and only sent if you've opted in here.
+            </ConsentRow>
           </fieldset>
 
           <div className="onboarding-actions">
@@ -615,17 +594,17 @@ export function OnboardingPage() {
           </div>
         </section>
       ) : (
-        <section className="onboarding-step" aria-labelledby="onboarding-step-habits-heading">
+        <section className="onboarding-step onboarding-step--habits" aria-labelledby="onboarding-step-habits-heading">
           <header className="onboarding-step__header">
             <h1 id="onboarding-step-habits-heading">Start with one small promise.</h1>
             <p className="text-muted">
               {quiz
-                ? 'We pre-selected a few based on your answers. Tick more, untick any, or add your own.'
-                : 'Pick ready-made habits, add your own, or do both. You can edit any of these later.'}
-            </p>
-            <p className="onboarding-habits-count" aria-live="polite">
-              <strong>{selectedStarterIds.length + validCustomHabits.length}</strong>{' '}
-              habit{selectedStarterIds.length + validCustomHabits.length === 1 ? '' : 's'} ready to start.
+                ? 'A few are pre-selected for you. Tick more, untick any, or add your own.'
+                : 'Pick ready-made habits, add your own, or both.'}
+              {' '}
+              <strong className="onboarding-habits-count" aria-live="polite">
+                {selectedStarterIds.length + validCustomHabits.length} ready to start.
+              </strong>
             </p>
           </header>
 
@@ -635,23 +614,34 @@ export function OnboardingPage() {
                 (category) => (
                   <div key={category} className="starter-habit-group">
                     <h2 className="starter-habit-group__title">{category}</h2>
-                    <div className="starter-habit-grid">
+                    <ul className="starter-habit-grid" role="list">
                       {groupedTemplates[category].map((habit) => {
                         const selected = selectedStarterIds.includes(habit.id);
                         const recommended = quizPickedIds.has(habit.id);
                         return (
-                          <label
+                          <li
                             key={habit.id}
                             className={`starter-habit ${selected ? 'starter-habit--selected' : ''}`}
+                            title={habit.description ?? undefined}
                           >
-                            <input
-                              type="checkbox"
+                            <HabitCheckbox
                               checked={selected}
-                              onChange={() => toggleStarterHabit(habit.id)}
+                              onClick={() => toggleStarterHabit(habit.id)}
+                              ariaLabel={
+                                selected
+                                  ? `Remove ${habit.name} from starter habits`
+                                  : `Add ${habit.name} to starter habits`
+                              }
                             />
-                            <span className="starter-habit__body">
-                              <span className="starter-habit__heading">
-                                <strong>{habit.name}</strong>
+                            <div
+                              className="starter-habit__body"
+                              onClick={(event) => {
+                                if ((event.target as HTMLElement).closest('button')) return;
+                                toggleStarterHabit(habit.id);
+                              }}
+                            >
+                              <span className="starter-habit__name">
+                                {habit.name}
                                 {recommended && (
                                   <span
                                     className="starter-habit__badge"
@@ -661,13 +651,14 @@ export function OnboardingPage() {
                                   </span>
                                 )}
                               </span>
-                              <span>{habit.description}</span>
-                              <em>{formatTemplateMeta(habit)}</em>
-                            </span>
-                          </label>
+                              <span className="starter-habit__meta">
+                                {formatTemplateMeta(habit)}
+                              </span>
+                            </div>
+                          </li>
                         );
                       })}
-                    </div>
+                    </ul>
                   </div>
                 ),
               )}
@@ -677,108 +668,74 @@ export function OnboardingPage() {
               <div className="onboarding-custom-habits__head">
                 <h2>Your own habits</h2>
                 <p className="text-muted">
-                  Add up to {MAX_CUSTOM_HABITS}. Daily by default — you can change frequency
-                  and timing later from the Habits page.
+                  Add up to {MAX_CUSTOM_HABITS} — daily by default, tweak later in Habits.
                 </p>
               </div>
-              {customHabits.length === 0 ? (
-                <p className="text-muted onboarding-custom-habits__empty">
-                  Nothing here yet. Tap "Add habit" below to create your first one.
-                </p>
-              ) : (
+              {customHabits.length > 0 && (
                 <ul className="custom-habit-list" role="list">
                   {customHabits.map((draft, index) => (
                     <li key={draft.id} className="custom-habit-card">
-                      <div className="custom-habit-card__head">
-                        <span className="custom-habit-card__index">Habit {index + 1}</span>
-                        <button
-                          type="button"
-                          className="custom-habit-card__remove"
-                          aria-label={`Remove habit ${index + 1}`}
-                          onClick={() => removeCustomHabit(draft.id)}
+                      <span className="custom-habit-card__index" aria-hidden="true">
+                        {index + 1}
+                      </span>
+                      <div className="custom-habit-card__fields">
+                        <input
+                          aria-label={`Habit ${index + 1} name`}
+                          className="input custom-habit-card__name"
+                          type="text"
+                          value={draft.name}
+                          onChange={(event) =>
+                            updateCustomHabit(draft.id, {
+                              name: event.target.value.slice(0, 80),
+                            })
+                          }
+                          placeholder="e.g. Read 10 pages"
+                          autoComplete="off"
+                        />
+                        <select
+                          aria-label={`Habit ${index + 1} category`}
+                          className="input custom-habit-card__category"
+                          value={draft.category}
+                          onChange={(event) =>
+                            updateCustomHabit(draft.id, {
+                              category: event.target.value as HabitCategory,
+                            })
+                          }
                         >
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                            <path d="M6 6l12 12M6 18 18 6" />
-                          </svg>
-                          <span>Remove</span>
-                        </button>
+                          {HABIT_CATEGORIES.map((category) => (
+                            <option key={category} value={category}>
+                              {category}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          aria-label={`Habit ${index + 1}: times per day`}
+                          title="Times per day"
+                          className="input custom-habit-card__count"
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={draft.target_count}
+                          onChange={(event) =>
+                            updateCustomHabit(draft.id, {
+                              target_count: Math.max(
+                                1,
+                                Math.min(12, Number(event.target.value) || 1),
+                              ),
+                            })
+                          }
+                        />
                       </div>
-                      <div className="custom-habit-card__grid">
-                        <div className="field">
-                          <label
-                            className="field__label"
-                            htmlFor={`custom-habit-${draft.id}-name`}
-                          >
-                            What is the habit?
-                          </label>
-                          <input
-                            id={`custom-habit-${draft.id}-name`}
-                            className="input"
-                            type="text"
-                            value={draft.name}
-                            onChange={(event) =>
-                              updateCustomHabit(draft.id, {
-                                name: event.target.value.slice(0, 80),
-                              })
-                            }
-                            placeholder="e.g. Read 10 pages"
-                            autoComplete="off"
-                          />
-                        </div>
-                        <div className="field">
-                          <label
-                            className="field__label"
-                            htmlFor={`custom-habit-${draft.id}-category`}
-                          >
-                            Category
-                          </label>
-                          <select
-                            id={`custom-habit-${draft.id}-category`}
-                            className="input"
-                            value={draft.category}
-                            onChange={(event) =>
-                              updateCustomHabit(draft.id, {
-                                category: event.target.value as HabitCategory,
-                              })
-                            }
-                          >
-                            {HABIT_CATEGORIES.map((category) => (
-                              <option key={category} value={category}>
-                                {category}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="field__help">Used for grouping and colour only.</p>
-                        </div>
-                        <div className="field">
-                          <label
-                            className="field__label"
-                            htmlFor={`custom-habit-${draft.id}-target`}
-                          >
-                            How many times per day?
-                          </label>
-                          <input
-                            id={`custom-habit-${draft.id}-target`}
-                            className="input"
-                            type="number"
-                            min={1}
-                            max={12}
-                            value={draft.target_count}
-                            onChange={(event) =>
-                              updateCustomHabit(draft.id, {
-                                target_count: Math.max(
-                                  1,
-                                  Math.min(12, Number(event.target.value) || 1),
-                                ),
-                              })
-                            }
-                          />
-                          <p className="field__help">
-                            Use 1 for a once-a-day habit, or higher for repeatable things like
-                            drinking water.
-                          </p>
-                        </div>
-                      </div>
+                      <button
+                        type="button"
+                        className="custom-habit-card__remove"
+                        aria-label={`Remove habit ${index + 1}`}
+                        onClick={() => removeCustomHabit(draft.id)}
+                      >
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                          <path d="M6 6l12 12M6 18 18 6" />
+                        </svg>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -857,20 +814,14 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
   }
 
   return (
-    <section className="onboarding-step" aria-labelledby="onboarding-step-quiz-heading">
+    <section className="onboarding-step onboarding-step--quiz" aria-labelledby="onboarding-step-quiz-heading">
       <header className="onboarding-step__header">
         <h1 id="onboarding-step-quiz-heading">Who are you tending toward?</h1>
-        <p className="text-muted">
-          Five quick questions so we can pick starting habits that fit. Nothing is locked in — you
-          can change any of this later.
-        </p>
+        <p className="text-muted">Five quick taps so we can pick starting habits that fit.</p>
       </header>
 
       <div className="quiz">
-        <QuizQuestion
-          title="I want to grow…"
-          hint="Pick up to three."
-        >
+        <QuizQuestion number={1} title="I want to grow" hint="Pick up to three">
           <div className="quiz-chips" role="group">
             {INTENT_OPTIONS.map((option) => (
               <QuizChip
@@ -884,7 +835,7 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
           </div>
         </QuizQuestion>
 
-        <QuizQuestion title="How much room do your days have?">
+        <QuizQuestion number={2} title="How much room do your days have">
           <div className="quiz-chips" role="radiogroup" aria-label="Pace">
             {PACE_OPTIONS.map((option) => (
               <QuizChip
@@ -899,10 +850,7 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
           </div>
         </QuizQuestion>
 
-        <QuizQuestion
-          title="When will you show up?"
-          hint="Any time that fits."
-        >
+        <QuizQuestion number={3} title="When will you show up" hint="Any that fit">
           <div className="quiz-chips" role="group">
             {TIME_OPTIONS.map((option) => (
               <QuizChip
@@ -915,7 +863,7 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
           </div>
         </QuizQuestion>
 
-        <QuizQuestion title="What season are you in?">
+        <QuizQuestion number={4} title="What season are you in">
           <div className="quiz-chips" role="radiogroup" aria-label="Energy">
             {ENERGY_OPTIONS.map((option) => (
               <QuizChip
@@ -930,7 +878,7 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
           </div>
         </QuizQuestion>
 
-        <QuizQuestion title="What trips you up most?">
+        <QuizQuestion number={5} title="What trips you up most">
           <div className="quiz-chips" role="radiogroup" aria-label="Biggest blocker">
             {BLOCKER_OPTIONS.map((option) => (
               <QuizChip
@@ -1047,18 +995,33 @@ function QuizSelect({ label, value, onChange, options }: QuizSelectProps) {
 }
 
 interface QuizQuestionProps {
+  number: number;
   title: string;
   hint?: string;
   children: React.ReactNode;
 }
 
-function QuizQuestion({ title, hint, children }: QuizQuestionProps) {
+function QuizQuestion({ number, title, hint, children }: QuizQuestionProps) {
+  const headingId = useId();
+  /*
+   * Using <div role="group"> + a labelled heading rather than
+   * <fieldset>/<legend>. The native legend renders in a special border-
+   * positioned box that ignores its parent's padding and routinely
+   * overflows when the parent uses flex/grid. role="group" +
+   * aria-labelledby gives screen readers the same grouping semantics
+   * without the layout pain.
+   */
   return (
-    <fieldset className="quiz-question">
-      <legend>{title}</legend>
-      {hint && <p className="quiz-question__hint text-muted">{hint}</p>}
+    <div className="quiz-question" role="group" aria-labelledby={headingId}>
+      <h3 id={headingId} className="quiz-question__header">
+        <span className="quiz-question__number" aria-hidden="true">{number}</span>
+        <span className="quiz-question__title-group">
+          <span className="quiz-question__title">{title}</span>
+          {hint && <span className="quiz-question__hint">{hint}</span>}
+        </span>
+      </h3>
       {children}
-    </fieldset>
+    </div>
   );
 }
 
@@ -1103,4 +1066,55 @@ function extractMessage(err: unknown): string {
     if (data?.error?.message) return data.error.message;
   }
   return 'Something went wrong setting up your companion. Please try again.';
+}
+
+/*
+ * Single consent row: HabitCheckbox button + clickable text. The text
+ * has its own onClick so mouse users can toggle by tapping the
+ * description, and the button itself is keyboard-accessible. No parent
+ * onClick — that would double-fire when the button's click bubbles up.
+ */
+function ConsentRow({
+  checked,
+  disabled,
+  onToggle,
+  label,
+  children,
+  modifier,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onToggle: () => void;
+  label: string;
+  children: React.ReactNode;
+  modifier?: 'secondary';
+}) {
+  const className = [
+    'consent-check',
+    modifier === 'secondary' ? 'consent-check--secondary' : null,
+    disabled ? 'consent-check--disabled' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return (
+    <div className={className}>
+      <HabitCheckbox
+        checked={checked}
+        disabled={disabled}
+        onClick={onToggle}
+        ariaLabel={label}
+      />
+      <span
+        className="consent-check__text"
+        onClick={(event) => {
+          if (disabled) return;
+          // Don't double-fire when the click originates inside the button.
+          if ((event.target as HTMLElement).closest('button')) return;
+          onToggle();
+        }}
+      >
+        {children}
+      </span>
+    </div>
+  );
 }

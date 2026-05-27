@@ -16,6 +16,7 @@ import {
 } from '../hooks/useSocial';
 import { useShop, type ShopItem } from '../hooks/useShop';
 import { useLeaderboard } from '../hooks/useLeaderboard';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useToastContext } from '../context/ToastContext';
 import { getItemPlaceholder } from '../lib/utils';
 import { trackEvent } from '../lib/analytics';
@@ -120,6 +121,7 @@ export function FriendsPage() {
 
   return (
     <section className="page friends-page">
+      <MobilePageHeader title="Friends" />
       <header className="page__header">
         <div>
           <p className="page__eyebrow">Social</p>

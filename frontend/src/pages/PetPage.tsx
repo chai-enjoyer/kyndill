@@ -7,6 +7,7 @@ import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
 import { SpritePet } from '../components/common/SpritePet';
 import { StatIcon, type StatIconName } from '../components/common/StatIcon';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useInventory, type InventoryEntry } from '../hooks/useInventory';
@@ -152,6 +153,7 @@ export function PetPage() {
 
   return (
     <section className="page pet-page">
+      <MobilePageHeader title="Companion" />
       <header className="page__header pet-page__header">
         <div>
           <p className="page__eyebrow">Companion</p>

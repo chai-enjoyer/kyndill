@@ -13,7 +13,15 @@ import { useMoodPing } from '../hooks/useMoodPing';
 import { useShop } from '../hooks/useShop';
 import { DashboardSidebar } from '../components/dashboard/DashboardSidebar';
 import { HabitListItem } from '../components/dashboard/HabitListItem';
+import { HabitDetailsModal } from '../components/dashboard/HabitDetailsModal';
 import { PetPanel } from '../components/dashboard/PetPanel';
+import { ActivityFeed } from '../components/dashboard/ActivityFeed';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
+import { MobilePetStrip } from '../components/dashboard/mobile/MobilePetStrip';
+import { MobilePetCare } from '../components/dashboard/mobile/MobilePetCare';
+import { MobileStatsRow } from '../components/dashboard/mobile/MobileStatsRow';
+import { MobileXpRow } from '../components/dashboard/mobile/MobileXpRow';
+import { MobileHabitList } from '../components/dashboard/mobile/MobileHabitList';
 import { LevelUpModal } from '../components/dashboard/LevelUpModal';
 import { FeedModal } from '../components/dashboard/FeedModal';
 import { ItemDropToast } from '../components/dashboard/ItemDropToast';
@@ -46,6 +54,7 @@ export function DashboardPage() {
   const [levelUp, setLevelUp] = useState<number | null>(null);
   const [itemDrop, setItemDrop] = useState<DroppedItem | null>(null);
   const [feedbackHabit, setFeedbackHabit] = useState<{ id: string; name: string } | null>(null);
+  const [detailsHabit, setDetailsHabit] = useState<typeof habits[number] | null>(null);
   const [feedOpen, setFeedOpen] = useState(false);
   const [pullStart, setPullStart] = useState<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
@@ -187,6 +196,76 @@ export function DashboardPage() {
       <div className="pull-refresh" aria-live="polite">
         {refreshing ? 'Refreshing...' : pullDistance > 70 ? 'Release to refresh' : 'Pull to refresh'}
       </div>
+
+      {/*
+       * Mobile dashboard tree. Hidden on desktop via CSS (@media min-width: 881px).
+       * Renders the brief's mobile-first stack: brand-header → greeting+date →
+       * pet strip → quick stats → "TODAY" habit list → activity feed.
+       */}
+      <div className="m-dashboard">
+        <MobilePageHeader />
+
+        <section className="m-greeting" aria-label="Today">
+          <h1 className="m-greeting__title">
+            {greeting}
+            {firstName && `, ${firstName}`}.
+          </h1>
+          <p className="m-greeting__date">{dateLabel}</p>
+        </section>
+
+        {pet && !petLoading ? (
+          <>
+            <MobilePetStrip pet={pet} streak={user?.streak_current ?? 0} />
+            <MobilePetCare pet={pet} onOpenFeed={() => setFeedOpen(true)} />
+          </>
+        ) : petLoading ? (
+          <div className="m-pet-strip m-pet-strip--skeleton" aria-busy="true">
+            <LoadingSkeleton width={56} height={56} rounded />
+            <div className="m-pet-strip__skel-body">
+              <LoadingSkeleton width="40%" height={14} />
+              <LoadingSkeleton width="80%" height={8} />
+            </div>
+            <LoadingSkeleton width={36} height={18} />
+          </div>
+        ) : null}
+
+        <MobileStatsRow
+          completed={completed}
+          total={total}
+          streak={user?.streak_current ?? 0}
+          level={user?.level ?? 1}
+        />
+        <MobileXpRow level={user?.level ?? 1} xp={user?.xp ?? 0} />
+
+        <section className="m-habits-section" aria-labelledby="m-today-heading">
+          <h2 id="m-today-heading" className="m-section-label">Today</h2>
+          {habitsError ? (
+            <ErrorState message={habitsError} onRetry={refreshDashboard} />
+          ) : habitsLoading ? (
+            <MobileHabitsSkeleton />
+          ) : total === 0 ? (
+            <EmptyHabits />
+          ) : (
+            <MobileHabitList habits={habits} onComplete={handleHabitComplete} />
+          )}
+        </section>
+
+        <section className="m-activity-section" aria-label="Activity">
+          <ActivityFeed
+            activity={activity}
+            isLoading={activityLoading}
+            error={activityError}
+            onRetry={refetchActivity}
+          />
+        </section>
+      </div>
+
+      {/*
+       * Desktop dashboard tree (unchanged from the existing grid layout).
+       * Hidden on mobile via CSS (@media max-width: 880px). Continues to use
+       * the legacy DashboardSidebar / dashboard__main / dashboard__pet-panel
+       * three-column grid that the rest of the desktop CSS targets.
+       */}
       <DashboardSidebar
         completed={completed}
         total={total}
@@ -232,7 +311,12 @@ export function DashboardPage() {
         ) : (
           <ul className="dashboard__habits" role="list">
             {habits.map((habit) => (
-              <HabitListItem key={habit.id} habit={habit} onComplete={handleHabitComplete} />
+              <HabitListItem
+                key={habit.id}
+                habit={habit}
+                onComplete={handleHabitComplete}
+                onOpenDetails={setDetailsHabit}
+              />
             ))}
           </ul>
         )}
@@ -246,6 +330,9 @@ export function DashboardPage() {
         ) : null}
       </aside>
 
+      {detailsHabit && (
+        <HabitDetailsModal habit={detailsHabit} onClose={() => setDetailsHabit(null)} />
+      )}
       {levelUp !== null && <LevelUpModal newLevel={levelUp} onClose={() => setLevelUp(null)} />}
       {feedOpen && <FeedModal onClose={() => setFeedOpen(false)} onFed={refetchPet} />}
       {itemDrop && <ItemDropToast item={itemDrop} onClose={() => setItemDrop(null)} />}
@@ -310,6 +397,22 @@ function HabitsSkeleton() {
           <LoadingSkeleton width={24} height={24} rounded />
           <LoadingSkeleton width="45%" height={18} />
           <LoadingSkeleton width={60} height={18} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function MobileHabitsSkeleton() {
+  return (
+    <ul className="m-habits" role="list" aria-busy="true" aria-live="polite">
+      {[0, 1, 2].map((i) => (
+        <li key={i} className="m-habit">
+          <div className="m-habit__row m-habit__row--skeleton" aria-hidden="true">
+            <LoadingSkeleton width={28} height={28} rounded />
+            <LoadingSkeleton width="55%" height={16} />
+            <LoadingSkeleton width={40} height={14} />
+          </div>
         </li>
       ))}
     </ul>

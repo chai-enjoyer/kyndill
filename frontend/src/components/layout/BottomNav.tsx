@@ -9,13 +9,14 @@ const PRIMARY_ITEMS: { to: string; label: string; icon: string }[] = [
   { to: '/friends', label: 'Friends', icon: 'M8.7 11.2a3.7 3.7 0 1 0 0-7.4 3.7 3.7 0 0 0 0 7.4zM3.4 21a5.7 5.7 0 0 1 11.2 0M17 10.5a3.1 3.1 0 1 0 0-6.2M15.8 15.4A5.1 5.1 0 0 1 22.1 21' },
 ];
 
+/* Profile moved to the in-page header avatar; Settings reachable from
+ * the gear icon on every page header. Both are intentionally absent from
+ * this menu to avoid duplicating destinations. */
 const MORE_ITEMS: { to: string; label: string; icon: string }[] = [
   { to: '/shop', label: 'Shop', icon: 'M7.1 8.2h9.8l-.8 10.5a1.6 1.6 0 0 1-1.6 1.5H9.5a1.6 1.6 0 0 1-1.6-1.5L7.1 8.2zM9.4 8.2a2.6 2.6 0 1 1 5.2 0M8.8 12.2h6.4' },
   { to: '/leaderboard', label: 'Leaderboard', icon: 'M8 21h8M12 17v4M7 4h10v3a5 5 0 0 1-10 0V4zM7 6H4.5a2 2 0 0 0 0 4H7M17 6h2.5a2 2 0 0 1 0 4H17' },
   { to: '/progress', label: 'Progress', icon: 'M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-8M20 16v-3' },
   { to: '/pet', label: 'Pet', icon: 'M8.2 13.2a4.2 4.2 0 1 0 7.6 0M7 8.3c.2-2 1.8-3.6 3.9-3.8M17 8.3c-.2-2-1.8-3.6-3.9-3.8M9.2 11.4h.01M14.8 11.4h.01M10 16.1c1.3.9 2.7.9 4 0' },
-  { to: '/profile', label: 'Profile', icon: 'M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2zM4.4 21a7.6 7.6 0 0 1 15.2 0' },
-  { to: '/settings', label: 'Settings', icon: 'M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4zM19.2 15a1.4 1.4 0 0 0 .3 1.6l.1.1-2.8 2.8-.1-.1a1.4 1.4 0 0 0-1.6-.3 1.4 1.4 0 0 0-.8 1.3V20h-4v-.1a1.4 1.4 0 0 0-.8-1.3 1.4 1.4 0 0 0-1.6.3l-.1.1-2.8-2.8.1-.1A1.4 1.4 0 0 0 4.8 15a1.4 1.4 0 0 0-1.3-.8H3v-4h.5a1.4 1.4 0 0 0 1.3-.8 1.4 1.4 0 0 0-.3-1.6l-.1-.1 2.8-2.8.1.1a1.4 1.4 0 0 0 1.6.3 1.4 1.4 0 0 0 .8-1.3V4h4v.1a1.4 1.4 0 0 0 .8 1.3 1.4 1.4 0 0 0 1.6-.3l.1-.1 2.8 2.8-.1.1a1.4 1.4 0 0 0-.3 1.6 1.4 1.4 0 0 0 1.3.8h.5v4h-.5a1.4 1.4 0 0 0-1.3.8z' },
 ];
 
 export function BottomNav() {

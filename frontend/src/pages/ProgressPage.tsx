@@ -1,10 +1,11 @@
-import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatedValue } from '../components/common/AnimatedValue';
 import { Button } from '../components/common/Button';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { CategoryPill } from '../components/dashboard/CategoryPill';
 import { FlameIcon } from '../components/common/FlameIcon';
+import { WeekCandle } from '../components/progress/WeekCandle';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useProgress, type ProgressSummary } from '../hooks/useProgress';
 
 export function ProgressPage() {
@@ -40,6 +41,7 @@ export function ProgressPage() {
 
   return (
     <section className="page progress-page">
+      <MobilePageHeader title="Progress" />
       <header className="page__header">
         <div>
           <p className="page__eyebrow">Insights</p>
@@ -56,54 +58,65 @@ export function ProgressPage() {
           <div className="progress-hero">
             <p className="progress-panel__eyebrow">7-day completion</p>
             <strong>
-              <AnimatedValue value={`${summary.overview.weekly_completion_rate}%`} />
+              <AnimatedValue value={`${Math.min(100, Math.max(0, summary.overview.weekly_completion_rate))}%`} />
             </strong>
-            <span className="text-muted">Average completion rate from real habit activity.</span>
-            <dl className="progress-hero__meta">
-              <div>
-                <dt>Check-ins</dt>
-                <dd>{weekCompleted}/{weekTarget}</dd>
-              </div>
-              <div>
-                <dt>Active days</dt>
-                <dd>{summary.overview.active_days}</dd>
-              </div>
-              <div>
-                <dt>Reflections</dt>
-                <dd>{summary.overview.recovery_reflections}</dd>
-              </div>
-            </dl>
+            <ul className="progress-hero__meta" aria-label="Last 7 days summary">
+              <li>
+                <span>{weekCompleted}<span className="progress-hero__meta-sep">/{weekTarget}</span></span>
+                <small>Check-ins</small>
+              </li>
+              <li>
+                <span>{summary.overview.active_days}</span>
+                <small>Active days</small>
+              </li>
+              <li>
+                <span>{summary.overview.recovery_reflections}</span>
+                <small>Reflections</small>
+              </li>
+            </ul>
           </div>
           <WeeklyChart summary={summary} />
         </section>
 
         <section className="progress-panel progress-panel--wide progress-panel--metrics">
-          <div className="progress-panel__head">
-            <h2>Behavioral indicators</h2>
-            <p>Useful for evaluating engagement and adherence during testing.</p>
-          </div>
-          <div className="progress-stat-grid progress-stat-grid--four">
-            <StatCard label="Habits" value={summary.overview.total_habits_created} detail={`${summary.overview.active_habits} active`} />
-            <StatCard label="Check-ins" value={summary.overview.total_check_ins} detail={`${summary.overview.total_completed_days} completed days`} />
-            <StatCard label="Active days" value={summary.overview.active_days} detail="Days with activity" />
-            <StatCard label="Focus" value={formatMinutes(summary.overview.focus_minutes)} detail={`${summary.overview.focus_sessions} sessions`} />
-          </div>
+          <h2>Behavioral indicators</h2>
+          <ul className="progress-tile-grid progress-tile-grid--four">
+            <ProgressTile
+              value={summary.overview.total_habits_created}
+              label="Habits"
+              detail={`${summary.overview.active_habits} active`}
+            />
+            <ProgressTile
+              value={summary.overview.total_check_ins}
+              label="Check-ins"
+              detail={`${summary.overview.total_completed_days} days completed`}
+            />
+            <ProgressTile
+              value={summary.overview.active_days}
+              label="Active days"
+            />
+            <ProgressTile
+              value={formatMinutes(summary.overview.focus_minutes)}
+              label="Focus"
+              detail={`${summary.overview.focus_sessions} sessions`}
+            />
+          </ul>
         </section>
 
         <section className="progress-panel">
           <h2>Streaks</h2>
-          <div className="progress-streaks">
-            <div>
-              <span className="progress-streaks__icon" aria-hidden="true"><FlameIcon size={28} /></span>
-              <span>Current</span>
+          <ul className="progress-streaks" aria-label="Streak summary">
+            <li>
+              <span className="progress-streaks__icon" aria-hidden="true"><FlameIcon size={20} /></span>
               <strong><AnimatedValue value={summary.overview.current_streak} /></strong>
-            </div>
-            <div>
-              <span className="progress-streaks__icon" aria-hidden="true"><FlameIcon size={28} /></span>
-              <span>Longest</span>
+              <small>Current</small>
+            </li>
+            <li>
+              <span className="progress-streaks__icon" aria-hidden="true"><FlameIcon size={20} /></span>
               <strong><AnimatedValue value={summary.overview.longest_streak} /></strong>
-            </div>
-          </div>
+              <small>Longest</small>
+            </li>
+          </ul>
         </section>
 
         <section className="progress-panel">
@@ -142,11 +155,11 @@ export function ProgressPage() {
 
         <section className="progress-panel">
           <h2>Social signals</h2>
-          <div className="progress-stat-grid progress-stat-grid--compact">
-            <StatCard label="Friends" value={summary.social.friends} />
-            <StatCard label="Gifts sent" value={summary.social.gifts_sent} />
-            <StatCard label="Gifts received" value={summary.social.gifts_received} />
-          </div>
+          <ul className="progress-tile-grid progress-tile-grid--three">
+            <ProgressTile value={summary.social.friends} label="Friends" />
+            <ProgressTile value={summary.social.gifts_sent} label="Gifts sent" />
+            <ProgressTile value={summary.social.gifts_received} label="Gifts received" />
+          </ul>
         </section>
       </div>
     </section>
@@ -157,16 +170,8 @@ function WeeklyChart({ summary }: { summary: ProgressSummary }) {
   return (
     <div className="progress-chart" role="list" aria-label="Weekly completion chart">
       {summary.weekly.map((day) => {
-        const rate = Math.min(100, Math.max(0, day.rate ?? 0));
         const scheduled = day.rate !== null;
-        const flameDuration = 2.8 - rate / 90;
-        const flameStyle = {
-          '--flame-scale': scheduled ? `${0.66 + rate / 155}` : '0.52',
-          '--flame-opacity': scheduled ? `${0.42 + rate / 175}` : '0.22',
-          '--flame-glow': scheduled ? `${0.14 + rate / 145}` : '0.04',
-          '--flame-duration': `${flameDuration.toFixed(2)}s`,
-          '--flame-inner-progress-duration': `${(flameDuration * 0.7).toFixed(2)}s`,
-        } as CSSProperties;
+        const rate = scheduled ? Math.min(100, Math.max(0, day.rate ?? 0)) : 0;
         return (
           <div
             key={day.date}
@@ -182,9 +187,7 @@ function WeeklyChart({ summary }: { summary: ProgressSummary }) {
               aria-valuenow={rate}
               aria-valuetext={scheduled ? `${rate}% complete` : 'No habits scheduled'}
             >
-              <span className="progress-chart__flame-stage" style={flameStyle}>
-                <FlameIcon size={64} className="progress-chart__flame" />
-              </span>
+              <WeekCandle rate={day.rate} />
             </div>
             <strong>{day.rate === null ? '-' : `${day.rate}%`}</strong>
             <span>{day.label}</span>
@@ -215,7 +218,7 @@ function CategoryBreakdown({ summary }: { summary: ProgressSummary }) {
   );
 }
 
-function StatCard({
+function ProgressTile({
   label,
   value,
   detail,
@@ -225,11 +228,11 @@ function StatCard({
   detail?: string;
 }) {
   return (
-    <article className="progress-stat-card">
-      <span>{label}</span>
+    <li className="progress-tile">
       <strong><AnimatedValue value={value} /></strong>
+      <span className="progress-tile__label">{label}</span>
       {detail && <small>{detail}</small>}
-    </article>
+    </li>
   );
 }
 

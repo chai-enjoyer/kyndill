@@ -77,7 +77,6 @@ export function SettingsPage() {
   const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS);
   const [reminderHour, setReminderHour] = useState<number | null>(19);
   const [researchConsent, setResearchConsent] = useState(false);
-  const [shareTextConsent, setShareTextConsent] = useState(false);
   const [feedbackNote, setFeedbackNote] = useState('');
   const [feedbackSaving, setFeedbackSaving] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -92,7 +91,6 @@ export function SettingsPage() {
     if (!profile) return;
     setPrefs({ ...DEFAULT_PREFS, ...profile.notification_prefs });
     setResearchConsent(profile.research_consent);
-    setShareTextConsent(profile.share_text_consent);
     setReminderHour(profile.reminder_hour);
   }, [profile]);
 
@@ -186,26 +184,19 @@ export function SettingsPage() {
 
   async function updateResearchConsent(value: boolean) {
     setResearchConsent(value);
-    // Server enforces the same rule, but mirror it locally so the UI reflects
-    // the new state instantly without an extra round-trip.
-    if (!value) setShareTextConsent(false);
     try {
-      const updated = await save({ research_consent: value });
+      /* Text-length-only collection isn't a meaningful intermediate
+       * state (the analytical value of 'they wrote 80 chars' is near
+       * zero), so the single research toggle now governs both flags
+       * together: opting in shares the actual text, opting out turns
+       * everything off. */
+      const updated = await save({
+        research_consent: value,
+        share_text_consent: value,
+      });
       mergeUser({ research_consent: updated.research_consent });
-      setShareTextConsent(updated.share_text_consent);
     } catch (err) {
       setResearchConsent(!value);
-      showToast(extractMessage(err, 'Could not save consent setting.'), 'error');
-    }
-  }
-
-  async function updateShareTextConsent(value: boolean) {
-    setShareTextConsent(value);
-    try {
-      const updated = await save({ share_text_consent: value });
-      setShareTextConsent(updated.share_text_consent);
-    } catch (err) {
-      setShareTextConsent(!value);
       showToast(extractMessage(err, 'Could not save consent setting.'), 'error');
     }
   }
@@ -358,25 +349,9 @@ export function SettingsPage() {
               <span className="switch__track" aria-hidden="true" />
               <span className="switch__label">Participate in anonymized evaluation</span>
             </label>
-            <label
-              className={`switch settings-switch${researchConsent ? '' : ' settings-switch--disabled'}`}
-            >
-              <input
-                type="checkbox"
-                checked={shareTextConsent}
-                disabled={!researchConsent}
-                onChange={(e) => updateShareTextConsent(e.target.checked)}
-              />
-              <span className="switch__track" aria-hidden="true" />
-              <span className="switch__label">
-                Share the text I write, not just its length
-              </span>
-            </label>
             <p className="text-muted settings-card__hint">
               {researchConsent
-                ? shareTextConsent
-                  ? 'Habit names, reflection notes, and feedback you submit from now on are stored with their text intact.'
-                  : 'Free-text fields you write are stored as a length only — researchers can see "you wrote 80 characters" but not the words.'
+                ? 'Habit names, reflection notes, and feedback you submit from now on are stored with your other anonymized events.'
                 : 'Turning evaluation off stops new data collection immediately. Existing rows stay until you delete the account.'}
             </p>
             <form className="settings-feedback" onSubmit={submitFeedback}>

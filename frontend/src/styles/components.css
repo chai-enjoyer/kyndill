@@ -3201,73 +3201,94 @@ body:has(.item-drop-toast) .toast-viewport {
   font-size: var(--text-base);
 }
 
-.wishlist-editor__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--space-2);
-}
-
-.wishlist-editor__option {
-  display: grid;
-  grid-template-columns: 16px 28px minmax(0, 1fr);
-  gap: var(--space-2);
-  align-items: center;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: var(--text-sm);
-}
-
-.wishlist-editor__option.is-picked {
-  border-color: var(--color-sage);
-  background-color: var(--color-sage-subtle);
-}
-
-.wishlist-editor__option.is-disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* Legacy wishlist grid/option rules removed — the row-list pattern in
+ * the Phase 1 block (mobile-first dashboard rebuild) is the canonical
+ * styling and was being silently undone here. */
 
 .wishlist-editor__actions {
   display: flex;
   justify-content: flex-end;
 }
 
+/* Friend-profile wishlist view: same row anatomy as the editor's
+ * ordered list (position number + thumb + name) so a friend's wishlist
+ * reads with the exact same vocabulary as the owner's editor. */
 .wishlist-view {
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
 }
 
 .wishlist-view > li {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  gap: var(--space-2);
+  grid-template-columns: 24px 36px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
   font-size: var(--text-sm);
+}
+.wishlist-view > li:last-child { border-bottom: 0; }
+
+.wishlist-view__position {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-align: center;
 }
 
 .wishlist-view__image {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  display: block;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-2);
+  background-color: var(--color-surface-sunken);
   background-size: cover;
   background-position: center;
 }
 
+.wishlist-view__name {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * Full-width card matching the header/pet/stat blocks above (same
+ * surface-raised tint + padding + radius). Without width:100% it would
+ * shrink to content width inside the modal's centred grid.
+ */
 .friend-profile-modal__wishlist {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px dashed var(--color-border);
+  width: 100%;
+  margin-top: 0;
+  padding: var(--space-4);
+  border-top: 0;
+  border-radius: var(--radius-2);
+  background-color: var(--color-surface-raised);
 }
 
 .friend-profile-modal__wishlist h3 {
-  margin: 0 0 var(--space-2) 0;
+  margin: 0 0 var(--space-3) 0;
   font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+/* Stat-card divs nested under .friend-profile-modal get a tinted bg
+ * via `.friend-profile-modal div`. The wishlist's list items use <li>,
+ * not <div>, so they're unaffected. But the WishlistItemThumb renders
+ * inside <span>, so we explicitly suppress any surface-raised tint that
+ * might bleed in via descendant selectors. */
+.friend-profile-modal__wishlist div {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 
 .gift-option--freeze {
@@ -3772,8 +3793,16 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 @media (max-width: 720px) {
+  /*
+   * Unified mobile page padding: matches the dashboard's
+   * --m-page-padding-x (20px). Without this, the header content padded
+   * itself at 20px while the page body sat at 16px, making the header
+   * read as "from a different layout". Same 20px gutter top + sides
+   * across the dashboard and every other page now.
+   */
   .page {
-    padding: var(--space-5) var(--space-4) calc(var(--bottom-nav-height) + var(--space-5));
+    padding: var(--m-page-padding-x) var(--m-page-padding-x)
+             calc(var(--bottom-nav-height) + var(--m-page-padding-x));
   }
 
   .page__header,
@@ -5416,12 +5445,11 @@ body:has(.item-drop-toast) .toast-viewport {
 .progress-panel--hero {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr);
+  grid-template-columns: minmax(200px, 0.45fr) minmax(0, 1fr);
   gap: var(--space-6);
   align-items: center;
-  background:
-    linear-gradient(135deg, var(--color-honey-subtle), transparent 58%),
-    var(--color-surface);
+  /* Flat surface — let the giant completion number carry the warmth. */
+  background-color: var(--color-surface);
 }
 
 .progress-panel--metrics {
@@ -5469,82 +5497,141 @@ body:has(.item-drop-toast) .toast-viewport {
 
 .progress-panel--hero strong {
   display: block;
-  margin-bottom: var(--space-1);
+  margin: var(--space-2) 0 var(--space-4);
   font-family: var(--font-display);
-  font-size: var(--text-5xl);
-  line-height: 1;
-  color: var(--color-text);
-}
-
-.progress-hero__meta {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin: var(--space-5) 0 0;
-}
-
-.progress-hero__meta div {
-  min-width: 0;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-2);
-  background-color: oklch(1 0 0 / 0.42);
-}
-
-:root.dark .progress-hero__meta div,
-:root[data-theme='dark'] .progress-hero__meta div {
-  background-color: oklch(0.16 0.005 50 / 0.42);
-}
-
-.progress-hero__meta dt {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
-.progress-hero__meta dd {
-  margin: var(--space-1) 0 0;
-  color: var(--color-text);
-  font-family: var(--font-mono);
+  font-size: clamp(3rem, 8vw, 4.25rem);
   font-weight: var(--weight-bold);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--color-sage-strong);
 }
 
-.progress-stat-grid {
+/* Three inline stats below the hero number. No bordered boxes, no extra
+ * paragraph copy — the number is the message; these are the receipts. */
+.progress-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.progress-hero__meta li {
+  flex: 1 1 0;
+  min-width: 90px;
+  padding: var(--space-3) var(--space-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-hero__meta li + li {
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.progress-hero__meta li > span {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.progress-hero__meta-sep {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+.progress-hero__meta small {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+/*
+ * Compact stat tile, used by Behavioral indicators + Social signals.
+ * No box, no shadow — the dividers between tiles do the separation
+ * work. Big mono number + uppercase label + optional detail line.
+ * Replaces the old .progress-stat-card / .progress-stat-grid pattern.
+ */
+.progress-tile-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.progress-stat-grid--four {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
+.progress-tile-grid--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.progress-tile-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-.progress-stat-grid--compact {
-  grid-template-columns: 1fr;
-}
-
-.progress-stat-card {
+.progress-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-height: 80px;
+  padding: var(--space-3) var(--space-4);
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-2);
-  background-color: var(--color-surface-raised);
 }
 
-.progress-stat-card span,
-.progress-stat-card small {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
+/* Hairline divider between tiles within the same row. */
+.progress-tile + .progress-tile::before {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 0;
+  width: 1px;
+  background-color: var(--color-border-subtle);
 }
 
-.progress-stat-card strong {
-  display: block;
-  margin-block: var(--space-2) var(--space-1);
-  font-family: var(--font-display);
+.progress-tile strong {
+  font-family: var(--font-mono);
   font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--color-text);
 }
+
+.progress-tile__label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1;
+}
+
+.progress-tile small {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  line-height: 1.2;
+}
+
+/* Backwards-compat shim for any caller still using the old class.
+ * Phase 2 sweep will remove these references. */
+.progress-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.progress-stat-grid--four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.progress-stat-grid--compact { grid-template-columns: 1fr; }
+.progress-stat-card { min-width: 0; padding: var(--space-4); border: 1px solid var(--color-border-subtle); border-radius: var(--radius-2); background-color: var(--color-surface-raised); }
+.progress-stat-card span, .progress-stat-card small { display: block; color: var(--color-text-muted); font-size: var(--text-xs); }
+.progress-stat-card strong { display: block; margin-block: var(--space-2) var(--space-1); font-family: var(--font-display); font-size: var(--text-2xl); line-height: 1; color: var(--color-text); }
 
 .progress-chart {
   display: grid;
@@ -5561,71 +5648,88 @@ body:has(.item-drop-toast) .toast-viewport {
   text-align: center;
 }
 
+/*
+ * Track: a flat surface for the candle SVG to live on. No bottom radial
+ * halo, no overall vertical fade. The candle SVG handles its own warmth.
+ */
 .progress-chart__track {
   position: relative;
-  display: grid;
-  place-items: end center;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   min-height: 140px;
-  padding: var(--space-2) var(--space-1);
+  padding: 0;
   border-radius: var(--radius-3);
-  background:
-    radial-gradient(circle at 50% 84%, var(--color-honey-subtle) 0 18%, transparent 48%),
-    linear-gradient(180deg, transparent 0%, var(--color-surface-sunken) 100%);
+  background-color: var(--color-surface-sunken);
   overflow: hidden;
 }
 
-.progress-chart__flame-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 74px;
-  height: 74px;
-  opacity: var(--flame-opacity);
-  transform: scale(var(--flame-scale));
-  transform-origin: 50% 92%;
+/*
+ * The week candle SVG fills the track top-to-bottom but caps its own
+ * aspect ratio so it never becomes the spaghetti-thin column the old
+ * CSS candle produced on narrow phones. xMidYMax in the SVG keeps the
+ * wax planted to the cell's lower edge regardless of viewport width.
+ */
+.week-candle {
+  display: block;
+  /* width capped at 64px (the SVG's natural viewBox width) — past that
+   * the SVG would scale up beyond design intent. Below 64px, it shrinks
+   * with the cell. */
+  width: min(100%, 64px);
+  height: 100%;
+  /* Aspect ratio of the viewBox (64/120). This is what stops the candle
+   * going thin-and-tall: as the cell narrows the height drops too. */
+  aspect-ratio: 64 / 120;
+}
+
+.week-candle__flame {
+  transform: scale(var(--wc-flame-scale, 1));
+  opacity: var(--wc-flame-opacity, 1);
+  transform-origin: 32px 52px;
   transition:
-    opacity var(--duration-slow) var(--ease-out),
     transform var(--duration-slow) var(--ease-out),
-    filter var(--duration-slow) var(--ease-out);
-  filter:
-    drop-shadow(0 0 calc(8px + 20px * var(--flame-glow)) oklch(0.72 0.15 52 / calc(0.10 + var(--flame-glow) * 0.28)));
+    opacity var(--duration-slow) var(--ease-out);
 }
 
-.progress-chart__flame-stage::before {
-  content: '';
-  position: absolute;
-  right: 15%;
-  bottom: 7%;
-  left: 15%;
-  height: 12px;
-  border-radius: var(--radius-full);
-  background: radial-gradient(ellipse, var(--color-honey) 0%, transparent 72%);
-  opacity: calc(0.14 + var(--flame-glow) * 0.45);
+/*
+ * Per-path breathing. The outer flame body sways with kyndill-flame-icon-outer
+ * and the inner flame pulses with kyndill-flame-icon-inner. transform-box:
+ * fill-box scopes the transform-origin to each path's own bounding box so the
+ * anchor sits at the bottom of the flame, not the bottom of the SVG.
+ */
+.week-candle__flame-outer,
+.week-candle__flame-inner {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
 }
 
-.progress-chart__flame {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  color: color-mix(in oklch, var(--color-accent) calc(58% + var(--flame-glow) * 42%), var(--color-honey));
-}
-
-.progress-chart__flame .animated-flame__outer {
-  animation-duration: var(--flame-duration, var(--flame-outer-duration, 2.7s));
+.week-candle__flame-outer {
+  animation-name: kyndill-flame-icon-outer;
+  animation-duration: var(--flame-outer-duration, 2.7s);
   animation-delay: var(--flame-outer-delay, 0s);
+  animation-timing-function: var(--ease-in-out);
+  animation-iteration-count: infinite;
 }
 
-.progress-chart__flame .animated-flame__inner {
-  animation-duration: var(--flame-inner-progress-duration, var(--flame-inner-duration, 1.9s));
+.week-candle__flame-inner {
+  animation-name: kyndill-flame-icon-inner;
+  animation-duration: var(--flame-inner-duration, 1.9s);
   animation-delay: var(--flame-inner-delay, 0s);
+  animation-timing-function: var(--ease-in-out);
+  animation-iteration-count: infinite;
 }
 
-.progress-chart__day--rest .progress-chart__flame {
-  color: var(--color-text-faint);
+.week-candle__halo {
+  opacity: var(--wc-halo-opacity, 0.25);
+  transition: opacity var(--duration-slow) var(--ease-out);
 }
 
-.progress-chart__day--rest .animated-flame__spark {
-  display: none;
+.week-candle--rest .week-candle__flame { transform: scale(var(--wc-flame-scale, 0.55)); }
+.week-candle--rest .week-candle__flame-core { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .week-candle__flame-outer,
+  .week-candle__flame-inner { animation: none; }
 }
 
 .progress-chart__day strong {
@@ -5639,40 +5743,65 @@ body:has(.item-drop-toast) .toast-viewport {
   font-size: var(--text-xs);
 }
 
+/* Streaks: two compact cells side by side. Flame on top, mono number,
+ * uppercase label. No honey-tinted boxes — the flame icon carries the
+ * warmth without flooding the panel with color. */
 .progress-streaks {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.progress-streaks > div {
-  display: grid;
-  gap: var(--space-2);
+.progress-streaks > li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-height: 96px;
+  padding: var(--space-3) var(--space-4);
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-2);
-  background-color: var(--color-honey-subtle);
+}
+
+.progress-streaks > li + li::before {
+  content: '';
+  position: absolute;
+  top: 20px;
+  bottom: 20px;
+  left: 0;
+  width: 1px;
+  background-color: var(--color-border-subtle);
 }
 
 .progress-streaks__icon {
-  display: inline-grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-surface);
+  display: inline-flex;
   color: var(--color-accent);
-}
-
-.progress-streaks span:not(.progress-streaks__icon) {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
+  width: 20px;
+  height: 20px;
 }
 
 .progress-streaks strong {
-  font-family: var(--font-display);
+  font-family: var(--font-mono);
   font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.progress-streaks small {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
   line-height: 1;
 }
 
@@ -6522,18 +6651,24 @@ body:has(.item-drop-toast) .toast-viewport {
 
 .consent-check {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  /* Wider checkbox column so the new HabitCheckbox (24×24 with rounded
+   * box) has breathing room. Slight padding-top on the column so the
+   * checkbox aligns with the first line of text instead of the row top. */
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: var(--space-3);
   align-items: start;
   color: var(--color-text);
-  cursor: pointer;
 }
 
-.consent-check input {
-  width: 20px;
-  height: 20px;
-  margin: 2px 0 0;
-  accent-color: var(--color-sage);
+.consent-check .habit-checkbox {
+  margin-top: 2px;
+}
+
+.consent-check__text {
+  cursor: pointer;
+}
+.consent-check--disabled .consent-check__text {
+  cursor: not-allowed;
 }
 
 .onboarding-step--consent {
@@ -6660,38 +6795,46 @@ body:has(.item-drop-toast) .toast-viewport {
   text-align: left;
 }
 
+.onboarding-step--habits {
+  width: min(960px, 100%);
+}
+
 .onboarding-habits {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  width: min(960px, 100%);
+  width: 100%;
   text-align: left;
 }
 
+/* Two-line compact starter card: HabitCheckbox + name (with optional
+ * "Pick for you" badge) + small frequency meta on the second line.
+ * The full description lives in `title="..."` so it's discoverable on
+ * hover without consuming vertical space. */
 .starter-habit-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .starter-habit {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: var(--space-2);
-  align-items: start;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
   min-height: 0;
-  padding: var(--space-3);
+  padding: 10px 12px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-2);
   background-color: var(--color-surface);
-  box-shadow: var(--shadow-1);
   color: var(--color-text);
-  cursor: pointer;
   text-align: left;
   transition:
     background-color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
+    border-color var(--duration-fast) var(--ease-out);
 }
 
 .starter-habit:hover {
@@ -6699,17 +6842,10 @@ body:has(.item-drop-toast) .toast-viewport {
   background-color: var(--color-surface-raised);
 }
 
-.starter-habit input {
-  width: 18px;
-  height: 18px;
-  margin: 1px 0 0;
-  accent-color: var(--color-sage);
-}
-
 .starter-habit--selected {
   border-color: var(--color-sage);
   background-color: var(--color-sage-subtle);
-  box-shadow: 0 0 0 3px var(--color-sage-glow);
+  box-shadow: inset 0 0 0 1px var(--color-sage);
 }
 
 .starter-habit__body {
@@ -6717,31 +6853,25 @@ body:has(.item-drop-toast) .toast-viewport {
   min-width: 0;
   flex-direction: column;
   gap: 2px;
+  cursor: pointer;
 }
 
-.starter-habit__body strong {
+.starter-habit__name {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   color: var(--color-text);
   font-size: var(--text-sm);
-  line-height: var(--leading-snug);
-}
-
-.starter-habit__body span {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  line-height: var(--leading-snug);
-}
-
-.starter-habit__body em {
-  align-self: flex-start;
-  margin-top: var(--space-1);
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-full);
-  background-color: var(--color-surface);
-  color: var(--color-sage-strong);
-  font-style: normal;
-  font-size: 10px;
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+
+.starter-habit__meta {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
 }
 
 .onboarding-custom-habit {
@@ -6831,72 +6961,67 @@ body:has(.item-drop-toast) .toast-viewport {
   padding: 0;
 }
 
+/* Single-row custom habit card: [number] [name input | category | count] [remove].
+ * Replaces the previous labelled 3-column form which was tall + repetitive. */
 .custom-habit-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-2);
   background-color: var(--color-surface);
 }
 
-.custom-habit-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+.custom-habit-card__index {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-sage-subtle);
+  color: var(--color-sage-strong);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
 }
 
-.custom-habit-card__index {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+.custom-habit-card__fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 130px 64px;
+  gap: 6px;
+  min-width: 0;
 }
+
+.custom-habit-card__fields .input {
+  min-height: 38px;
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+}
+
+.custom-habit-card__count { text-align: center; }
 
 .custom-habit-card__remove {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
   cursor: pointer;
   transition: background-color 120ms ease, color 120ms ease;
 }
-
 .custom-habit-card__remove:hover {
   background-color: var(--color-surface-sunken);
-  color: var(--color-text);
+  color: var(--color-error);
 }
-
 .custom-habit-card__remove:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-sage);
   outline-offset: 2px;
-}
-
-.custom-habit-card__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-3);
-  text-align: left;
-}
-
-.custom-habit-card__grid .field {
-  margin: 0;
-}
-
-.custom-habit-card__grid .field__help {
-  font-size: 11px;
-  line-height: 1.3;
-  color: var(--color-text-muted);
 }
 
 .custom-habit-add {
@@ -6932,86 +7057,198 @@ body:has(.item-drop-toast) .toast-viewport {
 
 /* ─── Onboarding quiz ─── */
 
+/*
+ * Layout strategy:
+ *   Desktop: 2-col grid of question cards.
+ *   Mobile:  1-col flow with tighter padding + smaller chips so all five
+ *            questions remain scannable without runaway scrolling.
+ *
+ * Each question is rendered as a subtle "card" (tinted bg + radius) so
+ * the user reads the page as 5 discrete steps, not one long fieldset.
+ */
+.onboarding-step--quiz {
+  width: min(960px, 100%);
+}
+
 .quiz {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-5);
+  gap: var(--space-3);
   width: 100%;
   text-align: left;
 }
 
-.quiz-question {
-  margin: 0;
-  padding: var(--space-3) 0 0;
-  border: 0;
+/* First question (the multi-select "I want to grow") has the most chips,
+ * so let it span both columns on desktop — chips wrap on a single full-
+ * width row instead of squeezing into one half. */
+.quiz > .quiz-question:first-child {
+  grid-column: 1 / -1;
 }
 
-.quiz-question > legend {
-  margin: 0 0 var(--space-1);
+.quiz-question {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2);
+  background-color: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Numbered header: small sage circle + title + optional inline hint.
+ * Targets the <h3> heading (replaced the native <legend> which had
+ * layout quirks). */
+/*
+ * Header layout: number circle on the left, title + optional hint in a
+ * text column to the right. align-items: center on the row keeps the
+ * 22px circle vertically aligned with the title's first line; baseline
+ * alignment produced a visual drift because the circle's centered glyph
+ * has a different baseline geometry than flowing text.
+ */
+.quiz-question__header {
+  margin: 0;
   padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-body);
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   color: var(--color-text);
+  line-height: 1.2;
+}
+
+.quiz-question__number {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-sage-subtle);
+  color: var(--color-sage-strong);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  flex: none;
+}
+
+/* Title + hint stack so the hint sits beneath the title at the same
+ * left edge — visually aligned with the number circle's right side. */
+.quiz-question__title-group {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.quiz-question__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
 }
 
 .quiz-question__hint {
-  margin: 0 0 var(--space-2);
-  font-size: var(--text-xs);
+  font-size: 12px;
+  font-weight: var(--weight-regular);
   color: var(--color-text-muted);
+  line-height: 1.2;
 }
 
 .quiz-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: 6px;
 }
 
 .quiz-chip {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
+  align-items: baseline;
+  gap: 6px;
   min-height: 0;
-  padding: 6px var(--space-3);
+  padding: 8px 12px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background-color: var(--color-surface);
+  border-radius: var(--radius-2);
+  background-color: var(--color-bg-page);
   color: var(--color-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
   transition:
     border-color 140ms var(--ease-out),
-    background-color 140ms var(--ease-out),
-    box-shadow 140ms var(--ease-out);
+    background-color 140ms var(--ease-out);
 }
 
-.quiz-chip:hover {
-  border-color: var(--color-sage);
-}
+.quiz-chip:hover { border-color: var(--color-sage); }
 
 .quiz-chip:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-sage);
   outline-offset: 2px;
 }
 
 .quiz-chip.is-pressed {
   border-color: var(--color-sage);
   background-color: var(--color-sage-subtle);
-  box-shadow: 0 0 0 2px var(--color-sage-glow);
+  box-shadow: inset 0 0 0 1px var(--color-sage);
 }
 
 .quiz-chip__label {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   line-height: 1.2;
+  white-space: nowrap;
 }
 
+/* Inline hint with a middot separator instead of stacking under the
+ * label — keeps the chip on one line wherever possible, saves vertical
+ * space, and reads as natural language. */
 .quiz-chip__hint {
-  margin-top: 2px;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: var(--weight-regular);
   color: var(--color-text-muted);
   line-height: 1.2;
+}
+.quiz-chip__hint::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--color-text-faint);
+}
+
+/* Mobile compactness: tighter cards, smaller chip padding, hide chip
+ * hints (the hover/tap label is still informative; the hint is nice-to-
+ * have, not load-bearing). The step still has 5 questions of meaningful
+ * content but they no longer eat half the screen each. */
+@media (max-width: 720px) {
+  .quiz {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+  .quiz-question {
+    padding: 10px var(--space-3) var(--space-3);
+    gap: 8px;
+  }
+  .quiz-question__header {
+    font-size: var(--text-sm);
+    gap: 6px;
+  }
+  .quiz-question__number {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    transform: translateY(1px);
+  }
+  .quiz-question__hint { font-size: 11px; }
+  .quiz-chips { gap: 4px; }
+  .quiz-chip {
+    padding: 6px 10px;
+    border-radius: 8px;
+  }
+  .quiz-chip__label { font-size: 13px; }
+  /* Drop the hint to keep each chip single-line. The chip's label is the
+   * decision; the descriptive hint is reserved for desktop where there's
+   * room. */
+  .quiz-chip__hint { display: none; }
 }
 
 .onboarding-actions--quiz {
@@ -7107,19 +7344,55 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 @media (max-width: 720px) {
-  .custom-habit-card__grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-2);
-  }
-
   .quiz {
     grid-template-columns: 1fr;
     gap: var(--space-3);
   }
 
+  /* Stay at 2-col on phones so 5 categories don't expand into 5*N rows.
+   * Compact card padding so two-per-row reads at 360px. */
   .starter-habit-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
   }
+  .starter-habit {
+    padding: 8px 10px;
+    gap: 8px;
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+  .starter-habit__name { font-size: 13px; }
+  .starter-habit__meta { font-size: 10px; }
+
+  /* Tighter custom-habit rows on phones — name takes most of the width,
+   * category + count drop to a second line so all three fields stay
+   * tappable at 360px. */
+  .custom-habit-card {
+    grid-template-columns: 22px minmax(0, 1fr) 28px;
+    padding: 6px;
+  }
+  .custom-habit-card__fields {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    gap: 4px;
+  }
+  .custom-habit-card__fields .custom-habit-card__name {
+    grid-column: 1 / -1;
+  }
+  .custom-habit-card__fields .custom-habit-card__category,
+  .custom-habit-card__fields .custom-habit-card__count {
+    grid-row: 2;
+  }
+  .custom-habit-card__fields {
+    grid-template-columns: minmax(0, 1fr) 60px;
+  }
+  .custom-habit-card__fields .custom-habit-card__name {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 380px) {
+  .starter-habit-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 720px) {
@@ -7158,3 +7431,1674 @@ body:has(.item-drop-toast) .toast-viewport {
   .onboarding-name__form { text-align: center; }
   .onboarding-name__form .field { text-align: left; }
 }
+
+/* ====================================================================== */
+/* === Mobile-only dashboard rebuild (Phase 1) ========================= */
+/* ====================================================================== */
+/*
+ * Scope contract: every rule in this block is mobile-only (≤880px) or
+ * targets selectors that only exist in the .m-dashboard tree. Desktop
+ * (>880px) sees the original layout exactly as before. We render both
+ * trees in DashboardPage; CSS toggles which one is visible.
+ */
+
+/* Default state: mobile tree hidden so desktop layout doesn't fight it. */
+.m-dashboard { display: none; }
+
+@media (max-width: 880px) {
+  /* ---- Show mobile tree, hide desktop tree ------------------------- */
+  .m-dashboard {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+  .dashboard__sidebar,
+  .dashboard__main,
+  .dashboard__pet-panel { display: none !important; }
+
+  /* The desktop universal top nav is replaced by the in-page m-dashboard-header. */
+  .top-nav { display: none; }
+
+  /* App shell loses the topnav row on mobile so main can start at the safe-area top. */
+  .app-shell {
+    grid-template-rows: 1fr;
+    grid-template-areas: 'main';
+  }
+
+  /* The legacy mobile stylesheet padded .dashboard at ~line 2429.
+   * The new mobile tree paints edge-to-edge and each component owns its
+   * own page padding — strip the container pad. */
+  .dashboard {
+    padding: 0 !important;
+    gap: 0 !important;
+    min-height: calc(100dvh - var(--m-bottom-nav-height) - env(safe-area-inset-bottom)) !important;
+    background-color: var(--color-bg-page);
+  }
+
+  .pull-refresh { top: env(safe-area-inset-top); }
+
+  /* ---- Header strip (56px) ---------------------------------------- */
+  .m-dashboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    height: var(--m-header-height);
+    padding: 0 var(--m-page-padding-x);
+    padding-top: env(safe-area-inset-top);
+    border-bottom: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-page);
+    box-sizing: content-box;
+  }
+  .m-dashboard-header__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--color-text);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+  }
+  .m-dashboard-header__brand:hover { color: var(--color-text); }
+  .m-dashboard-header__brand:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: 4px;
+    border-radius: var(--radius-1);
+  }
+  .m-dashboard-header__mark {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+  }
+  .m-dashboard-header__wordmark {
+    font-size: 1.0625rem; /* 17px — sized against the icon, quieter than the 22px greeting below */
+    letter-spacing: -0.01em;
+  }
+  .m-dashboard-header__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .m-dashboard-header__icon-link {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    color: var(--color-text);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-dashboard-header__icon-link:hover,
+  .m-dashboard-header__icon-link:active {
+    background-color: var(--color-surface-sunken);
+  }
+  .m-dashboard-header__icon-link:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -2px;
+  }
+  .m-dashboard-header .notification-bell__button {
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--color-text);
+  }
+  .m-dashboard-header .notification-bell__button:hover,
+  .m-dashboard-header .notification-bell__button:active {
+    background-color: var(--color-surface-sunken);
+  }
+
+  /* ---- Greeting + date -------------------------------------------- */
+  .m-greeting { padding: var(--space-5) var(--m-page-padding-x) var(--space-4); }
+  .m-greeting__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: var(--weight-bold);
+    font-size: var(--m-text-page-heading); /* 22px */
+    line-height: 1.2;
+    letter-spacing: -0.012em;
+    color: var(--color-text);
+  }
+  .m-greeting__date {
+    margin: 6px 0 0;
+    font-family: var(--font-mono);
+    font-size: var(--m-text-body-secondary); /* 13px */
+    line-height: 1.3;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Pet summary strip (80px) ----------------------------------- */
+  .m-pet-strip {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 14px;
+    height: 80px;
+    padding: 0 var(--m-page-padding-x);
+    border-top: 1px solid var(--color-border-subtle);
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: transparent;
+    color: inherit;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-pet-strip:hover,
+  .m-pet-strip:active { background-color: var(--color-surface-sunken); }
+  .m-pet-strip:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -3px;
+  }
+  .m-pet-strip__sprite {
+    display: inline-grid;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    /* Flat — no halo. The pet itself carries enough warmth. */
+    background: transparent;
+  }
+  .m-pet-strip__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .m-pet-strip__name {
+    font-family: var(--font-body);
+    font-size: var(--m-text-habit-name);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .m-pet-strip__health {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+  .m-pet-strip__health-label {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: var(--weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--m-tracking-label);
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+  .m-pet-strip__health-track {
+    position: relative;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-surface-sunken);
+    overflow: hidden;
+  }
+  .m-pet-strip__health-track > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background-color: var(--color-sage);
+    transition: width var(--duration-slow) var(--ease-out);
+  }
+  .m-pet-strip__health-value {
+    font-family: var(--font-mono);
+    font-size: var(--m-text-stat-small);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    min-width: 22px;
+    text-align: right;
+  }
+  .m-pet-strip__streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: var(--m-text-stat-small);
+    font-weight: var(--weight-semibold);
+    color: var(--color-honey-strong);
+    font-variant-numeric: tabular-nums;
+  }
+  .m-pet-strip--skeleton { pointer-events: none; }
+  .m-pet-strip__skel-body { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ---- Quick stats row (64px) ------------------------------------- */
+  .m-stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    height: 64px;
+    padding: 0 var(--m-page-padding-x);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+  .m-stats-row__cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 100%;
+    position: relative;
+  }
+  .m-stats-row__cell + .m-stats-row__cell::before {
+    content: '';
+    position: absolute;
+    top: 14px;
+    bottom: 14px;
+    left: 0;
+    width: 1px;
+    background-color: var(--color-border-subtle);
+  }
+  .m-stats-row__value {
+    font-family: var(--font-mono);
+    font-size: var(--m-text-stat-medium);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .m-stats-row__label {
+    font-family: var(--font-body);
+    font-size: var(--m-text-section-label);
+    font-weight: var(--weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--m-tracking-label);
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+
+  /* ---- XP / level progress row ------------------------------------ */
+  .m-xp-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px var(--m-page-padding-x);
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: inherit;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-xp-row:hover,
+  .m-xp-row:active { background-color: var(--color-surface-sunken); }
+  .m-xp-row:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -3px;
+  }
+
+  .m-xp-row__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .m-xp-row__label {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: var(--weight-semibold);
+    letter-spacing: var(--m-tracking-label);
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+
+  .m-xp-row__value {
+    font-family: var(--font-mono);
+    font-size: var(--m-text-stat-small); /* 14px */
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .m-xp-row__value-sep { color: var(--color-text-muted); }
+
+  .m-xp-row__bar {
+    display: block;
+    height: 4px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-surface-sunken);
+    overflow: hidden;
+  }
+  .m-xp-row__bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background-color: var(--color-honey);
+    transition: width var(--duration-slow) var(--ease-out);
+  }
+
+  /* Skeleton row uses the same grid as a live row but is not interactive. */
+  .m-habit__row--skeleton {
+    cursor: default;
+    background: transparent;
+  }
+  .m-habit__row--skeleton:hover { background: transparent; }
+
+  /* ---- Section labels --------------------------------------------- */
+  .m-section-label {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-body);
+    font-size: var(--m-text-section-label);
+    font-weight: var(--weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--m-tracking-label);
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+  .m-habits-section { display: flex; flex-direction: column; margin-top: var(--space-4); }
+  .m-habits-section .m-section-label {
+    padding: 0 var(--m-page-padding-x);
+    margin-bottom: var(--space-3);
+  }
+
+  /* ---- Habit list + row ------------------------------------------- */
+  /*
+   * The entire row is the hold target. We render an <li> wrapping a
+   * button.m-habit__row that fills the row; pointer-down on the button
+   * starts the hold gesture. A background fill grows left→right as the
+   * hold accumulates so the visual progress reads at full row width
+   * regardless of where the finger lands.
+   */
+  .m-habits {
+    display: flex;
+    flex-direction: column;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .m-habit {
+    position: relative;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+  .m-habit:last-child { border-bottom: 0; }
+  .m-habit--burst { animation: kyndill-soft-confirm 640ms var(--ease-out); }
+
+  .m-habit__row {
+    position: relative;
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    min-height: 64px;
+    padding: 12px var(--m-page-padding-x);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    /* touch-action: pan-y lets the user still scroll the page vertically
+     * during a hold; we only own the press itself, not the swipe. */
+    touch-action: pan-y;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-habit__row:disabled { cursor: default; }
+  .m-habit__row:hover { background-color: var(--color-surface-sunken); }
+  .m-habit__row:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -3px;
+  }
+
+  /* Row content sits above the fill overlay. */
+  .m-habit__row > .m-habit__control,
+  .m-habit__row > .m-habit__body,
+  .m-habit__row > .m-habit__streak {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* The fill: a sage-tinted band that grows left→right over the hold
+   * duration. Snaps back in 120ms on release. */
+  .m-habit__row-fill {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-color: var(--color-sage-subtle);
+    transform-origin: left center;
+    transform: scaleX(0);
+    pointer-events: none;
+    transition: transform 120ms var(--ease-out);
+  }
+  .m-habit__row.is-holding .m-habit__row-fill {
+    transform: scaleX(1);
+    transition: transform var(--hold-duration, 650ms) linear;
+  }
+
+  /* Completed-row styling. */
+  .m-habit--done .m-habit__name {
+    color: var(--color-text-muted);
+    font-weight: var(--weight-medium);
+  }
+  .m-habit--done .m-habit__streak,
+  .m-habit--done .category-pill { opacity: 0.6; }
+
+  .m-habit__control {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+  }
+  /* Tap-padding extension to a 44px hit area without changing the 28px visual. */
+  .m-habit__control::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+
+  .m-habit__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .m-habit__name {
+    font-family: var(--font-body);
+    font-size: var(--m-text-habit-name);
+    font-weight: var(--weight-semibold);
+    line-height: 1.3;
+    letter-spacing: -0.005em;
+    color: var(--color-text);
+    /* Wrap rather than truncate. */
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
+  }
+
+  /* Category pill re-skin on mobile only — uppercase + 15% opacity tint.
+   * Desktop's .category-pill rules continue to apply outside of .m-habit. */
+  .m-habit .category-pill {
+    min-height: 18px;
+    padding: 2px 8px;
+    font-family: var(--font-body);
+    font-size: var(--m-text-section-label);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--m-tracking-label);
+    line-height: 1.2;
+    text-transform: uppercase;
+    border: 0;
+  }
+  .m-habit .category-pill--health {
+    color: var(--color-category-health);
+    background-color: color-mix(in oklch, var(--color-category-health) 15%, transparent);
+  }
+  .m-habit .category-pill--productivity {
+    color: var(--color-category-productivity);
+    background-color: color-mix(in oklch, var(--color-category-productivity) 15%, transparent);
+  }
+  .m-habit .category-pill--social {
+    color: var(--color-category-social);
+    background-color: color-mix(in oklch, var(--color-category-social) 15%, transparent);
+  }
+  .m-habit .category-pill--learning {
+    color: var(--color-category-learning);
+    background-color: color-mix(in oklch, var(--color-category-learning) 15%, transparent);
+  }
+  .m-habit .category-pill--wellness {
+    color: var(--color-category-wellness);
+    background-color: color-mix(in oklch, var(--color-category-wellness) 15%, transparent);
+  }
+
+  .m-habit__streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: var(--m-text-body-secondary);
+    font-weight: var(--weight-semibold);
+    font-variant-numeric: tabular-nums;
+    color: var(--color-honey-strong);
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .m-habit__streak-icon { display: inline-flex; color: var(--color-honey-strong); }
+  .m-habit__streak-icon .animated-flame { width: 13px; height: 13px; }
+  .m-habit__streak-value { color: inherit; font-weight: inherit; }
+
+  /* ---- Checkbox visual (28px, passive — the row carries the hold) - */
+  .m-habit__check {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: var(--color-sage);
+  }
+  .m-habit__check-box {
+    fill: var(--color-surface);
+    stroke: var(--color-border-strong);
+    stroke-width: 1.6;
+    transition:
+      fill var(--duration-base) var(--ease-out),
+      stroke var(--duration-base) var(--ease-out);
+  }
+  .m-habit__check-tick {
+    stroke: var(--color-text-on-accent);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 22;
+    stroke-dashoffset: 22;
+  }
+  .m-habit__check.is-checked .m-habit__check-box {
+    fill: var(--color-sage);
+    stroke: var(--color-sage);
+  }
+  .m-habit__check.is-checked .m-habit__check-tick {
+    animation: kyndill-checkmark-draw 320ms var(--ease-out) forwards;
+  }
+  /* While the row is being held the checkbox outline brightens so the
+   * control reads as "engaged" — the row fill is the primary cue. */
+  .m-habit__check.is-holding .m-habit__check-box {
+    stroke: var(--color-sage);
+    stroke-width: 2;
+  }
+
+  /* ---- Progress ring visual (28px, passive) ----------------------- */
+  .m-habit__ring {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+  }
+  .m-habit__ring-track { stroke: var(--color-border); }
+  .m-habit__ring-fill {
+    stroke: var(--color-sage);
+    transition: stroke-dashoffset 320ms var(--ease-out);
+  }
+  /* During the hold the ring sweeps clockwise to 360° in lockstep with
+   * the row fill (same easing + duration). On release without firing,
+   * the resting offset returns instantly. */
+  .m-habit__ring.is-holding .m-habit__ring-fill {
+    transition: stroke-dashoffset var(--hold-duration, 650ms) linear;
+  }
+  .m-habit__ring.is-holding .m-habit__ring-track {
+    stroke: var(--color-sage-subtle);
+  }
+  .m-habit__ring.is-done .m-habit__ring-count { color: var(--color-sage); }
+  .m-habit__ring-count {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  /* ---- Pet care (4 stat chips + Feed + Customize) ----------------- */
+  .m-pet-care {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 14px var(--m-page-padding-x) var(--space-4);
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: transparent;
+  }
+
+  .m-pet-care__stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .m-pet-care__stat { min-width: 0; }
+
+  .m-pet-care__stat-link {
+    display: grid;
+    grid-template-rows: auto auto auto;
+    align-items: center;
+    justify-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-2);
+    background-color: var(--color-bg-page);
+    color: var(--color-text);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .m-pet-care__stat-link:hover,
+  .m-pet-care__stat-link:active {
+    background-color: var(--color-surface-sunken);
+    border-color: var(--color-border);
+  }
+  .m-pet-care__stat-link:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: 2px;
+  }
+
+  .m-pet-care__stat-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    color: var(--color-sage-strong);
+  }
+
+  .m-pet-care__stat-meta {
+    display: grid;
+    grid-template-rows: auto auto;
+    justify-items: center;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .m-pet-care__stat-value {
+    font-family: var(--font-mono);
+    font-size: var(--m-text-stat-small); /* 14px */
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .m-pet-care__stat-bar {
+    width: 100%;
+    height: 3px;
+    border-radius: var(--radius-full);
+    background-color: var(--color-surface-sunken);
+    overflow: hidden;
+  }
+  .m-pet-care__stat-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background-color: var(--color-sage);
+    transition: width var(--duration-slow) var(--ease-out);
+  }
+
+  .m-pet-care__stat-label {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: var(--weight-medium);
+    text-transform: uppercase;
+    letter-spacing: var(--m-tracking-label);
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+
+  .m-pet-care__actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .m-pet-care__feed {
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 0;
+    border-radius: var(--radius-2);
+    background-color: var(--color-sage);
+    color: var(--color-text-on-accent);
+    font-family: var(--font-body);
+    font-size: var(--m-text-body-primary); /* 15px */
+    font-weight: var(--weight-semibold);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-pet-care__feed:hover,
+  .m-pet-care__feed:active {
+    background-color: var(--color-sage-strong);
+  }
+  .m-pet-care__feed:disabled {
+    background-color: var(--color-surface-sunken);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+  .m-pet-care__feed:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: 2px;
+  }
+
+  .m-pet-care__customize {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-2);
+    color: var(--color-text);
+    text-decoration: none;
+    font-family: var(--font-body);
+    font-size: var(--m-text-body-primary);
+    font-weight: var(--weight-medium);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      border-color var(--duration-fast) var(--ease-out);
+  }
+  .m-pet-care__customize:hover,
+  .m-pet-care__customize:active {
+    background-color: var(--color-surface-sunken);
+  }
+  .m-pet-care__customize:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: 2px;
+  }
+
+  /* ---- Activity feed (mobile re-skin of the shared component) ---- */
+  .m-activity-section {
+    margin-top: var(--space-8);
+    padding-bottom: var(--space-8);
+  }
+  .m-activity-section .activity-feed {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .m-activity-section .activity-feed__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 0 var(--m-page-padding-x);
+  }
+  /* Collapse the legacy header's inner div so the h2 + Refresh sit side-by-side. */
+  .m-activity-section .activity-feed__header > div { display: contents; }
+  .m-activity-section .activity-feed__header h2 {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: var(--m-text-section-label);
+    font-weight: var(--weight-medium);
+    letter-spacing: var(--m-tracking-label);
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    line-height: 1;
+  }
+  .m-activity-section .activity-feed__header p { display: none; }
+
+  .m-activity-section .activity-feed__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: none;
+    overflow: visible;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+  .m-activity-section .activity-feed__item {
+    min-height: 0;
+    border: 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+  }
+  .m-activity-section .activity-feed__item:last-child { border-bottom: 0; }
+  .m-activity-section .activity-feed__button {
+    width: 100%;
+    min-height: 48px;
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 12px var(--m-page-padding-x);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-activity-section .activity-feed__button:hover,
+  .m-activity-section .activity-feed__button:active {
+    background-color: var(--color-surface-sunken);
+    opacity: 1;
+  }
+  .m-activity-section .activity-feed__button:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -2px;
+  }
+  .m-activity-section .activity-feed__icon {
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin: 2px 0 0;
+    align-self: flex-start;
+    border-radius: var(--radius-full);
+    background-color: color-mix(in oklch, currentColor 12%, transparent);
+  }
+  .m-activity-section .activity-feed__icon svg { width: 14px; height: 14px; }
+  .m-activity-section .activity-feed__copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .m-activity-section .activity-feed__copy strong {
+    font-family: var(--font-body);
+    font-size: var(--m-text-stat-small);
+    font-weight: var(--weight-semibold);
+    color: var(--color-text);
+    line-height: 1.35;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .m-activity-section .activity-feed__copy span {
+    font-family: var(--font-body);
+    font-size: var(--m-text-body-secondary);
+    color: var(--color-text-muted);
+    line-height: 1.4;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .m-activity-section .activity-feed__item time {
+    align-self: flex-start;
+    padding-top: 2px;
+    font-family: var(--font-mono);
+    font-size: var(--m-text-section-label);
+    color: var(--color-text-faint);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .m-activity-section .activity-feed__empty {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--m-page-padding-x);
+    border: 0;
+    background: transparent;
+  }
+  .m-activity-section .activity-feed__empty p {
+    margin: 0;
+    color: var(--color-text-faint);
+    font-size: var(--m-text-body-primary);
+  }
+
+  .m-habits-section .dashboard__empty {
+    margin: 0 var(--m-page-padding-x);
+  }
+
+  /* ---- Bottom nav restyle (new 56 + safe-area, sage active) ------- */
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-bg-page);
+    box-shadow: none;
+  }
+  .bottom-nav__list {
+    height: var(--m-bottom-nav-height);
+    padding-bottom: 0;
+  }
+  .bottom-nav__icon {
+    width: 24px;
+    height: 24px;
+    stroke-width: 2;
+  }
+  .bottom-nav__label {
+    font-family: var(--font-body);
+    font-size: var(--m-text-bottom-nav);
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.01em;
+    color: inherit;
+  }
+  .bottom-nav__link { color: var(--color-text-muted); }
+  .bottom-nav__link:hover,
+  .bottom-nav__link:active { color: var(--color-text); }
+  .bottom-nav__link--active,
+  .bottom-nav__link--active:hover { color: var(--color-sage); }
+  .bottom-nav__link:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -4px;
+    border-radius: var(--radius-2);
+  }
+
+  /* Reserve the new 56px nav inset under main. */
+  .app-shell__main {
+    padding-bottom: calc(var(--m-bottom-nav-height) + env(safe-area-inset-bottom));
+  }
+}
+
+/* Reduced motion within the new mobile components. */
+@media (max-width: 880px) and (prefers-reduced-motion: reduce) {
+  .m-habit__check.is-checked .m-habit__check-tick,
+  .m-habit__ring-fill,
+  .m-pet-strip__health-track > span {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ====================================================================== */
+/* === Shared mobile page header (≤880px) ============================== */
+/* ====================================================================== */
+/*
+ * Rendered at the top of every page (except Settings — that page IS the
+ * settings destination). Hidden on desktop where the universal TopNav
+ * takes over above 880px.
+ */
+.m-page-header { display: none; }
+
+@media (max-width: 880px) {
+  .m-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    /*
+     * width:100% + border-box anchors the header to the parent's full
+     * content width regardless of how that parent positions children
+     * (flex, grid, place-items: center, etc.). Negative margins on
+     * `.page > .m-page-header` still pull the box to screen edges; this
+     * just guarantees the box width itself is identical everywhere.
+     */
+    width: 100%;
+    box-sizing: border-box;
+    /*
+     * Total height = 56 of content + the device's top safe-area inset
+     * (Safari notch, etc.). padding-top eats the safe-area portion so
+     * align-items:center centers content inside the 56px content area.
+     */
+    min-height: calc(var(--m-header-height) + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) var(--m-page-padding-x) 0;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background-color: var(--color-bg-page);
+  }
+
+  /*
+   * Focus page centers its single child shell with `display: grid;
+   * place-items: center`, which also centered the header (visible as
+   * an off-edge floating bar). Restore normal block flow on mobile so
+   * the header stretches and the focus-shell flows beneath it.
+   */
+  .focus-page {
+    display: block;
+    place-items: initial;
+  }
+
+  /*
+   * Full-bleed escape. We could match negative margins to the .page
+   * padding at every breakpoint, but that's brittle — any new media
+   * rule on .page silently re-introduces a side offset. Instead use
+   * the standard full-bleed pattern: pin the header to the parent's
+   * outer box independent of whatever padding the parent has, by
+   * positioning at left/right 0 with a margin trick.
+   *
+   * `width: auto` + `position: relative` + matching `left/right: 0`
+   * inside a normal-flow doc doesn't fully escape padding, so we use
+   * the classic 100% + margin trick: width 100% of parent INCLUDING
+   * its padding (calc), shifted left by the parent's left padding.
+   *
+   * In practice every page child of .page sits inside a padded box,
+   * so the simplest robust approach is `position: absolute` for the
+   * header alone, with the page reserving header height as top padding.
+   * That decouples the header geometry from .page padding entirely.
+   */
+  .page {
+    position: relative;
+  }
+  .page > .m-page-header:first-child {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+  /* Reserve header height + safe-area inset above page content so the
+   * first body element doesn't sit underneath the absolute header. */
+  .page:has(> .m-page-header:first-child) {
+    padding-top: calc(var(--m-header-height) + env(safe-area-inset-top) + var(--space-4));
+  }
+
+  .m-page-header__brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    /* Match the 40px hit target geometry of the right-side icon links so
+     * all four corners of the header have identical visual weight and
+     * sit at the same offset from the screen edge. */
+    height: 40px;
+    /* Pull-left so the mark icon's centre lines up with the right-side
+     * icon centres (both 40px buttons, so neg margin of (40 - 20)/2 = 10).
+     * Avoids the "left icon looks more flush than right" perception. */
+    margin-left: -8px;
+    padding: 0 4px;
+    border-radius: var(--radius-1);
+    color: var(--color-text);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: var(--weight-semibold);
+    line-height: 1;
+    min-width: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .m-page-header__brand:hover {
+    color: var(--color-text);
+    background-color: var(--color-surface-sunken);
+  }
+  .m-page-header__brand:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: 2px;
+  }
+
+  .m-page-header__mark {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    flex: none;
+  }
+
+  /* Same margin trick on the right so the cluster's outermost icon
+   * centre is symmetric to the brand icon centre. */
+  .m-page-header__actions { margin-right: -8px; }
+
+  .m-page-header__wordmark,
+  .m-page-header__title {
+    font-size: 1.0625rem; /* 17px */
+    letter-spacing: -0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  .m-page-header__actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex: none;
+  }
+
+  .m-page-header__icon-link,
+  .m-page-header__avatar-link {
+    display: inline-grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    color: var(--color-text);
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color var(--duration-fast) var(--ease-out);
+  }
+  .m-page-header__icon-link:hover,
+  .m-page-header__icon-link:active,
+  .m-page-header__avatar-link:hover,
+  .m-page-header__avatar-link:active {
+    background-color: var(--color-surface-sunken);
+  }
+  .m-page-header__icon-link:focus-visible,
+  .m-page-header__avatar-link:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -2px;
+  }
+
+  .m-page-header__avatar {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    overflow: hidden;
+    border-radius: var(--radius-full);
+    background-color: var(--color-sage-subtle);
+    color: var(--color-sage-strong);
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    font-weight: var(--weight-bold);
+  }
+  .m-page-header__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .m-page-header .notification-bell__button {
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--color-text);
+  }
+  .m-page-header .notification-bell__button:hover,
+  .m-page-header .notification-bell__button:active {
+    background-color: var(--color-surface-sunken);
+  }
+
+  /* The mobile header is now identical chrome on every page (brand +
+   * wordmark + bell + avatar + settings). The per-page eyebrow + h1
+   * stay visible inside the page body as the title for that surface. */
+  .page > .m-page-header + .page__header {
+    margin-bottom: var(--space-4);
+  }
+}
+
+/* ====================================================================== */
+/* === Completion gauge (desktop dashboard) ============================ */
+/* ====================================================================== */
+
+.completion-gauge {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.completion-gauge__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 320px;
+}
+
+.completion-gauge__bar {
+  transition: stroke-dashoffset var(--duration-slow) var(--ease-out);
+}
+
+.completion-gauge__readout {
+  position: absolute;
+  bottom: 4%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.completion-gauge__count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.completion-gauge__done {
+  font-size: var(--text-4xl);
+  line-height: 1;
+  color: var(--color-text);
+}
+.completion-gauge__sep,
+.completion-gauge__total {
+  font-size: var(--text-xl);
+  line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.completion-gauge__label {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ====================================================================== */
+/* === Desktop dashboard layout adjustments ============================ */
+/* ====================================================================== */
+/*
+ * Widens sidebar and pet column so the activity feed can breathe and
+ * the pet panel has room for its sprite + stats + actions. Removes
+ * the activity feed's max-height so the column fills viewport height.
+ * Mobile is unaffected (these rules wrap >880px).
+ */
+@media (min-width: 881px) {
+  .dashboard {
+    grid-template-columns: minmax(380px, 440px) minmax(0, 1fr) minmax(320px, 380px);
+    gap: var(--space-6);
+  }
+
+  .dashboard__sidebar {
+    width: 100%;
+    min-height: calc(100vh - var(--top-nav-height) - var(--space-12));
+    max-height: calc(100vh - var(--top-nav-height) - var(--space-8));
+    overflow-y: auto;
+    padding: var(--space-6);
+  }
+
+  /* Activity feed inside the sidebar: let the list grow to fill the
+   * remaining vertical space instead of capping at 300px. */
+  .dashboard__sidebar .activity-feed {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .dashboard__sidebar .activity-feed__list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+
+  .dashboard__pet-panel {
+    width: 100%;
+  }
+
+  /* Habit row click affordance on desktop. */
+  .habit-item--clickable {
+    cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      box-shadow var(--duration-fast) var(--ease-out);
+  }
+  .habit-item--clickable:hover {
+    background-color: var(--color-surface-sunken);
+  }
+  .habit-item--clickable:focus-visible {
+    outline: 2px solid var(--color-sage);
+    outline-offset: -3px;
+  }
+}
+
+/* New habit-row streak chip (no flame, mono number + tiny 'd' unit). */
+.habit-item__streak-unit {
+  margin-left: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.75em;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-regular);
+}
+
+/* ====================================================================== */
+/* === Habit details modal ============================================= */
+/* ====================================================================== */
+.habit-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.habit-details__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.habit-details__freq {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.habit-details__description {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+}
+
+.habit-details__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.habit-details__stats > div {
+  position: relative;
+  padding: var(--space-3) var(--space-4);
+  min-width: 0;
+}
+.habit-details__stats > div + div::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 1px;
+  background-color: var(--color-border-subtle);
+}
+
+.habit-details__stats dt {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.habit-details__stats dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.habit-details__streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-honey-strong);
+}
+
+.habit-details__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* ====================================================================== */
+/* === Progress page separator cleanup ================================= */
+/* ====================================================================== */
+/*
+ * The earlier rework wrapped tile / streak / social grids in border-top
+ * + border-bottom which read as "bordered boxes" against the panel's
+ * own border. Drop the outer border-bottom and lighten the inner
+ * dividers so the dividers feel like rhythm, not a frame.
+ */
+.progress-tile-grid,
+.progress-streaks,
+.progress-hero__meta {
+  border-bottom: 0;
+}
+.progress-tile-grid {
+  border-top-color: var(--color-border-subtle);
+}
+.progress-tile + .progress-tile::before,
+.progress-streaks > li + li::before {
+  background-color: var(--color-border-subtle);
+  top: 18px;
+  bottom: 18px;
+}
+
+/* Trim panel-internal whitespace so the hero / behavioral / streaks /
+ * social blocks have aligned row heights without obvious gaps. */
+.progress-panel h2 {
+  margin-bottom: var(--space-3);
+}
+
+/* ====================================================================== */
+/* === Desktop progress grid: compact, no forced row-stretch =========== */
+/* ====================================================================== */
+/*
+ * The previous attempt forced every panel in a row to match the tallest
+ * sibling (grid-auto-rows: 1fr), which left empty space inside the
+ * shorter panels and pushed the whole page taller. Reverting to natural
+ * heights and tightening padding so the panels fit their content.
+ */
+@media (min-width: 1081px) {
+  .progress-grid {
+    gap: var(--space-4);
+    align-items: start;
+  }
+  .progress-panel {
+    padding: var(--space-4);
+  }
+  .progress-panel h2 {
+    margin-bottom: var(--space-3);
+  }
+  /* Hero panel: tighten + drop the meta row's top padding so the giant
+   * percentage doesn't have a tall column of dead space below it. */
+  .progress-panel--hero {
+    padding: var(--space-5);
+    gap: var(--space-5);
+  }
+  .progress-panel--hero strong {
+    margin: var(--space-1) 0 var(--space-3);
+  }
+  .progress-hero__meta li { padding: var(--space-2) var(--space-3) 0; }
+
+  /* Streak + tile cells: tighter minimum heights so the panel doesn't
+   * inflate around a small number. */
+  .progress-streaks > li { min-height: 76px; }
+  .progress-tile { min-height: 70px; padding: var(--space-2) var(--space-3); }
+
+  /* Weekly chart: cap to a sane height so it doesn't push the hero
+   * panel down further than it needs to be. */
+  .progress-chart { min-height: 180px; }
+  .progress-chart__track { min-height: 120px; }
+}
+
+/* ====================================================================== */
+/* === Profile page: stats row across the top + form/wishlist columns == */
+/* ====================================================================== */
+/*
+ * Page layout, top-down on desktop:
+ *   [ STATS row (4 tiles, full width)        ]
+ *   [ FORM column        | WISHLIST column   ]
+ *
+ * Stats spread horizontally so they fill the page width with real
+ * content instead of stacking thinly in a sidebar; form + wishlist
+ * split the row below as equal columns so neither leaves dead air.
+ */
+.profile-stats--row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: var(--space-5);
+}
+
+/* Reset the legacy 2-column stats grid when used inline as a row. */
+.profile-stats.profile-stats--row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: var(--space-4) var(--space-5);
+  gap: var(--space-3);
+}
+
+.wishlist-editor { margin-top: 0; }
+
+@media (min-width: 881px) {
+  .profile-layout {
+    /* Drop the artificial max-width so the form + wishlist actually
+     * fill the page's content area instead of leaving 80–200px of
+     * dead space on the right at large viewports. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-6);
+    max-width: none;
+    align-items: start;
+  }
+
+  .profile-page { max-width: none; }
+
+  .profile-card { padding: var(--space-4) var(--space-5); }
+  .profile-card .field { gap: 4px; }
+
+  .wishlist-editor {
+    padding: var(--space-4) var(--space-5);
+    /* Let the column it lives in size it; no fixed height. */
+    height: auto;
+  }
+
+  /* Mobile pattern kept on narrow desktop windows */
+  @media (max-width: 1080px) {
+    .profile-layout { grid-template-columns: 1fr; }
+  }
+}
+
+/* Mobile: stats become a 2x2 grid again so 4 tiles don't squeeze into
+ * a single phone row. */
+@media (max-width: 720px) {
+  .profile-stats.profile-stats--row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Wishlist option rows: HabitCheckbox + thumb + name. The checkbox
+ * is the visible affordance now (matches the dashboard pattern), so we
+ * keep the row hover quiet and drop the heavy is-picked tint. */
+.wishlist-editor__option {
+  display: grid;
+  grid-template-columns: 28px 40px minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  padding: 10px var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+/* Single canonical thumb sizing for both ordered + catalog rows. */
+.wishlist-editor__image {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-2);
+  background-color: var(--color-surface-sunken);
+  background-size: cover;
+  background-position: center;
+}
+.wishlist-editor__option:last-child { border-bottom: 0; }
+.wishlist-editor__option:hover:not(.is-disabled) {
+  background-color: var(--color-surface-sunken);
+}
+.wishlist-editor__option.is-picked {
+  background: transparent;
+  border-bottom-color: var(--color-border-subtle);
+}
+.wishlist-editor__option.is-disabled {
+  opacity: 0.45;
+}
+
+.wishlist-editor__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.wishlist-editor__option-name {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wishlist-editor__option-meta {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* Snowflake thumb for streak-freeze entries. */
+.wishlist-editor__image--freeze,
+.wishlist-view__image--freeze {
+  display: inline-grid;
+  place-items: center;
+  background-image: none;
+  background-color: var(--color-info-subtle);
+  color: var(--color-info);
+}
+
+/* The catalog grid drops the boxy multi-column layout in favor of a
+ * single column of rows — matches the rest of the site's list patterns
+ * and stops the wishlist from looking like a separate widget. */
+.wishlist-editor__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Wishlist editor: switch from bordered card to the site's panel
+ * pattern (radius, subtle border, surface tint), and align the item
+ * rows + catalog grid to the rest of the dashboard styling. No
+ * margin-top — the editor sits flush with the top of its column so it
+ * aligns with the form on the same row of the profile layout. */
+.wishlist-editor {
+  margin-top: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-2);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.wishlist-editor__ordered > li {
+  display: grid;
+  grid-template-columns: 28px 40px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+  background-color: transparent;
+}
+.wishlist-editor__ordered > li:last-child { border-bottom: 0; }
+
+.wishlist-editor__name {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+}
+
+.wishlist-editor__controls > button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-1);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+.wishlist-editor__controls > button:hover:not(:disabled) {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+/* Second-pass wishlist override removed for the same reason — it was
+ * undoing the row-list pattern back to the bordered-tile grid. */
+

@@ -5,6 +5,7 @@ import { Button } from '../components/common/Button';
 import { CosmeticPreview } from '../components/common/CosmeticPreview';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { Modal } from '../components/common/Modal';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { usePet } from '../hooks/usePet';
@@ -71,6 +72,7 @@ export function ShopPage() {
 
   return (
     <section className="page shop-page">
+      <MobilePageHeader title="Shop" />
       <header className="page__header shop-page__header">
         <div>
           <h1>Kyndill Shop</h1>

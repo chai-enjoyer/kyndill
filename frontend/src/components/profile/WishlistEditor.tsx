@@ -1,11 +1,50 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../common/Button';
 import { LoadingSkeleton } from '../common/LoadingSkeleton';
+import { HabitCheckbox } from '../dashboard/HabitCheckbox';
 import { useToastContext } from '../../context/ToastContext';
 import { extractMessage } from '../../hooks/useSocial';
 import { useShop } from '../../hooks/useShop';
 import { useWishlist, type WishlistEntry } from '../../hooks/useWishlist';
 import { getItemPlaceholder } from '../../lib/utils';
+
+/* Inline snowflake icon for streak freeze items so they read as a
+ * distinct affordance rather than a placeholder thumbnail. Same path
+ * as the top-nav chip + dashboard sidebar freeze indicator. */
+function StreakFreezeIcon({ size = 24 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v18M5 7l14 10M19 7 5 17M7 5l2 4-4 1M17 5l-2 4 4 1M7 19l2-4-4-1M17 19l-2-4 4-1" />
+    </svg>
+  );
+}
+
+function WishlistItemThumb({ item }: { item: { name: string; type: 'consumable' | 'streak_freeze' } }) {
+  if (item.type === 'streak_freeze') {
+    return (
+      <span className="wishlist-editor__image wishlist-editor__image--freeze" aria-hidden="true">
+        <StreakFreezeIcon size={22} />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="wishlist-editor__image"
+      aria-hidden="true"
+      style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }}
+    />
+  );
+}
 
 // Small editor for the user's giftable-wishlist (≤3 items). Lists every
 // consumable + streak_freeze from the shop; user picks priorities. Saving
@@ -96,10 +135,7 @@ export function WishlistEditor() {
             return (
               <li key={itemId}>
                 <span className="wishlist-editor__position">{index + 1}</span>
-                <span
-                  className="wishlist-editor__image"
-                  style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }}
-                />
+                <WishlistItemThumb item={item} />
                 <span className="wishlist-editor__name">{item.name}</span>
                 <span className="wishlist-editor__controls">
                   <button
@@ -130,35 +166,28 @@ export function WishlistEditor() {
 
       <div className="wishlist-editor__catalog">
         <h3>Add items</h3>
-        <div className="wishlist-editor__grid">
+        <ul className="wishlist-editor__grid" role="list">
           {choosable.map((item) => {
             const isPicked = selected.includes(item.id);
             const atCap = !isPicked && selected.length >= MAX_ITEMS;
+            const disabled = atCap;
             return (
-              <label
+              <li
                 key={item.id}
                 className={`wishlist-editor__option${isPicked ? ' is-picked' : ''}${atCap ? ' is-disabled' : ''}`}
               >
-                <input
-                  type="checkbox"
+                <HabitCheckbox
                   checked={isPicked}
-                  disabled={atCap}
-                  onChange={() => toggle(item.id)}
+                  disabled={disabled}
+                  onClick={() => toggle(item.id)}
+                  ariaLabel={isPicked ? `Remove ${item.name} from wishlist` : `Add ${item.name} to wishlist`}
                 />
-                <span
-                  className="wishlist-editor__image wishlist-editor__image--small"
-                  style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }}
-                />
-                <span>
-                  {item.name}
-                  {item.type === 'streak_freeze' && (
-                    <small className="text-muted"> Streak freeze</small>
-                  )}
-                </span>
-              </label>
+                <WishlistItemThumb item={item} />
+                <span className="wishlist-editor__option-name">{item.name}</span>
+              </li>
             );
           })}
-        </div>
+        </ul>
       </div>
 
       <div className="wishlist-editor__actions">
@@ -176,13 +205,11 @@ export function WishlistView({ items }: { items: WishlistEntry[] }) {
   }
   return (
     <ol className="wishlist-view">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <li key={item.item_id}>
-          <span
-            className="wishlist-view__image"
-            style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }}
-          />
-          <span>{item.name}</span>
+          <span className="wishlist-view__position" aria-hidden="true">{index + 1}</span>
+          <WishlistItemThumb item={item} />
+          <span className="wishlist-view__name">{item.name}</span>
         </li>
       ))}
     </ol>

@@ -126,6 +126,26 @@
   --top-nav-height: 64px;
   --bottom-nav-height: 64px;
 
+  /*
+   * Mobile-first role tokens (Phase 1, mobile only). These are additive
+   * — they don't replace the legacy --text-* scale used by desktop. The
+   * dashboard's mobile layout (≤880px) consumes them; everything else
+   * keeps using the original scale, so desktop is unaffected.
+   */
+  --m-page-padding-x: 20px;
+  --m-bottom-nav-height: 56px;
+  --m-header-height: 56px;
+  --m-text-page-heading: 1.375rem;    /* 22px */
+  --m-text-section-label: 0.6875rem;  /* 11px UPPERCASE */
+  --m-text-body-primary: 0.9375rem;   /* 15px */
+  --m-text-body-secondary: 0.8125rem; /* 13px */
+  --m-text-habit-name: 1rem;          /* 16px */
+  --m-text-stat-small: 0.875rem;      /* 14px */
+  --m-text-stat-medium: 1.25rem;      /* 20px */
+  --m-text-stat-large: 1.75rem;       /* 28px */
+  --m-text-bottom-nav: 0.6875rem;     /* 11px */
+  --m-tracking-label: 0.06em;
+
   color-scheme: light dark;
 }
 

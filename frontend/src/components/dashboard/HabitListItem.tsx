@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { HabitWithStatus, CompleteResult } from '../../hooks/useHabits';
 import { AnimatedValue } from '../common/AnimatedValue';
-import { FlameIcon } from '../common/FlameIcon';
 import { HabitCheckbox } from './HabitCheckbox';
 import { CategoryPill } from './CategoryPill';
 import { Confetti } from './Confetti';
@@ -9,9 +8,10 @@ import { Confetti } from './Confetti';
 interface HabitListItemProps {
   habit: HabitWithStatus;
   onComplete: (habitId: string) => Promise<CompleteResult | null>;
+  onOpenDetails?: (habit: HabitWithStatus) => void;
 }
 
-export function HabitListItem({ habit, onComplete }: HabitListItemProps) {
+export function HabitListItem({ habit, onComplete, onOpenDetails }: HabitListItemProps) {
   const [submitting, setSubmitting] = useState(false);
   const [burst, setBurst] = useState(false);
   const targetCount = Math.max(1, habit.today_target_count || habit.target_count || 1);
@@ -38,9 +38,30 @@ export function HabitListItem({ habit, onComplete }: HabitListItemProps) {
     }
   }
 
+  const detailsClickable = Boolean(onOpenDetails);
+
+  function handleRowKey(event: React.KeyboardEvent<HTMLLIElement>) {
+    if (!detailsClickable) return;
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onOpenDetails?.(habit);
+    }
+  }
+
   return (
-    <li className={`habit-item ${habit.completed_today ? 'habit-item--done' : ''} ${burst ? 'habit-item--burst' : ''}`}>
-      <span className="habit-item__checkbox">
+    <li
+      className={`habit-item ${habit.completed_today ? 'habit-item--done' : ''} ${burst ? 'habit-item--burst' : ''}${detailsClickable ? ' habit-item--clickable' : ''}`}
+      onClick={detailsClickable ? () => onOpenDetails?.(habit) : undefined}
+      onKeyDown={handleRowKey}
+      tabIndex={detailsClickable ? 0 : undefined}
+      role={detailsClickable ? 'button' : undefined}
+      aria-label={detailsClickable ? `View details for ${habit.name}` : undefined}
+    >
+      <span
+        className="habit-item__checkbox"
+        onClick={(e) => e.stopPropagation()}
+      >
         <HabitCheckbox
           checked={habit.completed_today}
           disabled={habit.completed_today || submitting}
@@ -72,13 +93,9 @@ export function HabitListItem({ habit, onComplete }: HabitListItemProps) {
       </div>
 
       <span className="habit-item__streak" title={`${habit.current_streak} day streak`}>
-        <span className="habit-item__streak-icon" aria-hidden="true">
-          <FlameIcon size={15} />
-        </span>
         <AnimatedValue value={habit.current_streak} className="habit-item__streak-value" />
-        <span className="habit-item__streak-label text-muted">
-          {habit.current_streak === 1 ? 'day' : 'days'}
-        </span>
+        <span className="habit-item__streak-unit" aria-hidden="true">d</span>
+        <span className="visually-hidden">{habit.current_streak === 1 ? 'day' : 'days'} streak</span>
       </span>
     </li>
   );

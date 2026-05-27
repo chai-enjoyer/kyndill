@@ -208,12 +208,19 @@ export async function getSummary(userId: string): Promise<ProgressSummary> {
     weekStart,
     today,
   );
-  const weeklyRates = weekly
-    .map((day) => day.rate)
-    .filter((rate): rate is number => rate !== null);
+  /*
+   * 7-day completion is the ratio of completed habit instances to
+   * scheduled habit instances across the week — NOT the average of
+   * per-day rates. Averaging hid the user's actual progress: a week
+   * with one perfect day + several rest days would show 100%, even
+   * though the user only did one day's habits all week. The total
+   * ratio matches the intuition "20 of 24 habits done = 83%".
+   */
+  const weeklyScheduled = weekly.reduce((sum, day) => sum + day.target, 0);
+  const weeklyCompleted = weekly.reduce((sum, day) => sum + day.completed, 0);
   const weeklyCompletionRate =
-    weeklyRates.length > 0
-      ? Math.round(weeklyRates.reduce((sum, rate) => sum + rate, 0) / weeklyRates.length)
+    weeklyScheduled > 0
+      ? Math.min(100, Math.round((weeklyCompleted / weeklyScheduled) * 100))
       : 0;
 
   return {
@@ -257,6 +264,8 @@ function buildWeeklySummary(
   start: Date,
   end: Date,
 ): ProgressSummary['weekly'] {
+  const habitsById = new Map(habits.map((habit) => [habit.id, habit]));
+
   const completionByDate = new Map<string, CompletionRow[]>();
   for (const completion of completions) {
     const rows = completionByDate.get(completion.completed_on) ?? [];
@@ -270,18 +279,32 @@ function buildWeeklySummary(
       if (!isHabitExpectedOnDate(habit, date)) return sum;
       return sum + habit.target_count;
     }, 0);
+    /*
+     * Only count completions for habits that were actually scheduled
+     * for this date. Previously we summed every completion on the date,
+     * which let completions of off-schedule habits (e.g. a Tue-only
+     * habit logged on a Monday) push the day's rate above 100%, which
+     * then poisoned the weekly average and the per-day display.
+     */
     const completed = (completionByDate.get(dateStr) ?? []).reduce(
-      (sum, completion) =>
-        sum + Math.min(completion.completion_count, completion.target_count),
+      (sum, completion) => {
+        const habit = habitsById.get(completion.habit_id);
+        if (!habit || !isHabitExpectedOnDate(habit, date)) return sum;
+        return sum + Math.min(completion.completion_count, completion.target_count);
+      },
       0,
     );
-
+    /* Final safety clamp: rate can never exceed 100. */
+    const cappedCompleted = Math.min(completed, scheduledTarget);
     return {
       date: dateStr,
       label: WEEKDAY_LABELS[date.getUTCDay()],
-      completed,
+      completed: cappedCompleted,
       target: scheduledTarget,
-      rate: scheduledTarget > 0 ? Math.round((completed / scheduledTarget) * 100) : null,
+      rate:
+        scheduledTarget > 0
+          ? Math.min(100, Math.round((cappedCompleted / scheduledTarget) * 100))
+          : null,
     };
   });
 }
@@ -294,9 +317,22 @@ function findMostConsistentHabit(
 ): ProgressSummary['most_consistent_habit'] {
   if (habits.length === 0) return null;
 
+  const habitsById = new Map(habits.map((habit) => [habit.id, habit]));
+
+  /*
+   * Bucket completed dates by habit, but only count dates the habit
+   * was actually scheduled to run. Without this filter, completing a
+   * weekly-only habit on extra days would inflate completed_days past
+   * expected_days, producing rates >100% (and a misleading "most
+   * consistent" winner).
+   */
   const completedDatesByHabit = new Map<string, Set<string>>();
   for (const completion of completions) {
     if (completion.completion_count < completion.target_count) continue;
+    const habit = habitsById.get(completion.habit_id);
+    if (!habit) continue;
+    const dateObj = new Date(`${completion.completed_on}T00:00:00Z`);
+    if (!isHabitExpectedOnDate(habit, dateObj)) continue;
     const dates = completedDatesByHabit.get(completion.habit_id) ?? new Set<string>();
     dates.add(completion.completed_on);
     completedDatesByHabit.set(completion.habit_id, dates);
@@ -308,8 +344,11 @@ function findMostConsistentHabit(
       isHabitExpectedOnDate(habit, date),
     ).length;
     if (expectedDays === 0) continue;
-    const completedDays = completedDatesByHabit.get(habit.id)?.size ?? 0;
-    const rate = Math.round((completedDays / expectedDays) * 100);
+    const completedDays = Math.min(
+      completedDatesByHabit.get(habit.id)?.size ?? 0,
+      expectedDays,
+    );
+    const rate = Math.min(100, Math.round((completedDays / expectedDays) * 100));
     const candidate = {
       id: habit.id,
       name: habit.name,

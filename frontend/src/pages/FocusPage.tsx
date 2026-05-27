@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'rea
 import { api } from '../lib/api';
 import { Button } from '../components/common/Button';
 import { Modal } from '../components/common/Modal';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { extractMessage } from '../hooks/useSocial';
@@ -141,6 +142,7 @@ export function FocusPage() {
 
   return (
     <section className="page focus-page">
+      <MobilePageHeader title="Focus" />
       <div className="focus-shell">
         <header className="focus-header">
           <p className="page__eyebrow">Focus</p>

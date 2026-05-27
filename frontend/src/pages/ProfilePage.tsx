@@ -6,6 +6,7 @@ import { FlameIcon } from '../components/common/FlameIcon';
 import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
 import { JournalSection } from '../components/profile/JournalSection';
 import { WishlistEditor } from '../components/profile/WishlistEditor';
+import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useProfile } from '../hooks/useProfile';
@@ -102,6 +103,7 @@ export function ProfilePage() {
 
   return (
     <section className="page profile-page">
+      <MobilePageHeader title="Profile" />
       <header className="page__header">
         <div><p className="page__eyebrow">Account</p><h1>Profile</h1></div>
         <div className="profile-page__actions">
@@ -134,6 +136,13 @@ export function ProfilePage() {
         <JournalSection />
       ) : (
       <>
+      <div className="profile-stats profile-stats--row">
+        <Stat label="Level" value={profile.level} />
+        <Stat label="Total habits" value={profile.total_habits} />
+        <Stat label="Longest streak" value={profile.streak_longest} tone="streak" />
+        <Stat label="Focus time" value={`${profile.total_focus_minutes}m`} />
+      </div>
+
       <div className="profile-layout">
         <form className="profile-card" onSubmit={submit}>
           <div className="profile-avatar-row">
@@ -180,14 +189,8 @@ export function ProfilePage() {
           </div>
           <Button variant="primary" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
         </form>
-        <aside className="profile-stats">
-          <Stat label="Level" value={profile.level} />
-          <Stat label="Total habits" value={profile.total_habits} />
-          <Stat label="Longest streak" value={profile.streak_longest} tone="streak" />
-          <Stat label="Focus time" value={`${profile.total_focus_minutes}m`} />
-        </aside>
+        <WishlistEditor />
       </div>
-      <WishlistEditor />
       </>
       )}
     </section>
