@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { FlameIcon } from '../common/FlameIcon';
 
 interface LevelUpModalProps {
   newLevel: number;
@@ -29,19 +30,19 @@ export function LevelUpModal({ newLevel, onClose }: LevelUpModalProps) {
         onClick={onClose}
       />
       <div className="level-up__content" role="document">
-        <div className="level-up__burst" aria-hidden="true">
-          {Array.from({ length: 12 }, (_, i) => (
-            <span key={i} className={`level-up__ray level-up__ray--${i}`} />
-          ))}
+        <div className="level-up__emblem" aria-hidden="true">
+          <span className="level-up__halo" />
+          <FlameIcon size={52} className="level-up__flame" />
         </div>
-        <p className="level-up__eyebrow">LEVEL UP!</p>
+        <p className="level-up__eyebrow">You reached</p>
         <p className="level-up__level" id="level-up-heading">
-          <span className="level-up__level-prefix" aria-hidden="true">L</span>
-          {newLevel}
+          Level {newLevel}
         </p>
-        <p className="level-up__caption">Steady, steady. Small flames, every day.</p>
+        <p className="level-up__caption">
+          Another day tending the flame. Keep it lit tomorrow.
+        </p>
         <button type="button" className="btn btn--primary btn--lg" onClick={onClose} autoFocus>
-          Keep going
+          Continue
         </button>
       </div>
     </div>,

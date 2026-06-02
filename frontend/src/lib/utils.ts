@@ -7,6 +7,7 @@ import coffee from '../assets/sprites/coffee.svg';
 import cylinderHat from '../assets/sprites/cylinder_hat.png';
 import fish from '../assets/sprites/fish.svg';
 import medal from '../assets/sprites/medal.png';
+import snowflake from '../assets/sprites/snowflake.svg';
 import soap from '../assets/sprites/soap.svg';
 import sunglasses from '../assets/sprites/sunglasses.png';
 import toyBall from '../assets/sprites/toy_ball.svg';
@@ -40,6 +41,7 @@ function getSpriteItemAsset(itemName: string): string | null {
   if (name === 'water') return water;
   if (name === 'coffee') return coffee;
   if (name === 'soap') return soap;
+  if (name.includes('freeze')) return snowflake;
   if (name === 'toy ball') return toyBall;
   if (name === 'bow') return bow;
   if (name.includes('bow tie')) return bowTie;

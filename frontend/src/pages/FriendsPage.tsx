@@ -501,51 +501,106 @@ function SendGiftModal({
         {noOptions ? (
           <p className="friends-empty">Nothing to gift right now — consumables and unused streak freezes can both be sent.</p>
         ) : (
-          <div className="gift-list">
+          <fieldset className="gift-list" role="radiogroup" aria-label="Choose something to send">
             {freezeItem && (
-              <label
-                className={`gift-option gift-option--freeze${freezeCount < 1 ? ' is-disabled' : ''}`}
-              >
-                <input
-                  type="radio"
-                  name="gift"
-                  value={freezeItem.id}
-                  checked={selected === freezeItem.id}
-                  onChange={() => setSelected(freezeItem.id)}
-                  disabled={freezeCount < 1}
-                />
-                <span
-                  className="gift-option__image"
-                  style={{ backgroundImage: `url("${getItemPlaceholder(freezeItem.name)}")` }}
-                />
-                <span>
-                  {freezeItem.name}
-                  <small className="gift-option__hint text-muted">
-                    Sends one of your streak freezes
-                  </small>
-                </span>
-                <em>{freezeCount < 1 ? 'None to send' : `x${freezeCount}`}</em>
-              </label>
+              <GiftOption
+                name={freezeItem.name}
+                value={freezeItem.id}
+                count={freezeCount}
+                hint="Sends one of your streak freezes"
+                disabled={freezeCount < 1}
+                selected={selected === freezeItem.id}
+                onSelect={setSelected}
+                featured
+              />
             )}
             {items.map((item) => (
-              <label key={item.id} className="gift-option">
-                <input type="radio" name="gift" value={item.id} checked={selected === item.id} onChange={() => setSelected(item.id)} />
-                <span className="gift-option__image" style={{ backgroundImage: `url("${getItemPlaceholder(item.name)}")` }} />
-                <span>{item.name}</span>
-                <em>x{item.quantity}</em>
-              </label>
+              <GiftOption
+                key={item.id}
+                name={item.name}
+                value={item.id}
+                count={item.quantity}
+                selected={selected === item.id}
+                onSelect={setSelected}
+              />
             ))}
-          </div>
+          </fieldset>
         )}
-        <textarea className="textarea" maxLength={280} placeholder="Optional message" value={message} onChange={(event) => setMessage(event.target.value)} />
+        {!noOptions && (
+          <label className="gift-form__message">
+            <span className="field__label">Add a note <span className="text-muted">(optional)</span></span>
+            <textarea
+              className="textarea"
+              maxLength={280}
+              placeholder={`Say something to ${friend.display_name}…`}
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+            />
+          </label>
+        )}
         <div className="modal-actions">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button variant="primary" type="submit" disabled={!selected || sending}>
-            {sending ? 'Sending...' : 'Confirm send'}
+            {sending ? 'Sending...' : 'Send gift'}
           </Button>
         </div>
       </form>
     </Modal>
+  );
+}
+
+function GiftOption({
+  name,
+  value,
+  count,
+  hint,
+  selected,
+  disabled = false,
+  featured = false,
+  onSelect,
+}: {
+  name: string;
+  value: string;
+  count: number;
+  hint?: string;
+  selected: boolean;
+  disabled?: boolean;
+  featured?: boolean;
+  onSelect: (value: string) => void;
+}) {
+  const className = [
+    'gift-option',
+    featured && 'gift-option--freeze',
+    selected && 'is-selected',
+    disabled && 'is-disabled',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <label className={className}>
+      <input
+        type="radio"
+        name="gift"
+        value={value}
+        checked={selected}
+        disabled={disabled}
+        onChange={() => onSelect(value)}
+      />
+      <span
+        className="gift-option__image"
+        style={{ backgroundImage: `url("${getItemPlaceholder(name)}")` }}
+        aria-hidden="true"
+      />
+      <span className="gift-option__text">
+        <span className="gift-option__name">{name}</span>
+        {hint && <span className="gift-option__hint text-muted">{hint}</span>}
+      </span>
+      <span className="gift-option__qty">{disabled ? 'None left' : `×${count}`}</span>
+      <svg className="gift-option__check" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 13l4 4L19 7" />
+      </svg>
+    </label>
   );
 }
 

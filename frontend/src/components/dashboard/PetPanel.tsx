@@ -22,6 +22,7 @@ interface PetPanelProps {
   pet: PetPanelData;
   userStreak: number;
   onOpenFeed: () => void;
+  onRevive: () => void;
 }
 
 const SPECIES_LABEL: Record<PetSpecies, string> = {
@@ -39,7 +40,7 @@ const STAT_INFO = {
   cleanliness: 'Cleanliness slowly changes through habit activity. Health habits can improve it, while most completions use a little.',
 };
 
-export function PetPanel({ pet, userStreak, onOpenFeed }: PetPanelProps) {
+export function PetPanel({ pet, userStreak, onOpenFeed, onRevive }: PetPanelProps) {
   const petHealth = deriveStreakHealth(userStreak, pet);
   const mood = pet.is_fainted
     ? 'sad'
@@ -50,7 +51,7 @@ export function PetPanel({ pet, userStreak, onOpenFeed }: PetPanelProps) {
         : 'sad';
 
   const healthHint = pet.is_fainted
-    ? 'Resting. Light a habit to wake them.'
+    ? 'Fainted — revive to keep going.'
     : `Care stats + streak momentum = ${petHealth}`;
 
   return (
@@ -79,12 +80,25 @@ export function PetPanel({ pet, userStreak, onOpenFeed }: PetPanelProps) {
       </div>
 
       <div className="pet-panel__actions">
-        <Button variant="primary" onClick={onOpenFeed}>
-          Feed
-        </Button>
-        <Link to="/pet" className="btn btn--secondary">
-          Customize
-        </Link>
+        {pet.is_fainted ? (
+          <>
+            <Button variant="primary" onClick={onRevive}>
+              Revive
+            </Button>
+            <Button variant="secondary" onClick={onOpenFeed}>
+              Feed
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button variant="primary" onClick={onOpenFeed}>
+              Feed
+            </Button>
+            <Link to="/pet" className="btn btn--secondary">
+              Customize
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

@@ -63,6 +63,15 @@ router.post(
   },
 );
 
+router.post('/revive', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = await petService.revive(req.userId!);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post(
   '/equip',
   validate(itemIdSchema),

@@ -12,7 +12,24 @@ const MEDAL_ID = '00000000-0000-4000-8000-000000000020';
 const SOUP_ID = '00000000-0000-4000-8000-000000000021';
 const FOCUS_ID = '00000000-0000-4000-8000-000000000030';
 
-const now = new Date('2026-05-13T09:00:00.000Z').toISOString();
+/* Anchor date for mocked data. Kept inside "today" so relative-time
+ * strings (e.g. "2 days ago" in the activity feed) render predictably
+ * during the test run. Bump this when the snapshot baseline drifts. */
+const TODAY = new Date('2026-05-27T09:00:00.000Z');
+const now = TODAY.toISOString();
+
+function isoDateMinusDays(offset: number): string {
+  const d = new Date(TODAY);
+  d.setUTCDate(d.getUTCDate() - offset);
+  return d.toISOString().slice(0, 10);
+}
+
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function weekdayLabel(offset: number): string {
+  const d = new Date(TODAY);
+  d.setUTCDate(d.getUTCDate() - offset);
+  return WEEKDAY_LABELS[d.getUTCDay()];
+}
 
 export const mockUser = {
   id: USER_ID,
@@ -39,8 +56,13 @@ const mockProfile = {
     friendRequests: true,
     gifts: true,
     focusReminders: true,
+    dailyReminder: true,
+    moodPing: false,
   },
   research_consent: true,
+  share_text_consent: true,
+  reminder_hour: 19,
+  reminder_timezone: 'UTC',
 };
 
 const mockPet = {
@@ -250,14 +272,17 @@ const progressSummary = {
     recovery_reflections: 2,
     weekly_completion_rate: 76,
   },
+  /* Always derived from TODAY so the chart fills the most recent 7
+   * days regardless of when the suite is run. The day labels match the
+   * actual weekday for each date. */
   weekly: [
-    { date: '2026-05-07', label: 'Thu', completed: 3, target: 4, rate: 75 },
-    { date: '2026-05-08', label: 'Fri', completed: 4, target: 4, rate: 100 },
-    { date: '2026-05-09', label: 'Sat', completed: 2, target: 3, rate: 67 },
-    { date: '2026-05-10', label: 'Sun', completed: 0, target: 0, rate: null },
-    { date: '2026-05-11', label: 'Mon', completed: 3, target: 5, rate: 60 },
-    { date: '2026-05-12', label: 'Tue', completed: 5, target: 5, rate: 100 },
-    { date: '2026-05-13', label: 'Wed', completed: 3, target: 4, rate: 75 },
+    { date: isoDateMinusDays(6), label: weekdayLabel(6), completed: 3, target: 4, rate: 75 },
+    { date: isoDateMinusDays(5), label: weekdayLabel(5), completed: 4, target: 4, rate: 100 },
+    { date: isoDateMinusDays(4), label: weekdayLabel(4), completed: 2, target: 3, rate: 67 },
+    { date: isoDateMinusDays(3), label: weekdayLabel(3), completed: 0, target: 0, rate: null },
+    { date: isoDateMinusDays(2), label: weekdayLabel(2), completed: 3, target: 5, rate: 60 },
+    { date: isoDateMinusDays(1), label: weekdayLabel(1), completed: 5, target: 5, rate: 100 },
+    { date: isoDateMinusDays(0), label: weekdayLabel(0), completed: 3, target: 4, rate: 75 },
   ],
   most_consistent_habit: {
     id: HABIT_ID,
@@ -284,6 +309,10 @@ const progressSummary = {
 const friends = [
   { id: FRIEND_ID, display_name: 'Mika Stone', username: 'mika', avatar_url: null, level: 3, streak_current: 5 },
   { id: '00000000-0000-4000-8000-000000000005', display_name: 'Noor Vale', username: 'noor', avatar_url: null, level: 2, streak_current: null },
+];
+
+const publicUsers = [
+  { id: '00000000-0000-4000-8000-000000000009', display_name: 'Remy Lake', username: 'remy', avatar_url: null, level: 2 },
 ];
 
 const activity = [
@@ -333,6 +362,8 @@ export async function mockAuthenticatedApp(page: Page): Promise<void> {
     if (method === 'GET' && pathname === '/api/pet') return json(route, mockPet);
     if (method === 'PATCH' && pathname === '/api/pet/name') return json(route, mockPet);
     if (method === 'POST' && pathname === '/api/pet/feed') return json(route, { ...mockPet, hunger: 92 });
+    if (method === 'POST' && pathname === '/api/pet/revive')
+      return json(route, { pet: { ...mockPet, is_fainted: false, health: 60 }, new_freeze_count: 0 });
     if (method === 'POST' && pathname === '/api/pet/equip') return json(route, { equipped: mockPet.equipped });
     if (method === 'POST' && pathname === '/api/pet/unequip') return empty(route);
 
@@ -401,12 +432,9 @@ export async function mockAuthenticatedApp(page: Page): Promise<void> {
       });
     }
     if (method === 'GET' && pathname === '/api/user/search') {
-      return json(route, {
-        users: [
-          { id: '00000000-0000-4000-8000-000000000009', display_name: 'Remy Lake', username: 'remy', avatar_url: null, level: 2 },
-        ],
-      });
+      return json(route, { users: publicUsers });
     }
+    if (method === 'GET' && pathname === '/api/user/discover') return json(route, { users: publicUsers });
     if (method === 'GET' && pathname === `/api/user/friends/${FRIEND_ID}/profile`) {
       return json(route, {
         id: FRIEND_ID,
@@ -491,16 +519,44 @@ export async function mockAuthenticatedApp(page: Page): Promise<void> {
 }
 
 export async function captureForReport(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  await page.waitForTimeout(250);
+  /*
+   * Settle the page before capturing. Without these waits the screenshot
+   * can include half-rendered states: web fonts mid-swap (text shifts
+   * after the snapshot), in-flight network responses, or animation
+   * frames mid-transition. We:
+   *   1. briefly allow ordinary page-load requests to drain
+   *   2. wait for fonts to actually be ready in the page
+   *   3. force-finish CSS animations + transitions so nothing is
+   *      caught mid-flight
+   *   4. give the browser one paint frame to apply (1)-(3)
+   */
+  await page.waitForLoadState('networkidle', { timeout: 1000 }).catch(() => undefined);
+  await page.evaluate(async () => {
+    try { await document.fonts.ready; } catch { /* not supported */ }
+  });
+  await page.addStyleTag({
+    content: `*, *::before, *::after {
+      animation-duration: 0s !important;
+      animation-delay: 0s !important;
+      transition-duration: 0s !important;
+      transition-delay: 0s !important;
+    }`,
+  });
+  await page.waitForTimeout(150);
+
   const dir = path.join(process.cwd(), 'reports', 'screenshots');
   await mkdir(dir, { recursive: true });
   const project = slug(testInfo.project.name);
   const filePath = path.join(dir, `${project}-${slug(name)}.png`);
-  await page.screenshot({ path: filePath, fullPage: true, animations: 'disabled' });
+  const fullPage = !/webkit|safari/i.test(testInfo.project.name);
+  await page.screenshot({ path: filePath, fullPage, animations: 'disabled' });
   await testInfo.attach(`${name} screenshot`, {
     path: filePath,
     contentType: 'image/png',
   });
+  if (/webkit|safari/i.test(testInfo.project.name)) {
+    await page.close().catch(() => undefined);
+  }
 }
 
 async function json(route: Route, data: unknown, status = 200): Promise<void> {

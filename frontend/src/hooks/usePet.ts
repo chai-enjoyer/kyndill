@@ -57,6 +57,16 @@ export function usePet() {
     setPet((prev) => (prev ? { ...prev, ...data } : prev));
   }, []);
 
+  // Instant revive by spending a streak freeze. Returns the new freeze count
+  // so callers can keep the shop/sidebar in sync without a refetch.
+  const revive = useCallback(async (): Promise<number> => {
+    const { data } = await api.post<{ pet: PetFullState; new_freeze_count: number }>(
+      '/api/pet/revive',
+    );
+    setPet((prev) => (prev ? { ...prev, ...data.pet } : data.pet));
+    return data.new_freeze_count;
+  }, []);
+
   const equip = useCallback(async (itemId: string): Promise<void> => {
     const { data } = await api.post<{ equipped: PetFullState['equipped'] }>('/api/pet/equip', {
       item_id: itemId,
@@ -105,7 +115,7 @@ export function usePet() {
     [],
   );
 
-  return { pet, isLoading, error, refetch, feed, equip, unequip, rename, applyCompletion };
+  return { pet, isLoading, error, refetch, feed, revive, equip, unequip, rename, applyCompletion };
 }
 
 function extractMessage(err: unknown): string {

@@ -353,8 +353,11 @@
 
 .modal__content {
   position: relative;
+  display: flex;
+  flex-direction: column;
   max-width: 480px;
   width: 100%;
+  max-height: calc(100dvh - 2 * var(--space-4));
   background-color: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-3);
@@ -368,11 +371,24 @@
 }
 
 .modal__title {
+  flex: none;
   font-size: var(--text-2xl);
   margin: 0 var(--space-8) var(--space-3) 0;
 }
 
-.modal__body { color: var(--color-text); }
+/* The body is the scroll region so the title and close button stay pinned
+ * while long forms (add habit, gift picker) overflow on small screens. */
+.modal__body {
+  color: var(--color-text);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Counter the content padding so scrollbars sit at the panel edge, then
+   * restore it as inner spacing — keeps focus rings from being clipped. */
+  margin: 0 calc(-1 * var(--space-6));
+  padding: var(--space-1) var(--space-6) 0;
+}
 
 .modal__close {
   position: absolute;
@@ -507,6 +523,25 @@ body:has(.item-drop-toast) .toast-viewport {
 
   .btn--sm {
     min-height: var(--tap-target-min);
+  }
+
+  /* Give modals the full small screen minus a thin gutter, and reclaim the
+   * room the body's negative margin/padding used on desktop. Stay centered
+   * (inherited from .modal) for consistency with the desktop dialog. */
+  .modal {
+    padding: var(--space-3);
+  }
+
+  .modal__content,
+  .modal__content--wide {
+    max-width: none;
+    max-height: calc(100dvh - 2 * var(--space-3));
+    padding: var(--space-5) var(--space-4) var(--space-4);
+  }
+
+  .modal__body {
+    margin: 0 calc(-1 * var(--space-4));
+    padding: var(--space-1) var(--space-4) 0;
   }
 }
 
@@ -1289,13 +1324,16 @@ body:has(.item-drop-toast) .toast-viewport {
   font-weight: var(--weight-bold);
 }
 
+/* Portaled to <body> and pinned to the viewport's right edge (top is set
+ * inline from the bell's position). This keeps the panel fully on-screen
+ * regardless of where the bell sits in its header. */
 .notification-menu {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  right: 0;
-  z-index: 80;
-  width: min(340px, calc(100vw - var(--space-8)));
-  overflow: hidden;
+  position: fixed;
+  right: var(--space-3);
+  z-index: 90;
+  width: min(340px, calc(100vw - 2 * var(--space-3)));
+  max-height: min(70vh, 540px);
+  overflow-y: auto;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-2);
   background-color: var(--color-surface);
@@ -1373,9 +1411,7 @@ body:has(.item-drop-toast) .toast-viewport {
   min-height: calc(100vh - var(--top-nav-height));
   overflow-x: clip;
   padding: var(--space-6);
-  background:
-    linear-gradient(180deg, var(--color-bg-page-elevated) 0%, var(--color-bg-page) 42%),
-    var(--color-bg-page);
+  background-color: var(--color-bg-page);
   transform: translateY(var(--pull-distance, 0));
   transition: transform 180ms var(--ease-out);
 }
@@ -2314,6 +2350,89 @@ body:has(.item-drop-toast) .toast-viewport {
   color: var(--color-text-muted);
 }
 
+/* ============================== Pet care prompt ============================== */
+
+.pet-care-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+}
+
+.pet-care-prompt__art {
+  display: grid;
+  place-items: center;
+  width: 150px;
+  height: 150px;
+}
+
+/* A fainted companion reads as dimmed and still — the breathing animation is
+ * deliberately absent here. */
+.pet-care-prompt__art.is-fainted {
+  filter: grayscale(0.6) brightness(0.92);
+  opacity: 0.85;
+}
+
+.pet-care-prompt__lead {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--color-text);
+}
+
+.pet-care-prompt__stats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pet-care-prompt__stat {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.pet-care-prompt__stat strong {
+  color: var(--color-danger, var(--color-accent));
+  font-family: var(--font-mono);
+}
+
+.pet-care-prompt__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.pet-care-prompt__actions .btn {
+  width: 100%;
+}
+
+.pet-care-prompt__freeze-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  margin-right: var(--space-2);
+  vertical-align: -3px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.pet-care-prompt__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
 .item-drop-toast {
   position: fixed;
   right: var(--space-6);
@@ -2386,79 +2505,63 @@ body:has(.item-drop-toast) .toast-viewport {
 
 .level-up__content {
   position: relative;
-  width: min(440px, 100%);
+  width: min(380px, 100%);
+  max-height: calc(100dvh - 2 * var(--space-6));
   overflow: hidden;
-  padding: var(--space-12) var(--space-8);
-  border: 1px solid var(--color-honey);
+  padding: var(--space-10) var(--space-8) var(--space-8);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-3);
-  background:
-    radial-gradient(circle at 50% 32%, var(--color-honey-subtle) 0%, transparent 52%),
-    var(--color-surface);
+  background-color: var(--color-surface);
   box-shadow: var(--shadow-2);
   text-align: center;
   animation: kyndill-rise var(--duration-slow) var(--ease-out);
 }
 
-.level-up__burst {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  width: 1px;
-  height: 1px;
-  pointer-events: none;
+.level-up__emblem {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto var(--space-5);
 }
 
-.level-up__ray {
-  --angle: 0deg;
+.level-up__halo {
   position: absolute;
-  left: -2px;
-  bottom: 0;
-  width: 4px;
-  height: 84px;
+  inset: 0;
   border-radius: var(--radius-full);
-  transform-origin: center bottom;
-  background-color: var(--color-honey);
-  animation: kyndill-level-up-burst 1.25s var(--ease-out) infinite;
+  background-color: var(--color-honey-subtle);
+  filter: blur(10px);
+  animation: kyndill-level-up-halo 2.6s var(--ease-in-out) infinite;
 }
 
-.level-up__ray--0 { --angle: 0deg; }
-.level-up__ray--1 { --angle: 30deg; }
-.level-up__ray--2 { --angle: 60deg; }
-.level-up__ray--3 { --angle: 90deg; }
-.level-up__ray--4 { --angle: 120deg; }
-.level-up__ray--5 { --angle: 150deg; }
-.level-up__ray--6 { --angle: 180deg; }
-.level-up__ray--7 { --angle: 210deg; }
-.level-up__ray--8 { --angle: 240deg; }
-.level-up__ray--9 { --angle: 270deg; }
-.level-up__ray--10 { --angle: 300deg; }
-.level-up__ray--11 { --angle: 330deg; }
+.level-up__flame {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 3px 10px oklch(0.72 0.16 55 / 0.32));
+}
 
 .level-up__eyebrow {
-  margin: 0 0 var(--space-3);
-  color: var(--color-accent);
-  font-family: var(--font-display);
-  font-size: var(--text-3xl);
-  font-weight: var(--weight-bold);
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .level-up__level {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(var(--text-5xl), 14vw, 7rem);
+  font-size: clamp(var(--text-4xl), 11vw, var(--text-5xl));
   font-weight: var(--weight-bold);
-  line-height: 0.9;
+  line-height: 1;
   animation: kyndill-level-up-number 520ms var(--ease-out);
 }
 
-.level-up__level-prefix {
-  font-size: var(--text-3xl);
-  color: var(--color-text-muted);
-  margin-right: var(--space-1);
-}
-
 .level-up__caption {
-  margin: var(--space-4) auto var(--space-6);
-  max-width: 28ch;
+  margin: var(--space-3) auto var(--space-6);
+  max-width: 26ch;
   color: var(--color-text-muted);
 }
 
@@ -2551,7 +2654,7 @@ body:has(.item-drop-toast) .toast-viewport {
   .stat-bar__fill,
   .level-up,
   .level-up__content,
-  .level-up__ray,
+  .level-up__halo,
   .level-up__level {
     animation: none;
   }
@@ -3291,19 +3394,17 @@ body:has(.item-drop-toast) .toast-viewport {
   border-radius: 0;
 }
 
-.gift-option--freeze {
-  background-color: var(--color-sage-subtle);
-}
-
-.gift-option--freeze.is-disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+/* The freeze is the headline gift; tint it with honey so it reads as
+ * featured, while the sage selected state still wins when chosen. */
+.gift-option--freeze:not(.is-selected) {
+  border-color: var(--color-honey);
+  background-color: var(--color-honey-subtle);
 }
 
 .gift-option__hint {
   display: block;
   font-size: var(--text-xs);
-  margin-top: 2px;
+  line-height: 1.3;
 }
 
 .pet-stat {
@@ -3915,6 +4016,14 @@ body:has(.item-drop-toast) .toast-viewport {
   gap: var(--space-3);
 }
 
+/* .gift-list is a <fieldset> for radiogroup semantics — strip its chrome. */
+.gift-list {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
 .request-card,
 .friend-card {
   display: grid;
@@ -4103,35 +4212,94 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 .gift-option {
+  position: relative;
   display: grid;
-  grid-template-columns: 18px 44px minmax(0, 1fr) auto;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2);
-  border: 1px solid var(--color-border-subtle);
+  min-height: var(--tap-target-min);
+  padding: var(--space-3);
+  border: 1.5px solid var(--color-border-subtle);
   border-radius: var(--radius-2);
+  background-color: var(--color-surface);
   cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) var(--ease-out);
 }
 
-.gift-option:has(input:checked) {
+/* The radio drives selection state but is visually replaced by the card +
+ * checkmark, so pull it out of the layout without losing keyboard focus. */
+.gift-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gift-option:hover:not(.is-disabled) {
+  border-color: var(--color-sage);
+}
+
+.gift-option.is-selected {
   border-color: var(--color-sage);
   background-color: var(--color-sage-subtle);
 }
 
+.gift-option.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .gift-option__image {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-1);
   background-color: oklch(0.976 0.007 78);
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: 80%;
 }
 
-.gift-option em {
+.gift-option__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.gift-option__name {
+  font-weight: var(--weight-medium);
+}
+
+.gift-option__qty {
   color: var(--color-text-muted);
-  font-style: normal;
   font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* Checkmark fades in when the card is selected, replacing the quantity slot's
+ * visual weight with a clear "this one" affordance. */
+.gift-option__check {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  color: var(--color-sage);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.gift-option.is-selected .gift-option__check {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.gift-form__message {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .friend-profile-modal {
@@ -4360,17 +4528,15 @@ body:has(.item-drop-toast) .toast-viewport {
 
 .focus-shell {
   position: relative;
-  width: min(760px, 100%);
+  width: min(640px, 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-6);
-  padding: var(--space-10);
+  padding: var(--space-10) var(--space-12);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-3);
-  background:
-    radial-gradient(circle at 50% 18%, var(--color-honey-subtle) 0%, transparent 48%),
-    var(--color-surface);
+  background-color: var(--color-surface);
   box-shadow: var(--shadow-2);
 }
 
@@ -4443,8 +4609,8 @@ body:has(.item-drop-toast) .toast-viewport {
   position: relative;
   display: grid;
   place-items: center;
-  width: 260px;
-  height: 260px;
+  width: 300px;
+  height: 300px;
 }
 
 .focus-ring {
@@ -4542,14 +4708,15 @@ body:has(.item-drop-toast) .toast-viewport {
   opacity: 0.6;
 }
 
+/* Settings sit in the same card, separated from the timer by a hairline
+ * divider rather than nested in their own box (which read as box-in-box). */
 .focus-audio {
   display: grid;
   gap: var(--space-4);
-  width: min(620px, 100%);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-2);
-  background-color: color-mix(in oklch, var(--color-surface-raised), transparent 12%);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .focus-volume {
@@ -5948,12 +6115,42 @@ body:has(.item-drop-toast) .toast-viewport {
     font-size: var(--text-sm);
   }
 
+  /* Mobile focus: keep the card (border + surface + shadow for depth) but
+   * compress the stack so the timer AND the ambient/volume settings fit on
+   * one screen — no scroll to reach the controls. The MobilePageHeader
+   * already shows "Focus", so the in-shell header is redundant here. */
   .focus-shell {
-    padding: var(--space-6) var(--space-4);
+    gap: var(--space-4);
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .focus-header {
+    display: none;
+  }
+
+  .focus-timer-wrap {
+    width: 190px;
+    height: 190px;
   }
 
   .focus-timer {
-    font-size: var(--text-5xl);
+    font-size: var(--text-4xl);
+  }
+
+  .ambient-controls button {
+    min-height: 40px;
+    padding-inline: var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .ambient-controls button svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .focus-audio {
+    gap: var(--space-3);
+    padding: var(--space-3);
   }
 
   .focus-volume {
@@ -6047,25 +6244,13 @@ body:has(.item-drop-toast) .toast-viewport {
   gap: var(--space-6);
   padding: var(--space-12) var(--space-8);
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 32%, var(--color-honey-subtle) 0%, transparent 55%),
-    radial-gradient(circle at 18% 78%, var(--color-sage-subtle) 0%, transparent 55%),
-    linear-gradient(180deg,
-      oklch(0.97 0.012 80) 0%,
-      oklch(0.92 0.028 75) 55%,
-      oklch(0.85 0.045 60) 100%);
+  background-color: var(--color-honey-subtle);
   border-right: 1px solid var(--color-border-subtle);
 }
 
 :root.dark .auth-illustration,
 :root[data-theme='dark'] .auth-illustration {
-  background:
-    radial-gradient(circle at 50% 32%, oklch(0.34 0.05 70 / 0.55) 0%, transparent 55%),
-    radial-gradient(circle at 18% 78%, oklch(0.30 0.04 145 / 0.45) 0%, transparent 55%),
-    linear-gradient(180deg,
-      oklch(0.20 0.012 75) 0%,
-      oklch(0.22 0.018 65) 60%,
-      oklch(0.26 0.030 55) 100%);
+  background-color: var(--color-bg-page-elevated);
 }
 
 .auth-illustration__svg {
@@ -6387,9 +6572,7 @@ body:has(.item-drop-toast) .toast-viewport {
   align-items: center;
   gap: var(--space-8);
   padding: var(--space-10) var(--space-6) var(--space-12);
-  background:
-    radial-gradient(circle at 50% 8%, var(--color-honey-subtle) 0%, transparent 50%),
-    var(--color-bg-page);
+  background-color: var(--color-bg-page);
 }
 
 .onboarding-steps {
@@ -8071,26 +8254,23 @@ body:has(.item-drop-toast) .toast-viewport {
 
   .m-pet-care__stat { min-width: 0; }
 
+  /* The tile is a stack: two identical content layers fill it from corner to
+   * corner. The fill layer sits on top, tinted sage and clipped to --fill
+   * height (bottom-up), so the stat reads as a vertically filled gauge with
+   * the icon/value/label legible over both the fill and the bare tile. */
   .m-pet-care__stat-link {
-    display: grid;
-    grid-template-rows: auto auto auto;
-    align-items: center;
-    justify-items: center;
-    gap: 4px;
-    padding: 8px 4px;
+    position: relative;
+    display: block;
+    overflow: hidden;
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius-2);
     background-color: var(--color-bg-page);
-    color: var(--color-text);
     text-decoration: none;
     -webkit-tap-highlight-color: transparent;
-    transition:
-      background-color var(--duration-fast) var(--ease-out),
-      border-color var(--duration-fast) var(--ease-out);
+    transition: border-color var(--duration-fast) var(--ease-out);
   }
   .m-pet-care__stat-link:hover,
   .m-pet-care__stat-link:active {
-    background-color: var(--color-surface-sunken);
     border-color: var(--color-border);
   }
   .m-pet-care__stat-link:focus-visible {
@@ -8098,44 +8278,57 @@ body:has(.item-drop-toast) .toast-viewport {
     outline-offset: 2px;
   }
 
+  .m-pet-care__stat-content {
+    display: grid;
+    grid-template-rows: auto auto auto;
+    align-items: center;
+    justify-items: center;
+    gap: 4px;
+    padding: 8px 4px;
+    min-height: 72px;
+  }
+
+  /* Base layer: icon + text on the bare tile. */
+  .m-pet-care__stat-content .m-pet-care__stat-icon {
+    color: var(--color-sage-strong);
+  }
+  .m-pet-care__stat-content .m-pet-care__stat-value {
+    color: var(--color-text);
+  }
+  .m-pet-care__stat-content .m-pet-care__stat-label {
+    color: var(--color-text-muted);
+  }
+
+  /* Fill layer: same content, light ink on a sage fill, clipped to --fill. */
+  .m-pet-care__stat-content--fill {
+    position: absolute;
+    inset: 0;
+    background-color: var(--color-sage);
+    clip-path: inset(calc(100% - var(--fill, 0%)) 0 0 0);
+    transition: clip-path var(--duration-slow) var(--ease-out);
+  }
+  .m-pet-care__stat-content--fill .m-pet-care__stat-icon,
+  .m-pet-care__stat-content--fill .m-pet-care__stat-value {
+    color: var(--color-text-on-accent);
+  }
+  .m-pet-care__stat-content--fill .m-pet-care__stat-label {
+    color: var(--color-text-on-accent);
+    opacity: 0.85;
+  }
+
   .m-pet-care__stat-icon {
     display: inline-grid;
     place-items: center;
     width: 24px;
     height: 24px;
-    color: var(--color-sage-strong);
-  }
-
-  .m-pet-care__stat-meta {
-    display: grid;
-    grid-template-rows: auto auto;
-    justify-items: center;
-    gap: 3px;
-    width: 100%;
   }
 
   .m-pet-care__stat-value {
     font-family: var(--font-mono);
     font-size: var(--m-text-stat-small); /* 14px */
     font-weight: var(--weight-semibold);
-    color: var(--color-text);
     font-variant-numeric: tabular-nums;
     line-height: 1;
-  }
-
-  .m-pet-care__stat-bar {
-    width: 100%;
-    height: 3px;
-    border-radius: var(--radius-full);
-    background-color: var(--color-surface-sunken);
-    overflow: hidden;
-  }
-  .m-pet-care__stat-bar > span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background-color: var(--color-sage);
-    transition: width var(--duration-slow) var(--ease-out);
   }
 
   .m-pet-care__stat-label {
@@ -8144,7 +8337,6 @@ body:has(.item-drop-toast) .toast-viewport {
     font-weight: var(--weight-medium);
     text-transform: uppercase;
     letter-spacing: var(--m-tracking-label);
-    color: var(--color-text-muted);
     line-height: 1;
   }
 

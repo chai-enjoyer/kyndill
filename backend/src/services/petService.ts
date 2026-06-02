@@ -7,6 +7,15 @@ const PET_STAT_COLUMNS = ['health', 'happiness', 'hunger', 'energy', 'cleanlines
 type PetStat = (typeof PET_STAT_COLUMNS)[number];
 const ALLOWED_STATS: ReadonlySet<string> = new Set(PET_STAT_COLUMNS);
 
+// A pet faints only when derived health bottoms out — never just because a
+// single care stat (hunger/energy) hit zero. It auto-revives once health
+// climbs back to REVIVE_HEALTH through feeding or habit completions.
+const FAINT_HEALTH = 0;
+const REVIVE_HEALTH = 25;
+// Floor the care stats restore a streak-freeze revive lifts a fainted pet to,
+// guaranteeing health clears REVIVE_HEALTH regardless of streak.
+const REVIVE_STAT_FLOOR = 60;
+
 export const EQUIP_SLOTS = [
   'hat',
   'accessory',
@@ -127,15 +136,13 @@ export async function applyPassiveDecay(
   }
 
   const { rows: updatedRows } = await executor.query<PetRow>(
+    // Decay only lowers care stats and never faints the pet on its own —
+    // fainting is decided purely by derived health below (see FAINT_HEALTH).
     `UPDATE pets
         SET hunger = GREATEST(0, hunger - $2),
             energy = GREATEST(0, energy - $3),
             cleanliness = GREATEST(0, cleanliness - $4),
             happiness = GREATEST(0, happiness - $5),
-            is_fainted = CASE
-              WHEN GREATEST(0, hunger - $2) = 0 OR GREATEST(0, energy - $3) = 0 THEN TRUE
-              ELSE is_fainted
-            END,
             last_decay_at = NOW()
       WHERE user_id = $1
       RETURNING ${PET_COLUMNS}`,
@@ -153,7 +160,7 @@ export async function applyPassiveDecay(
               ELSE is_fainted
             END
       WHERE user_id = $1`,
-    [userId, health, updatedRows[0].hunger <= 0 || updatedRows[0].energy <= 0 || health <= 0],
+    [userId, health, health <= FAINT_HEALTH],
   );
 }
 
@@ -323,8 +330,8 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
 
     const streak = await getCurrentStreak(userId, client);
     const health = derivePetHealth(streak, petRows[0]);
-    const shouldFaint = petRows[0].hunger <= 0 || petRows[0].energy <= 0 || health <= 0;
-    const shouldRevive = !shouldFaint && petRows[0].hunger > 0 && petRows[0].energy > 0 && health >= 25;
+    const shouldFaint = health <= FAINT_HEALTH;
+    const shouldRevive = health >= REVIVE_HEALTH;
     const syncedPet = await client.query<PetRow>(
       `UPDATE pets
           SET health = $2,
@@ -354,6 +361,82 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
 
     await client.query('COMMIT');
     return petRows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// ============================================================
+// Revive a fainted pet by spending a streak freeze
+// ============================================================
+
+export interface ReviveResult {
+  pet: PetRow;
+  new_freeze_count: number;
+}
+
+// Instant revival path: spend one streak freeze to lift a fainted pet's care
+// stats to a healthy floor so derived health clears the revive threshold no
+// matter the streak. Feeding and completing habits stay as the free,
+// slower revival routes — this is the premium shortcut.
+export async function revive(userId: string): Promise<ReviveResult> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: petRows } = await client.query<PetRow>(
+      `SELECT ${PET_COLUMNS} FROM pets WHERE user_id = $1 FOR UPDATE`,
+      [userId],
+    );
+    if (petRows.length === 0) {
+      throw new HttpError(404, 'PET_NOT_FOUND', 'Pet does not exist');
+    }
+    if (!petRows[0].is_fainted) {
+      throw new HttpError(409, 'NOT_FAINTED', 'Your companion is already awake');
+    }
+
+    const { rows: streakRows } = await client.query<{ freeze_count: number; current_streak: number }>(
+      `SELECT freeze_count, current_streak FROM streaks WHERE user_id = $1 FOR UPDATE`,
+      [userId],
+    );
+    const freezeCount = streakRows[0]?.freeze_count ?? 0;
+    if (freezeCount < 1) {
+      throw new HttpError(
+        400,
+        'NO_FREEZE',
+        'You need a streak freeze to revive instantly. Feed your companion or complete a habit instead.',
+      );
+    }
+
+    const streak = streakRows[0]?.current_streak ?? 0;
+    const restored = {
+      happiness: Math.max(petRows[0].happiness, REVIVE_STAT_FLOOR),
+      hunger: Math.max(petRows[0].hunger, REVIVE_STAT_FLOOR),
+      energy: Math.max(petRows[0].energy, REVIVE_STAT_FLOOR),
+      cleanliness: Math.max(petRows[0].cleanliness, REVIVE_STAT_FLOOR),
+    };
+    const health = derivePetHealth(streak, restored);
+
+    const { rows: updated } = await client.query<PetRow>(
+      `UPDATE pets
+          SET happiness = $2, hunger = $3, energy = $4, cleanliness = $5,
+              health = $6, is_fainted = FALSE
+        WHERE user_id = $1
+        RETURNING ${PET_COLUMNS}`,
+      [userId, restored.happiness, restored.hunger, restored.energy, restored.cleanliness, health],
+    );
+
+    const newFreeze = freezeCount - 1;
+    await client.query(`UPDATE streaks SET freeze_count = $1 WHERE user_id = $2`, [
+      newFreeze,
+      userId,
+    ]);
+
+    await client.query('COMMIT');
+    return { pet: updated[0], new_freeze_count: newFreeze };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -451,8 +534,8 @@ export async function applyHabitCompletionEffects(
   }
 
   const health = derivePetHealth(currentStreak, rows[0]);
-  const shouldFaint = rows[0].hunger <= 0 || rows[0].energy <= 0 || health <= 0;
-  const shouldRevive = !shouldFaint && health >= 25;
+  const shouldFaint = health <= FAINT_HEALTH;
+  const shouldRevive = health >= REVIVE_HEALTH;
   const synced = await client.query<PetCompletionEffect>(
     `UPDATE pets
         SET health = $2,

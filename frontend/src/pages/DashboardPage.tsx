@@ -24,6 +24,7 @@ import { MobileXpRow } from '../components/dashboard/mobile/MobileXpRow';
 import { MobileHabitList } from '../components/dashboard/mobile/MobileHabitList';
 import { LevelUpModal } from '../components/dashboard/LevelUpModal';
 import { FeedModal } from '../components/dashboard/FeedModal';
+import { PetCarePromptModal, petNeedsCare } from '../components/dashboard/PetCarePromptModal';
 import { ItemDropToast } from '../components/dashboard/ItemDropToast';
 import { HabitFeedbackModal } from '../components/dashboard/HabitFeedbackModal';
 import { RecoveryReflectionModal } from '../components/dashboard/RecoveryReflectionModal';
@@ -47,7 +48,7 @@ export function DashboardPage() {
     save: saveRecoveryReflection,
     dismiss: dismissRecoveryPrompt,
   } = useRecoveryPrompt();
-  const { pet, isLoading: petLoading, applyCompletion, refetch: refetchPet } = usePet();
+  const { pet, isLoading: petLoading, applyCompletion, refetch: refetchPet, revive } = usePet();
   const { freezeCount, refetch: refetchShop } = useShop();
   const moodPing = useMoodPing();
 
@@ -56,6 +57,7 @@ export function DashboardPage() {
   const [feedbackHabit, setFeedbackHabit] = useState<{ id: string; name: string } | null>(null);
   const [detailsHabit, setDetailsHabit] = useState<typeof habits[number] | null>(null);
   const [feedOpen, setFeedOpen] = useState(false);
+  const [carePromptDismissed, setCarePromptDismissed] = useState(false);
   const [pullStart, setPullStart] = useState<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -173,6 +175,37 @@ export function DashboardPage() {
     setPullStart(null);
   }
 
+  // A fainted pet always warrants the prompt; otherwise nudge once care stats
+  // run critically low. Dismissing hides it until the condition clears and
+  // re-triggers, so it never nags in a loop.
+  const careAlert: 'fainted' | 'low' | null = pet
+    ? pet.is_fainted
+      ? 'fainted'
+      : petNeedsCare(pet)
+        ? 'low'
+        : null
+    : null;
+
+  useEffect(() => {
+    if (!careAlert) setCarePromptDismissed(false);
+  }, [careAlert]);
+
+  const showCarePrompt =
+    !!pet &&
+    careAlert !== null &&
+    !carePromptDismissed &&
+    !feedOpen &&
+    levelUp === null &&
+    !feedbackHabit &&
+    !moodPing.isOpen &&
+    !recoveryPrompt;
+
+  async function handleRevive() {
+    await revive();
+    showToast(`${pet?.name ?? 'Your companion'} is back on their feet.`, 'success');
+    void refetchShop();
+  }
+
   const completed = habits.filter((h) => h.completed_today).length;
   const total = habits.length;
   const firstName = user?.display_name?.split(' ')[0] ?? '';
@@ -216,7 +249,11 @@ export function DashboardPage() {
         {pet && !petLoading ? (
           <>
             <MobilePetStrip pet={pet} streak={user?.streak_current ?? 0} />
-            <MobilePetCare pet={pet} onOpenFeed={() => setFeedOpen(true)} />
+            <MobilePetCare
+              pet={pet}
+              onOpenFeed={() => setFeedOpen(true)}
+              onRevive={() => setCarePromptDismissed(false)}
+            />
           </>
         ) : petLoading ? (
           <div className="m-pet-strip m-pet-strip--skeleton" aria-busy="true">
@@ -326,7 +363,12 @@ export function DashboardPage() {
         {petLoading ? (
           <PetPanelSkeleton />
         ) : pet ? (
-          <PetPanel pet={pet} userStreak={user?.streak_current ?? 0} onOpenFeed={() => setFeedOpen(true)} />
+          <PetPanel
+            pet={pet}
+            userStreak={user?.streak_current ?? 0}
+            onOpenFeed={() => setFeedOpen(true)}
+            onRevive={() => setCarePromptDismissed(false)}
+          />
         ) : null}
       </aside>
 
@@ -335,6 +377,18 @@ export function DashboardPage() {
       )}
       {levelUp !== null && <LevelUpModal newLevel={levelUp} onClose={() => setLevelUp(null)} />}
       {feedOpen && <FeedModal onClose={() => setFeedOpen(false)} onFed={refetchPet} />}
+      {showCarePrompt && pet && (
+        <PetCarePromptModal
+          pet={pet}
+          freezeCount={freezeCount}
+          onFeed={() => {
+            setCarePromptDismissed(true);
+            setFeedOpen(true);
+          }}
+          onRevive={handleRevive}
+          onClose={() => setCarePromptDismissed(true)}
+        />
+      )}
       {itemDrop && <ItemDropToast item={itemDrop} onClose={() => setItemDrop(null)} />}
       {feedbackHabit && (
         <HabitFeedbackModal
