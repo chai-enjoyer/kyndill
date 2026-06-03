@@ -255,7 +255,15 @@ Returns the updated pet.
 
 Body: `{ "item_id": "<uuid>" }`.
 
-Consumes a consumable item from inventory and applies its effect to one pet stat. Returns the updated pet.
+Consumes a consumable item from inventory and applies its effect to one pet stat. Allowed even while the pet is fainted — feeding is a free, gradual revival path. Returns the updated pet.
+
+### POST `/revive`
+
+No body. Instantly revives a fainted pet by spending one streak freeze: care stats are lifted to a healthy floor so derived health clears the revive threshold regardless of streak.
+
+Returns `{ "pet": <pet>, "new_freeze_count": <number> }`.
+
+Errors: `409 NOT_FAINTED` if the pet is already awake, `400 NO_FREEZE` if the caller has no streak freezes (feeding or completing a habit remain as free revival paths).
 
 ### POST `/equip`
 

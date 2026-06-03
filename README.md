@@ -28,6 +28,7 @@ kyndill/
 - Habit CRUD, drag reorder, daily/weekly schedules, time windows, and repeated same-day check-ins.
 - Dashboard with pet panel, streak freezes, activity feed, item drops, feedback prompts, progress, and real-time updates.
 - Pet care, consumables, sprite-backed cosmetics, inventory, shop purchases, and streak-freeze buying.
+- Pet recovery: a companion only faints when its health hits zero, with low-stat care prompts and three ways back — feed it, complete a habit, or spend a streak freeze to revive instantly.
 - Friends, incoming/outgoing requests, gifts, friend profiles, notifications, and leaderboards.
 - Focus timer with real ambient audio, volume control, completion reward, and optional rating.
 - Progress/insights and recovery reflection for evaluation-oriented behavioral data.
