@@ -1,5 +1,5 @@
-import { InfoTip } from '../common/InfoTip';
-import { StatIcon, type StatIconName } from '../common/StatIcon';
+import { InfoTip } from '../ui/InfoTip';
+import { StatIcon, type StatIconName } from './StatIcon';
 
 interface StatBarProps {
   label: string;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AxiosError } from 'axios';
 import { api } from '../lib/api';
-import type { PetSpecies } from '../components/common/PlaceholderPet';
+import type { PetSpecies } from '../components/pet/PlaceholderPet';
 
 export interface Friend {
   id: string;

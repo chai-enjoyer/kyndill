@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Button } from '../common/Button';
-import { type PetSpecies } from '../common/PlaceholderPet';
-import { SpritePet } from '../common/SpritePet';
+import { Button } from '../ui/Button';
+import { type PetSpecies } from './PlaceholderPet';
+import { SpritePet } from './SpritePet';
 import { StatBar } from './StatBar';
 import { deriveStreakHealth } from '../../lib/utils';
 

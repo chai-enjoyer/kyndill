@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatedValue } from '../components/common/AnimatedValue';
-import { Button } from '../components/common/Button';
-import { FlameIcon } from '../components/common/FlameIcon';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { Modal } from '../components/common/Modal';
-import { SpritePet } from '../components/common/SpritePet';
+import { AnimatedValue } from '../components/ui/AnimatedValue';
+import { Button } from '../components/ui/Button';
+import { FlameIcon } from '../components/illustration/FlameIcon';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { Modal } from '../components/ui/Modal';
+import { SpritePet } from '../components/pet/SpritePet';
 import { useInventory, type InventoryEntry } from '../hooks/useInventory';
 import {
   useSocial,
@@ -44,8 +44,7 @@ export function FriendsPage() {
   const { entries, isLoading: leaderboardLoading } = useLeaderboard('friends');
   const { consumables, refetch: refetchInventory } = useInventory();
   const { freezeCount, streakFreezes, refetch: refetchShop } = useShop();
-  // The shop seeds a single streak_freeze item; surface the first one as the
-  // canonical "gift a freeze" choice.
+  // в шопе одна заморозка - берём её как вариант подарка
   const freezeItem: ShopItem | null = streakFreezes[0] ?? null;
   const { showToast } = useToastContext();
   const [query, setQuery] = useState('');
@@ -362,9 +361,7 @@ function AddFriendModal({
   const [suggestionsLoading, setSuggestionsLoading] = useState(true);
   const [sending, setSending] = useState<string | null>(null);
 
-  // Pre-load a list of public profiles so the modal isn't empty before the user
-  // types anything. Public-only by design — private and friends-only accounts
-  // are filtered server-side.
+  // подгружаем публичные профили, чтобы модалка не была пустой до ввода
   useEffect(() => {
     let alive = true;
     setSuggestionsLoading(true);

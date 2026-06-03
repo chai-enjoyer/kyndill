@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { HabitWithStatus, CompleteResult } from '../../hooks/useHabits';
-import { AnimatedValue } from '../common/AnimatedValue';
+import { AnimatedValue } from '../ui/AnimatedValue';
 import { HabitCheckbox } from './HabitCheckbox';
 import { CategoryPill } from './CategoryPill';
-import { Confetti } from './Confetti';
+import { Confetti } from '../ui/Confetti';
 
 interface HabitListItemProps {
   habit: HabitWithStatus;

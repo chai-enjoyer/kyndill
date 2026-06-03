@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Button } from '../common/Button';
-import { LoadingSkeleton } from '../common/LoadingSkeleton';
-import { Modal } from '../common/Modal';
+import { Button } from '../ui/Button';
+import { LoadingSkeleton } from '../ui/LoadingSkeleton';
+import { Modal } from '../ui/Modal';
 import type { ActivityEntry } from '../../hooks/useActivityFeed';
 
 export function ActivityFeed({

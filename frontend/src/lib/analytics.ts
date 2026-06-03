@@ -1,13 +1,7 @@
 import { api, TOKEN_STORAGE_KEY } from './api';
 
-// Lightweight client-side event queue.
-//
-// Goals:
-//  - Cheap fire-and-forget API for the rest of the app (`trackEvent('x', {...})`).
-//  - Batches into a single POST every ~3 s or when 20 events queue up.
-//  - Flushes on page hide (sendBeacon path) so the last screen of activity isn't lost.
-//  - Respects consent: if the user has not opted in, every track call is a no-op
-//    and nothing leaves the device. The flag is settable from AuthContext.
+// лёгкая клиентская очередь событий: trackEvent копит и шлёт батчем (~3с или 20 событий),
+// флашит на pagehide через sendBeacon. Без согласия пользователя - полный no-op.
 
 const QUEUE_LIMIT = 20;
 const FLUSH_DELAY_MS = 3000;
@@ -61,8 +55,7 @@ export async function flush(): Promise<void> {
   try {
     await api.post(ENDPOINT, { events: batch });
   } catch {
-    // Drop the batch on failure — analytics must never block the UI. A retry
-    // queue would risk filling memory if the backend stays down.
+    // упал батч - просто роняем. Аналитика не должна блокировать UI.
   }
 }
 
@@ -70,8 +63,7 @@ function bindLifecycle(): void {
   if (bound || typeof window === 'undefined') return;
   bound = true;
 
-  // sendBeacon is the only path that survives an unload reliably. Falls back
-  // to a sync XHR-ish API.post if Beacon isn't available.
+  // на unload надёжно выживает только sendBeacon/keepalive fetch
   const sendOnExit = () => {
     if (queue.length === 0) return;
     const body = JSON.stringify({ events: queue });
@@ -79,8 +71,7 @@ function bindLifecycle(): void {
     try {
       if ('sendBeacon' in navigator) {
         const blob = new Blob([body], { type: 'application/json' });
-        // sendBeacon doesn't carry our Authorization header, so it'll be
-        // rejected by requireAuth. Fall through to fetch keepalive instead.
+        // sendBeacon не несёт Authorization, поэтому шлём fetch keepalive с токеном
         const token = window.localStorage.getItem(TOKEN_STORAGE_KEY);
         if (token) {
           void fetch(ENDPOINT, {
@@ -93,17 +84,16 @@ function bindLifecycle(): void {
             body,
           }).catch(() => undefined);
         } else {
-          // Last-ditch beacon (unauthenticated; backend will reject but at
-          // least we don't throw).
+          // без токена - beacon вслепую (бэк отклонит, но мы не упадём)
           navigator.sendBeacon(ENDPOINT, blob);
         }
       }
     } catch {
-      // ignore — analytics must never throw on unload.
+      // ignore - analytics must never throw on unload.
     }
   };
 
-  // visibilitychange + pagehide together cover all browsers reliably.
+  // visibilitychange + pagehide вместе покрывают все браузеры
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') sendOnExit();
   });

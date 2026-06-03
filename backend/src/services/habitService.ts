@@ -529,8 +529,7 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       const diffDays = Math.round((todayMs - lastMs) / 86_400_000);
 
       if (diffDays === 0) {
-        // A different habit was already completed today; the user-wide streak
-        // doesn't bump again. (Per-habit duplicate is blocked by step 2.)
+        // сегодня уже была другая привычка - общий стрик не растёт повторно
         newStreak = s.current_streak;
       } else if (diffDays === 1) {
         newStreak = s.current_streak + 1;
@@ -575,7 +574,7 @@ export async function complete(userId: string, habitId: string): Promise<Complet
           [habitId, userId, today, nextCount, targetCount, xpEarned, coinsEarned],
         );
       } catch (err) {
-        // Concurrent duplicate completion (UNIQUE habit_id, user_id, completed_on).
+        // гонка: дубль завершения (UNIQUE habit_id, user_id, completed_on)
         if (isUniqueViolation(err)) {
           throw new HttpError(409, 'ALREADY_COMPLETED', 'Habit already completed today');
         }
@@ -697,7 +696,7 @@ export async function complete(userId: string, habitId: string): Promise<Complet
       });
     }
 
-    // Best-effort fanout to friends; failures don't roll back the completion.
+    // рассылка друзьям best-effort - ошибка не откатывает completion
     try {
       const { rows: friends } = await pool.query<{ friend_id: string }>(
         'SELECT friend_id FROM friends WHERE user_id = $1',

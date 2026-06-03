@@ -7,13 +7,10 @@ const PET_STAT_COLUMNS = ['health', 'happiness', 'hunger', 'energy', 'cleanlines
 type PetStat = (typeof PET_STAT_COLUMNS)[number];
 const ALLOWED_STATS: ReadonlySet<string> = new Set(PET_STAT_COLUMNS);
 
-// A pet faints only when derived health bottoms out — never just because a
-// single care stat (hunger/energy) hit zero. It auto-revives once health
-// climbs back to REVIVE_HEALTH through feeding or habit completions.
+// обморок только по health, не по отдельному стату. Авто-оживление при REVIVE_HEALTH.
 const FAINT_HEALTH = 0;
 const REVIVE_HEALTH = 25;
-// Floor the care stats restore a streak-freeze revive lifts a fainted pet to,
-// guaranteeing health clears REVIVE_HEALTH regardless of streak.
+// до какого уровня поднимаем статы при оживлении заморозкой (чтобы health точно > REVIVE_HEALTH)
 const REVIVE_STAT_FLOOR = 60;
 
 export const EQUIP_SLOTS = [
@@ -112,10 +109,7 @@ export async function applyPassiveDecay(
   executor: PoolClient | typeof pool = pool,
 ): Promise<void> {
   const { rows } = await executor.query<{ elapsed_hours: number }>(
-    // Per-hour granularity so daily-active users still feel decay between
-    // sessions. The previous per-day floor meant any user who interacted
-    // even once a day never saw stats move — last_decay_at was reset on
-    // every completion, so the day counter could never tick over.
+    // считаем по часам, а не по дням - иначе у daily-active юзера статы не двигались
     `SELECT FLOOR(EXTRACT(EPOCH FROM (NOW() - last_decay_at)) / 3600)::int AS elapsed_hours
        FROM pets
       WHERE user_id = $1`,
@@ -125,7 +119,7 @@ export async function applyPassiveDecay(
   if (elapsedHours <= 0) return;
 
   const hours = Math.min(elapsedHours, 24 * 7);
-  // Per-day rates kept the same shape; just divided by 24 for hourly accrual.
+  // дневные ставки делим на 24
   const hungerDrop = Math.round((hours / 24) * 6);
   const energyDrop = Math.round((hours / 24) * 5);
   const cleanlinessDrop = Math.round((hours / 24) * 4);
@@ -136,8 +130,7 @@ export async function applyPassiveDecay(
   }
 
   const { rows: updatedRows } = await executor.query<PetRow>(
-    // Decay only lowers care stats and never faints the pet on its own —
-    // fainting is decided purely by derived health below (see FAINT_HEALTH).
+    // decay только опускает статы; обморок решается по health ниже
     `UPDATE pets
         SET hunger = GREATEST(0, hunger - $2),
             energy = GREATEST(0, energy - $3),
@@ -261,9 +254,7 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    // Decay inside the transaction so the bonus is applied to a row that
-    // already accounts for elapsed time — and so a feed cannot race with a
-    // habit completion to overwrite the other's decay accrual.
+    // decay внутри транзакции, чтобы бонус лёг на актуальную строку без гонок с completion
     await applyPassiveDecay(userId, client);
 
     const { rows: invRows } = await client.query<{
@@ -301,10 +292,7 @@ export async function feed(userId: string, itemId: string): Promise<PetRow> {
 
     const stat = inv.effect_stat as PetStat;
     const happinessBonus = stat === 'happiness' ? 0 : Math.max(1, Math.round(inv.effect_amount * 0.12));
-    // last_decay_at is intentionally NOT reset here. applyPassiveDecay was
-    // called at the top of this function and already updated it; resetting
-    // again would break the per-hour decay clock for any user who feeds
-    // frequently.
+    // last_decay_at тут не трогаем - его уже обновил applyPassiveDecay выше
     const petUpdate =
       stat === 'happiness'
         ? await client.query<PetRow>(
@@ -378,10 +366,7 @@ export interface ReviveResult {
   new_freeze_count: number;
 }
 
-// Instant revival path: spend one streak freeze to lift a fainted pet's care
-// stats to a healthy floor so derived health clears the revive threshold no
-// matter the streak. Feeding and completing habits stay as the free,
-// slower revival routes — this is the premium shortcut.
+// мгновенное оживление за одну заморозку. Бесплатные пути (еда, привычки) остаются.
 export async function revive(userId: string): Promise<ReviveResult> {
   const client = await pool.connect();
   try {
@@ -500,20 +485,15 @@ export async function unequip(userId: string, slot: EquipSlot): Promise<void> {
 // Called during habit completion (see habitService.complete)
 // ============================================================
 
-// Bumps the completion counter (the BEFORE UPDATE trigger updates stage),
-// nudges care stats, then recomputes health from streak + care state.
-// Completion should feel good, but it also spends a little energy/food so
-// consumables have a real purpose.
+// +1 к счётчику (триггер обновит stage), чуть двигаем статы, пересчитываем health.
+// Завершение тратит немного энергии/еды - чтобы расходники имели смысл.
 export async function applyHabitCompletionEffects(
   client: PoolClient,
   userId: string,
   currentStreak: number,
   habitCategory: string,
 ): Promise<PetCompletionEffect> {
-  // Decay must run BEFORE the completion bump. Without this, the previous
-  // version pinned last_decay_at to the latest completion, so a daily-active
-  // user's hunger/cleanliness never accrued — making the care economy moot.
-  // Decay sets last_decay_at = NOW() internally; we don't touch it again here.
+  // decay строго до бампа, иначе статы daily-active юзера не накапливаются
   await applyPassiveDecay(userId, client);
   const deltas = completionStatDeltas(habitCategory);
 

@@ -22,8 +22,7 @@ export interface RecoveryReflectionInput {
   skipped?: boolean;
 }
 
-// Once the user closes/skips today, don't ask again until tomorrow — even if
-// other missed days exist. Keyed by local date so it auto-expires overnight.
+// закрыл/пропустил сегодня - до завтра не спрашиваем. Ключ по локальной дате.
 const SUPPRESS_KEY = 'kyndill_recovery_suppress_date';
 
 function todayKey(): string {
@@ -42,8 +41,7 @@ function suppressForToday(): void {
   try {
     window.localStorage.setItem(SUPPRESS_KEY, todayKey());
   } catch {
-    // Storage unavailable (private mode / quota). In-memory suppression below
-    // still covers the current session.
+    // localStorage недоступен (инкогнито/квота) - в памяти всё равно подавим на сессию
   }
 }
 
@@ -79,17 +77,14 @@ export function useRecoveryPrompt() {
 
   const save = useCallback(async (input: RecoveryReflectionInput) => {
     await api.post('/api/recovery/reflection', input);
-    // Whether they reflected or skipped, they've engaged — give them peace
-    // for the rest of the day even if other missed days remain.
+    // ответил или пропустил - всё равно не дёргаем до завтра
     suppressForToday();
     suppressedRef.current = true;
     setPrompt(null);
   }, []);
 
-  // Closing via X / backdrop / ESC: respect "not now" by suppressing for the
-  // day. We still record a skip on the server for the specific missed_on so
-  // analytics and the 7-day window stay accurate, but the user won't be
-  // re-prompted until tomorrow.
+  // закрытие по X/бэкдропу/ESC = "не сейчас": подавляем на день, но на сервер
+  // всё равно шлём skip для конкретного missed_on (чтобы 7-дневное окно было точным)
   const dismiss = useCallback(() => {
     const current = promptRef.current;
     suppressForToday();
@@ -102,8 +97,7 @@ export function useRecoveryPrompt() {
         skipped: true,
       })
       .catch(() => {
-        // Silent failure is fine — suppression is local, so the user is not
-        // re-prompted today regardless.
+        // тихо глотаем - подавление локальное, сегодня всё равно не спросим
       });
   }, []);
 

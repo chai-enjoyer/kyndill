@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { api } from '../lib/api';
-import { Button } from '../components/common/Button';
-import { Modal } from '../components/common/Modal';
+import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';

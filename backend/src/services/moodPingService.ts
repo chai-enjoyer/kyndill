@@ -64,7 +64,7 @@ export async function submit(userId: string, input: MoodPingInput): Promise<void
 }
 
 // Monday of the current ISO-week, UTC. We deliberately ignore the user's
-// local timezone here — research data needs a stable anchor across users.
+// local timezone here - research data needs a stable anchor across users.
 function isoWeekMondayUtc(date: Date): string {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   // getUTCDay: 0 (Sun) .. 6 (Sat). ISO Monday is index 1.

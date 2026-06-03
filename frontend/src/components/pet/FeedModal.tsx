@@ -1,6 +1,6 @@
 import { AxiosError } from 'axios';
-import { Modal } from '../common/Modal';
-import { LoadingSkeleton } from '../common/LoadingSkeleton';
+import { Modal } from '../ui/Modal';
+import { LoadingSkeleton } from '../ui/LoadingSkeleton';
 import { useInventory } from '../../hooks/useInventory';
 import { useToastContext } from '../../context/ToastContext';
 import { getItemPlaceholder } from '../../lib/utils';

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '../common/Button';
-import { LoadingSkeleton } from '../common/LoadingSkeleton';
-import { HabitCheckbox } from '../dashboard/HabitCheckbox';
+import { Button } from '../ui/Button';
+import { LoadingSkeleton } from '../ui/LoadingSkeleton';
+import { HabitCheckbox } from '../habits/HabitCheckbox';
 import { useToastContext } from '../../context/ToastContext';
 import { extractMessage } from '../../hooks/useSocial';
 import { useShop } from '../../hooks/useShop';

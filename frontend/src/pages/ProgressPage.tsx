@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom';
-import { AnimatedValue } from '../components/common/AnimatedValue';
-import { Button } from '../components/common/Button';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { CategoryPill } from '../components/dashboard/CategoryPill';
-import { FlameIcon } from '../components/common/FlameIcon';
-import { WeekCandle } from '../components/progress/WeekCandle';
+import { AnimatedValue } from '../components/ui/AnimatedValue';
+import { Button } from '../components/ui/Button';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { CategoryPill } from '../components/habits/CategoryPill';
+import { FlameIcon } from '../components/illustration/FlameIcon';
+import { WeekCandle } from '../components/illustration/WeekCandle';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useProgress, type ProgressSummary } from '../hooks/useProgress';
 

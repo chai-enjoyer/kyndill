@@ -38,7 +38,7 @@ export async function set(userId: string, itemIds: string[]): Promise<WishlistEn
   if (itemIds.length > WISHLIST_MAX) {
     throw new HttpError(400, 'WISHLIST_TOO_LONG', `Wishlist can hold at most ${WISHLIST_MAX} items`);
   }
-  // De-dupe while preserving order — the position is determined by the input
+  // De-dupe while preserving order - the position is determined by the input
   // order so the user controls priority.
   const ordered: string[] = [];
   const seen = new Set<string>();

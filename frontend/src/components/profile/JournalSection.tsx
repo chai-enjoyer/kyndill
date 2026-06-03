@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Button } from '../common/Button';
-import { LoadingSkeleton } from '../common/LoadingSkeleton';
+import { Button } from '../ui/Button';
+import { LoadingSkeleton } from '../ui/LoadingSkeleton';
 import { useToastContext } from '../../context/ToastContext';
 import { extractMessage } from '../../hooks/useSocial';
 import { useJournal, type JournalEntry, type JournalEntryKind } from '../../hooks/useJournal';

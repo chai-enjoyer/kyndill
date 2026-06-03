@@ -1,12 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { AxiosError } from 'axios';
-import { Button } from '../components/common/Button';
-import { CosmeticPreview } from '../components/common/CosmeticPreview';
-import { InfoTip } from '../components/common/InfoTip';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { Modal } from '../components/common/Modal';
-import { SpritePet } from '../components/common/SpritePet';
-import { StatIcon, type StatIconName } from '../components/common/StatIcon';
+import { Button } from '../components/ui/Button';
+import { CosmeticPreview } from '../components/pet/CosmeticPreview';
+import { InfoTip } from '../components/ui/InfoTip';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { Modal } from '../components/ui/Modal';
+import { SpritePet } from '../components/pet/SpritePet';
+import { StatIcon, type StatIconName } from '../components/pet/StatIcon';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
@@ -195,7 +195,6 @@ export function PetPage() {
       <div className="pet-page__layout">
         <section className="pet-page__hero" aria-label="Pet overview">
           <div className="pet-page__pet-art">
-            {/* PLACEHOLDER: Replace with final pet display artist asset when delivered. */}
             <SpritePet
               species={pet.species}
               mood={pet.health > 60 ? 'happy' : pet.health > 30 ? 'neutral' : 'sad'}

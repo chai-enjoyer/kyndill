@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useLeaderboard, type LeaderboardEntry, type LeaderboardScope } from '../hooks/useLeaderboard';

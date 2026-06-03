@@ -80,7 +80,7 @@ export async function searchUsers(userId: string, query: string): Promise<UserSe
   return rows;
 }
 
-// Default suggestions for the Add Friend modal — public profiles only, with
+// Default suggestions for the Add Friend modal - public profiles only, with
 // people the caller is already connected to (or has a pending request with)
 // filtered out. Sorted by level so familiar/active users surface first.
 export async function discoverPublicUsers(userId: string): Promise<UserSearchResult[]> {
@@ -174,7 +174,7 @@ export async function updateProfile(
     sets.push(`research_consent = $${i++}`);
     values.push(input.research_consent);
     // Text sharing implicitly turns off when the user opts out of research at
-    // all — there is no scenario in which "no research data" + "share my text"
+    // all - there is no scenario in which "no research data" + "share my text"
     // makes sense, and forgetting this would silently strand stale consent.
     if (input.research_consent === false) {
       sets.push(`share_text_consent = $${i++}`);

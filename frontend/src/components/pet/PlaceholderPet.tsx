@@ -1,7 +1,4 @@
-// PLACEHOLDER: Replace with final pet artist assets when delivered.
-// Geometric stand-ins per species; mood swaps eye/mouth paths only. Colors
-// here are placeholders supplied in the foundation brief; they are not
-// design-token-aligned because the final art will supersede them.
+// геометрические заглушки по видам; mood меняет только глаза/рот
 
 import type { CSSProperties } from 'react';
 

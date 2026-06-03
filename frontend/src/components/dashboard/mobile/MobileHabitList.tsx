@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import type { HabitWithStatus, CompleteResult } from '../../../hooks/useHabits';
-import { AnimatedValue } from '../../common/AnimatedValue';
-import { CategoryPill } from '../CategoryPill';
-import { Confetti } from '../Confetti';
+import { AnimatedValue } from '../../ui/AnimatedValue';
+import { CategoryPill } from '../../habits/CategoryPill';
+import { Confetti } from '../../ui/Confetti';
 
 interface MobileHabitListProps {
   habits: HabitWithStatus[];
@@ -100,8 +100,8 @@ function MobileHabitRow({
 }
 
 /*
- * Hold gesture hook. Press → ramp; reach HOLD_DURATION_MS → fire.
- * Release / leave / cancel → reset. Keyboard activation (Enter/Space)
+ * Hold gesture hook. Press -> ramp; reach HOLD_DURATION_MS -> fire.
+ * Release / leave / cancel -> reset. Keyboard activation (Enter/Space)
  * still fires immediately so screen-reader and keyboard users aren't
  * forced into a long-press they can't perform.
  *

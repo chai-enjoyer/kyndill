@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { AxiosError } from 'axios';
-import { AnimatedValue } from '../components/common/AnimatedValue';
-import { Button } from '../components/common/Button';
-import { CosmeticPreview } from '../components/common/CosmeticPreview';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { Modal } from '../components/common/Modal';
+import { AnimatedValue } from '../components/ui/AnimatedValue';
+import { Button } from '../components/ui/Button';
+import { CosmeticPreview } from '../components/pet/CosmeticPreview';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { Modal } from '../components/ui/Modal';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';

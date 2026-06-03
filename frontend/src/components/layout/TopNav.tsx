@@ -1,8 +1,8 @@
 import { Link, NavLink } from 'react-router-dom';
 import { useRef } from 'react';
 import { useAuthContext } from '../../context/AuthContext';
-import { AnimatedValue } from '../common/AnimatedValue';
-import { FlameIcon } from '../common/FlameIcon';
+import { AnimatedValue } from '../ui/AnimatedValue';
+import { FlameIcon } from '../illustration/FlameIcon';
 import { createFlameMotionStyle, type FlameMotionStyle } from '../../lib/flameMotion';
 import { NotificationBell } from './NotificationBell';
 

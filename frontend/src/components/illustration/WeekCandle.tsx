@@ -2,25 +2,14 @@ import { useId, useRef, type CSSProperties } from 'react';
 import { createFlameMotionStyle, type FlameMotionStyle } from '../../lib/flameMotion';
 
 interface WeekCandleProps {
-  /* 0–100. Drives flame size, opacity, and glow. Null means the day
-   * had no scheduled habits — render an unlit candle (no flame).
-   * Zero means scheduled but no activity — also unlit. */
+  /* 0-100, задаёт размер/яркость пламени. null = в этот день не было привычек,
+   * 0 = были, но ничего не сделано. И то и другое - незажжённая свеча. */
   rate: number | null;
   className?: string;
 }
 
-/*
- * A smaller cousin of CandleIllustration tuned for the progress page's
- * 7-day chart. Same visual vocabulary as the login candle: tinted wax
- * column, dark wick, flame on top with a soft halo. The flame paths are
- * the same shapes as <CandleIllustration>, just placed on a 64×120
- * viewBox sized to fit a chart cell.
- *
- * The SVG itself fills its container (width:100% height:100%) and
- * preserves aspect ratio via xMidYMax — so it sticks to the bottom of
- * the cell and centers horizontally no matter how narrow the column.
- * That makes the "off-center on narrow phones" failure mode impossible.
- */
+// мини-версия CandleIllustration для недельного графика прогресса.
+// SVG тянется на весь контейнер, xMidYMax держит свечу по центру и у низа ячейки.
 export function WeekCandle({ rate, className }: WeekCandleProps) {
   const reactId = useId();
   const idBase = reactId.replace(/[^a-zA-Z0-9_-]/g, '');
@@ -31,22 +20,15 @@ export function WeekCandle({ rate, className }: WeekCandleProps) {
 
   const scheduled = rate !== null;
   const clamped = Math.min(100, Math.max(0, rate ?? 0));
-  /* Unlit when there's no activity to celebrate — either no habits
-   * were scheduled (rest day) or the user didn't complete anything.
-   * The candle still stands; the flame is absent. */
+  // свеча стоит всегда, но горит только если в этот день что-то сделано
   const isLit = scheduled && clamped > 0;
 
-  // Map completion to visual energy so a finished day reads as a tall
-  // bright flame vs. a barely-lit one. The wax stays unchanged — the
-  // candle always exists; only the flame responds to today's effort.
+  // процент выполнения = высота и яркость пламени
   const flameScale = 0.7 + clamped / 200;
   const flameOpacity = 0.55 + clamped / 220;
   const haloOpacity = 0.2 + clamped / 220;
 
-  /* Stagger flame breathing per candle so the chart doesn't pulse in
-   * unison. createFlameMotionStyle returns a frozen set of CSS vars
-   * (random delays + durations) so each rendered candle keeps its own
-   * cadence across re-renders. */
+  // рандомные задержки/длительности, чтобы свечи не «дышали» синхронно
   const motionStyle = useRef<FlameMotionStyle | null>(null);
   if (!motionStyle.current) motionStyle.current = createFlameMotionStyle();
 
@@ -123,9 +105,7 @@ export function WeekCandle({ rate, className }: WeekCandleProps) {
         strokeLinecap="round"
       />
 
-      {/* Flame group — only rendered when lit. Uses week-candle-only
-       * class names so the legacy `.animated-flame__*` rule doesn't
-       * override the gradient fills with `fill: currentColor`. */}
+      {/* пламя только когда горит; свои классы, чтобы .animated-flame__* не перебил градиенты */}
       {isLit && (
         <g className="week-candle__flame">
           <path

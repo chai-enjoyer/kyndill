@@ -6,7 +6,7 @@ import * as onboardingService from '../services/onboardingService';
 const router = Router();
 
 // Habit-pick answers are required (these drive the recommender). The
-// demographic block is fully optional — every field includes a
+// demographic block is fully optional - every field includes a
 // "prefer_not_say" value so a user who skips never produces null rows that
 // the research portal has to disambiguate from "didn't see this question".
 const quizSchema = z.object({

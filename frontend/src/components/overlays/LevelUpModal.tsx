@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { FlameIcon } from '../common/FlameIcon';
+import { FlameIcon } from '../illustration/FlameIcon';
 
 interface LevelUpModalProps {
   newLevel: number;

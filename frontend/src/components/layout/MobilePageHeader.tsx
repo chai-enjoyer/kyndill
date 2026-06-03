@@ -3,7 +3,7 @@ import { NotificationBell } from './NotificationBell';
 import { useAuthContext } from '../../context/AuthContext';
 
 interface MobilePageHeaderProps {
-  /* Kept for back-compat with existing callers — the header always
+  /* Kept for back-compat with existing callers - the header always
    * renders the Kyndill wordmark on every page so the chrome is
    * identical app-wide. The page title belongs in the page's own
    * heading below the header, not in the header itself. */
@@ -13,7 +13,7 @@ interface MobilePageHeaderProps {
 /*
  * Mobile-only page header. Rendered at the top of every page (except
  * Settings). Identical visual chrome on every page: brand mark + the
- * Kyndill wordmark on the left, notification bell → profile avatar →
+ * Kyndill wordmark on the left, notification bell -> profile avatar ->
  * settings on the right. 56px tall, flush with the safe-area top, 1px
  * bottom border. Hidden on desktop via CSS (the universal TopNav takes
  * over above 880px).

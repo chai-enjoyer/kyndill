@@ -3,7 +3,7 @@ import { HttpError } from '../middleware/errorHandler';
 
 // Self-view of the user's own reflections. Pulls from two tables (feedback_events
 // + mood_pings) and normalizes them into a single chronological stream. General
-// feedback (context = 'general_feedback') is intentionally excluded — that's
+// feedback (context = 'general_feedback') is intentionally excluded - that's
 // product feedback, not diary content.
 export type JournalEntryKind = 'habit_feedback' | 'recovery_reflection' | 'recovery_skipped' | 'mood_ping';
 export type JournalEntrySource = 'feedback' | 'mood_ping';
@@ -110,7 +110,7 @@ export async function deleteEntry(
   id: string,
 ): Promise<void> {
   const table = source === 'feedback' ? 'feedback_events' : 'mood_pings';
-  // user_id check in the WHERE clause is the authorization gate — without it
+  // user_id check in the WHERE clause is the authorization gate - without it
   // any logged-in user could delete any row by guessing UUIDs.
   const { rowCount } = await pool.query(
     `DELETE FROM ${table} WHERE id = $1 AND user_id = $2`,

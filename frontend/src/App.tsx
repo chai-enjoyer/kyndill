@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuthContext } from './context/AuthContext';
-import { ToastViewport } from './components/common/Toast';
+import { ToastViewport } from './components/ui/Toast';
 import { trackEvent } from './lib/analytics';
 import { AppShell } from './components/layout/AppShell';
 import { AuthPage } from './pages/AuthPage';

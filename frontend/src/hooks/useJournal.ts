@@ -35,7 +35,7 @@ export function useJournal() {
     try {
       const { data } = await api.get<{ entries: JournalEntry[] }>('/api/journal/entries');
       setEntries(data.entries);
-      // Page-full → assume more available; partial → reached the tail.
+      // полная страница - значит есть ещё; неполная - дошли до конца
       setHasMore(data.entries.length >= 30);
       setError(null);
     } catch (err) {
@@ -67,13 +67,12 @@ export function useJournal() {
   }, [entries, hasMore, isLoadingMore]);
 
   const remove = useCallback(async (entry: JournalEntry) => {
-    // Optimistic removal — the only failure mode is "row already gone", which
-    // is the user's desired end state anyway.
+    // оптимистично убираем сразу - худший случай "строки уже нет", и это ок
     setEntries((prev) => prev.filter((e) => !(e.source === entry.source && e.id === entry.id)));
     try {
       await api.delete(`/api/journal/entries/${entry.source}/${entry.id}`);
     } catch (err) {
-      // Re-add if the server pushed back (e.g. 401 because the session expired).
+      // вернём обратно, если сервер не принял (например 401 - сессия истекла)
       if (err instanceof AxiosError && err.response?.status !== 404) {
         setEntries((prev) => [entry, ...prev].sort(byCreatedDesc));
         throw err;

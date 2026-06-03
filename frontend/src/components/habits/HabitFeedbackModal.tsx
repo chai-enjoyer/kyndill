@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { AxiosError } from 'axios';
-import { Button } from '../common/Button';
-import { Modal } from '../common/Modal';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 import { api } from '../../lib/api';
 
 interface HabitFeedbackModalProps {
@@ -10,11 +10,8 @@ interface HabitFeedbackModalProps {
   onClose: () => void;
 }
 
-// Two rows of three. Energized→Proud→Calm sit in the "positive lane";
-// Foggy→Tough→Drained span the "harder" lane. Keeping it to six caps the
-// cognitive load while still distinguishing "I did it joyfully" from
-// "I dragged myself through it" — both register as completions but have
-// very different research signals.
+// два ряда по три: позитивная линия (Energized/Proud/Calm) и тяжёлая (Foggy/Tough/Drained).
+// шесть штук - баланс между нагрузкой на выбор и полезным сигналом для исследования
 const MOODS = [
   { value: 'energized', label: 'Energized' },
   { value: 'proud', label: 'Proud' },

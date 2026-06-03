@@ -1,7 +1,7 @@
-import { AnimatedValue } from '../common/AnimatedValue';
-import { FlameIcon } from '../common/FlameIcon';
+import { AnimatedValue } from '../ui/AnimatedValue';
+import { FlameIcon } from '../illustration/FlameIcon';
 import { ActivityFeed } from './ActivityFeed';
-import { CompletionRing } from './CompletionRing';
+import { CompletionRing } from '../habits/CompletionRing';
 import type { ActivityEntry } from '../../hooks/useActivityFeed';
 
 interface DashboardSidebarProps {

@@ -133,72 +133,6 @@
   font-size: var(--text-base);
 }
 
-/* ============================== Card ============================== */
-
-.card {
-  display: block;
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-3);
-  padding: var(--space-6);
-  box-shadow: var(--shadow-1);
-  transition:
-    background-color var(--duration-base) var(--ease-out),
-    border-color var(--duration-base) var(--ease-out),
-    box-shadow var(--duration-base) var(--ease-out);
-}
-
-.card--interactive { cursor: pointer; }
-
-.card--interactive:hover {
-  background-color: var(--color-surface-raised);
-  box-shadow: var(--shadow-2);
-}
-
-.card--interactive:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--color-accent-glow);
-}
-
-.card--selected {
-  background-color: var(--color-accent-subtle);
-  border-color: var(--color-accent);
-}
-
-.card__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin-bottom: var(--space-3);
-}
-
-.card__title {
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-text);
-}
-
-.card__meta {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.card__body { color: var(--color-text); }
-
-.card__footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border-subtle);
-}
-
 /* ============================== Field ============================== */
 
 .field {
@@ -376,16 +310,14 @@
   margin: 0 var(--space-8) var(--space-3) 0;
 }
 
-/* The body is the scroll region so the title and close button stay pinned
- * while long forms (add habit, gift picker) overflow on small screens. */
+/* скроллится только тело, заголовок и крестик остаются на месте */
 .modal__body {
   color: var(--color-text);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Counter the content padding so scrollbars sit at the panel edge, then
-   * restore it as inner spacing — keeps focus rings from being clipped. */
+  /* гасим паддинг контента, чтобы скроллбар был у края, и возвращаем внутри */
   margin: 0 calc(-1 * var(--space-6));
   padding: var(--space-1) var(--space-6) 0;
 }
@@ -525,9 +457,7 @@ body:has(.item-drop-toast) .toast-viewport {
     min-height: var(--tap-target-min);
   }
 
-  /* Give modals the full small screen minus a thin gutter, and reclaim the
-   * room the body's negative margin/padding used on desktop. Stay centered
-   * (inherited from .modal) for consistency with the desktop dialog. */
+  /* на мобилке почти весь экран, по центру (как на десктопе) */
   .modal {
     padding: var(--space-3);
   }
@@ -940,58 +870,6 @@ body:has(.item-drop-toast) .toast-viewport {
   .top-nav { padding: 0 var(--space-4); }
 }
 
-/* ============================== Sidebar ============================== */
-
-.sidebar {
-  grid-area: sidebar;
-  padding: var(--space-6) var(--space-3);
-  border-right: 1px solid var(--color-border-subtle);
-  background-color: var(--color-bg-page-elevated);
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.sidebar__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.sidebar__link {
-  display: block;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-2);
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  text-decoration: none;
-  transition:
-    background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.sidebar__link:hover {
-  background-color: var(--color-surface);
-  color: var(--color-text);
-}
-
-.sidebar__link:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-.sidebar__link--active {
-  background-color: var(--color-accent-subtle);
-  color: var(--color-text);
-}
-
-@media (max-width: 880px) {
-  .sidebar { display: none; }
-}
-
 /* ============================== Bottom nav (mobile only) ============================== */
 
 .bottom-nav {
@@ -1324,9 +1202,7 @@ body:has(.item-drop-toast) .toast-viewport {
   font-weight: var(--weight-bold);
 }
 
-/* Portaled to <body> and pinned to the viewport's right edge (top is set
- * inline from the bell's position). This keeps the panel fully on-screen
- * regardless of where the bell sits in its header. */
+/* рендерится в <body>, прибито к правому краю экрана (top задаётся инлайн) */
 .notification-menu {
   position: fixed;
   right: var(--space-3);
@@ -2367,7 +2243,7 @@ body:has(.item-drop-toast) .toast-viewport {
   height: 150px;
 }
 
-/* A fainted companion reads as dimmed and still — the breathing animation is
+/* A fainted companion reads as dimmed and still - the breathing animation is
  * deliberately absent here. */
 .pet-care-prompt__art.is-fainted {
   filter: grayscale(0.6) brightness(0.92);
@@ -3304,7 +3180,7 @@ body:has(.item-drop-toast) .toast-viewport {
   font-size: var(--text-base);
 }
 
-/* Legacy wishlist grid/option rules removed — the row-list pattern in
+/* Legacy wishlist grid/option rules removed - the row-list pattern in
  * the Phase 1 block (mobile-first dashboard rebuild) is the canonical
  * styling and was being silently undone here. */
 
@@ -3394,8 +3270,7 @@ body:has(.item-drop-toast) .toast-viewport {
   border-radius: 0;
 }
 
-/* The freeze is the headline gift; tint it with honey so it reads as
- * featured, while the sage selected state still wins when chosen. */
+/* заморозка - главный подарок, подсвечиваем honey (выбор всё равно перебьёт sage) */
 .gift-option--freeze:not(.is-selected) {
   border-color: var(--color-honey);
   background-color: var(--color-honey-subtle);
@@ -4016,7 +3891,7 @@ body:has(.item-drop-toast) .toast-viewport {
   gap: var(--space-3);
 }
 
-/* .gift-list is a <fieldset> for radiogroup semantics — strip its chrome. */
+/* .gift-list is a <fieldset> for radiogroup semantics - strip its chrome. */
 .gift-list {
   margin: 0;
   padding: 0;
@@ -4227,8 +4102,7 @@ body:has(.item-drop-toast) .toast-viewport {
     background-color var(--duration-fast) var(--ease-out);
 }
 
-/* The radio drives selection state but is visually replaced by the card +
- * checkmark, so pull it out of the layout without losing keyboard focus. */
+/* прячем radio, но оставляем фокус с клавиатуры - выбор показываем карточкой */
 .gift-option input {
   position: absolute;
   width: 1px;
@@ -4708,8 +4582,7 @@ body:has(.item-drop-toast) .toast-viewport {
   opacity: 0.6;
 }
 
-/* Settings sit in the same card, separated from the timer by a hairline
- * divider rather than nested in their own box (which read as box-in-box). */
+/* настройки в той же карточке, отделены тонкой линией, без вложенного бокса */
 .focus-audio {
   display: grid;
   gap: var(--space-4);
@@ -5615,7 +5488,7 @@ body:has(.item-drop-toast) .toast-viewport {
   grid-template-columns: minmax(200px, 0.45fr) minmax(0, 1fr);
   gap: var(--space-6);
   align-items: center;
-  /* Flat surface — let the giant completion number carry the warmth. */
+  /* Flat surface - let the giant completion number carry the warmth. */
   background-color: var(--color-surface);
 }
 
@@ -5674,7 +5547,7 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 /* Three inline stats below the hero number. No bordered boxes, no extra
- * paragraph copy — the number is the message; these are the receipts. */
+ * paragraph copy - the number is the message; these are the receipts. */
 .progress-hero__meta {
   display: flex;
   flex-wrap: wrap;
@@ -5724,7 +5597,7 @@ body:has(.item-drop-toast) .toast-viewport {
 
 /*
  * Compact stat tile, used by Behavioral indicators + Social signals.
- * No box, no shadow — the dividers between tiles do the separation
+ * No box, no shadow - the dividers between tiles do the separation
  * work. Big mono number + uppercase label + optional detail line.
  * Replaces the old .progress-stat-card / .progress-stat-grid pattern.
  */
@@ -5839,7 +5712,7 @@ body:has(.item-drop-toast) .toast-viewport {
  */
 .week-candle {
   display: block;
-  /* width capped at 64px (the SVG's natural viewBox width) — past that
+  /* width capped at 64px (the SVG's natural viewBox width) - past that
    * the SVG would scale up beyond design intent. Below 64px, it shrinks
    * with the cell. */
   width: min(100%, 64px);
@@ -5911,7 +5784,7 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 /* Streaks: two compact cells side by side. Flame on top, mono number,
- * uppercase label. No honey-tinted boxes — the flame icon carries the
+ * uppercase label. No honey-tinted boxes - the flame icon carries the
  * warmth without flooding the panel with color. */
 .progress-streaks {
   display: grid;
@@ -6115,10 +5988,7 @@ body:has(.item-drop-toast) .toast-viewport {
     font-size: var(--text-sm);
   }
 
-  /* Mobile focus: keep the card (border + surface + shadow for depth) but
-   * compress the stack so the timer AND the ambient/volume settings fit on
-   * one screen — no scroll to reach the controls. The MobilePageHeader
-   * already shows "Focus", so the in-shell header is redundant here. */
+  /* карточку оставляем, но ужимаем - чтобы таймер и настройки влезли без скролла */
   .focus-shell {
     gap: var(--space-4);
     padding: var(--space-5) var(--space-4);
@@ -7262,7 +7132,7 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 /* First question (the multi-select "I want to grow") has the most chips,
- * so let it span both columns on desktop — chips wrap on a single full-
+ * so let it span both columns on desktop - chips wrap on a single full-
  * width row instead of squeezing into one half. */
 .quiz > .quiz-question:first-child {
   grid-column: 1 / -1;
@@ -7318,7 +7188,7 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 /* Title + hint stack so the hint sits beneath the title at the same
- * left edge — visually aligned with the number circle's right side. */
+ * left edge - visually aligned with the number circle's right side. */
 .quiz-question__title-group {
   min-width: 0;
   display: flex;
@@ -7384,7 +7254,7 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 /* Inline hint with a middot separator instead of stacking under the
- * label — keeps the chip on one line wherever possible, saves vertical
+ * label - keeps the chip on one line wherever possible, saves vertical
  * space, and reads as natural language. */
 .quiz-chip__hint {
   font-size: 12px;
@@ -7546,7 +7416,7 @@ body:has(.item-drop-toast) .toast-viewport {
   .starter-habit__name { font-size: 13px; }
   .starter-habit__meta { font-size: 10px; }
 
-  /* Tighter custom-habit rows on phones — name takes most of the width,
+  /* Tighter custom-habit rows on phones - name takes most of the width,
    * category + count drop to a second line so all three fields stay
    * tappable at 360px. */
   .custom-habit-card {
@@ -7639,7 +7509,7 @@ body:has(.item-drop-toast) .toast-viewport {
   .dashboard__main,
   .dashboard__pet-panel { display: none !important; }
 
-  /* The desktop universal top nav is replaced by the in-page m-dashboard-header. */
+  /* на мобилке верхний навбар прячем - сверху MobilePageHeader */
   .top-nav { display: none; }
 
   /* App shell loses the topnav row on mobile so main can start at the safe-area top. */
@@ -7650,7 +7520,7 @@ body:has(.item-drop-toast) .toast-viewport {
 
   /* The legacy mobile stylesheet padded .dashboard at ~line 2429.
    * The new mobile tree paints edge-to-edge and each component owns its
-   * own page padding — strip the container pad. */
+   * own page padding - strip the container pad. */
   .dashboard {
     padding: 0 !important;
     gap: 0 !important;
@@ -7659,83 +7529,6 @@ body:has(.item-drop-toast) .toast-viewport {
   }
 
   .pull-refresh { top: env(safe-area-inset-top); }
-
-  /* ---- Header strip (56px) ---------------------------------------- */
-  .m-dashboard-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    height: var(--m-header-height);
-    padding: 0 var(--m-page-padding-x);
-    padding-top: env(safe-area-inset-top);
-    border-bottom: 1px solid var(--color-border-subtle);
-    background-color: var(--color-bg-page);
-    box-sizing: content-box;
-  }
-  .m-dashboard-header__brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--color-text);
-    text-decoration: none;
-    font-family: var(--font-display);
-    font-weight: var(--weight-semibold);
-    line-height: 1;
-  }
-  .m-dashboard-header__brand:hover { color: var(--color-text); }
-  .m-dashboard-header__brand:focus-visible {
-    outline: 2px solid var(--color-sage);
-    outline-offset: 4px;
-    border-radius: var(--radius-1);
-  }
-  .m-dashboard-header__mark {
-    display: inline-grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    flex: none;
-  }
-  .m-dashboard-header__wordmark {
-    font-size: 1.0625rem; /* 17px — sized against the icon, quieter than the 22px greeting below */
-    letter-spacing: -0.01em;
-  }
-  .m-dashboard-header__actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .m-dashboard-header__icon-link {
-    display: inline-grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-full);
-    color: var(--color-text);
-    text-decoration: none;
-    -webkit-tap-highlight-color: transparent;
-    transition: background-color var(--duration-fast) var(--ease-out);
-  }
-  .m-dashboard-header__icon-link:hover,
-  .m-dashboard-header__icon-link:active {
-    background-color: var(--color-surface-sunken);
-  }
-  .m-dashboard-header__icon-link:focus-visible {
-    outline: 2px solid var(--color-sage);
-    outline-offset: -2px;
-  }
-  .m-dashboard-header .notification-bell__button {
-    width: 44px;
-    height: 44px;
-    border: 0;
-    border-radius: var(--radius-full);
-    background: transparent;
-    color: var(--color-text);
-  }
-  .m-dashboard-header .notification-bell__button:hover,
-  .m-dashboard-header .notification-bell__button:active {
-    background-color: var(--color-surface-sunken);
-  }
 
   /* ---- Greeting + date -------------------------------------------- */
   .m-greeting { padding: var(--space-5) var(--m-page-padding-x) var(--space-4); }
@@ -7784,7 +7577,7 @@ body:has(.item-drop-toast) .toast-viewport {
     place-items: center;
     width: 56px;
     height: 56px;
-    /* Flat — no halo. The pet itself carries enough warmth. */
+    /* Flat - no halo. The pet itself carries enough warmth. */
     background: transparent;
   }
   .m-pet-strip__body {
@@ -7989,7 +7782,7 @@ body:has(.item-drop-toast) .toast-viewport {
   /*
    * The entire row is the hold target. We render an <li> wrapping a
    * button.m-habit__row that fills the row; pointer-down on the button
-   * starts the hold gesture. A background fill grows left→right as the
+   * starts the hold gesture. A background fill grows left->right as the
    * hold accumulates so the visual progress reads at full row width
    * regardless of where the finger lands.
    */
@@ -8047,7 +7840,7 @@ body:has(.item-drop-toast) .toast-viewport {
     z-index: 1;
   }
 
-  /* The fill: a sage-tinted band that grows left→right over the hold
+  /* The fill: a sage-tinted band that grows left->right over the hold
    * duration. Snaps back in 120ms on release. */
   .m-habit__row-fill {
     position: absolute;
@@ -8106,7 +7899,7 @@ body:has(.item-drop-toast) .toast-viewport {
     word-break: break-word;
   }
 
-  /* Category pill re-skin on mobile only — uppercase + 15% opacity tint.
+  /* Category pill re-skin on mobile only - uppercase + 15% opacity tint.
    * Desktop's .category-pill rules continue to apply outside of .m-habit. */
   .m-habit .category-pill {
     min-height: 18px;
@@ -8156,7 +7949,7 @@ body:has(.item-drop-toast) .toast-viewport {
   .m-habit__streak-icon .animated-flame { width: 13px; height: 13px; }
   .m-habit__streak-value { color: inherit; font-weight: inherit; }
 
-  /* ---- Checkbox visual (28px, passive — the row carries the hold) - */
+  /* ---- Checkbox visual (28px, passive - the row carries the hold) - */
   .m-habit__check {
     position: relative;
     display: inline-grid;
@@ -8190,7 +7983,7 @@ body:has(.item-drop-toast) .toast-viewport {
     animation: kyndill-checkmark-draw 320ms var(--ease-out) forwards;
   }
   /* While the row is being held the checkbox outline brightens so the
-   * control reads as "engaged" — the row fill is the primary cue. */
+   * control reads as "engaged" - the row fill is the primary cue. */
   .m-habit__check.is-holding .m-habit__check-box {
     stroke: var(--color-sage);
     stroke-width: 2;
@@ -8254,10 +8047,7 @@ body:has(.item-drop-toast) .toast-viewport {
 
   .m-pet-care__stat { min-width: 0; }
 
-  /* The tile is a stack: two identical content layers fill it from corner to
-   * corner. The fill layer sits on top, tinted sage and clipped to --fill
-   * height (bottom-up), so the stat reads as a vertically filled gauge with
-   * the icon/value/label legible over both the fill and the bare tile. */
+  /* два одинаковых слоя: sage-заливка поверх, обрезанная по --fill снизу вверх */
   .m-pet-care__stat-link {
     position: relative;
     display: block;
@@ -8288,7 +8078,7 @@ body:has(.item-drop-toast) .toast-viewport {
     min-height: 72px;
   }
 
-  /* Base layer: icon + text on the bare tile. */
+  /* нижний слой - на голой плитке */
   .m-pet-care__stat-content .m-pet-care__stat-icon {
     color: var(--color-sage-strong);
   }
@@ -8299,7 +8089,7 @@ body:has(.item-drop-toast) .toast-viewport {
     color: var(--color-text-muted);
   }
 
-  /* Fill layer: same content, light ink on a sage fill, clipped to --fill. */
+  /* верхний слой - светлый текст на sage, обрезан по --fill */
   .m-pet-care__stat-content--fill {
     position: absolute;
     inset: 0;
@@ -8601,7 +8391,7 @@ body:has(.item-drop-toast) .toast-viewport {
 /* === Shared mobile page header (≤880px) ============================== */
 /* ====================================================================== */
 /*
- * Rendered at the top of every page (except Settings — that page IS the
+ * Rendered at the top of every page (except Settings - that page IS the
  * settings destination). Hidden on desktop where the universal TopNav
  * takes over above 880px.
  */
@@ -8633,35 +8423,13 @@ body:has(.item-drop-toast) .toast-viewport {
     background-color: var(--color-bg-page);
   }
 
-  /*
-   * Focus page centers its single child shell with `display: grid;
-   * place-items: center`, which also centered the header (visible as
-   * an off-edge floating bar). Restore normal block flow on mobile so
-   * the header stretches and the focus-shell flows beneath it.
-   */
+  /* focus-page центрирует свой shell гридом - на мобилке возвращаем обычный поток */
   .focus-page {
     display: block;
     place-items: initial;
   }
 
-  /*
-   * Full-bleed escape. We could match negative margins to the .page
-   * padding at every breakpoint, but that's brittle — any new media
-   * rule on .page silently re-introduces a side offset. Instead use
-   * the standard full-bleed pattern: pin the header to the parent's
-   * outer box independent of whatever padding the parent has, by
-   * positioning at left/right 0 with a margin trick.
-   *
-   * `width: auto` + `position: relative` + matching `left/right: 0`
-   * inside a normal-flow doc doesn't fully escape padding, so we use
-   * the classic 100% + margin trick: width 100% of parent INCLUDING
-   * its padding (calc), shifted left by the parent's left padding.
-   *
-   * In practice every page child of .page sits inside a padded box,
-   * so the simplest robust approach is `position: absolute` for the
-   * header alone, with the page reserving header height as top padding.
-   * That decouples the header geometry from .page padding entirely.
-   */
+  /* хедер абсолютом во всю ширину, не завися от паддинга .page */
   .page {
     position: relative;
   }
@@ -8671,8 +8439,7 @@ body:has(.item-drop-toast) .toast-viewport {
     left: 0;
     right: 0;
   }
-  /* Reserve header height + safe-area inset above page content so the
-   * first body element doesn't sit underneath the absolute header. */
+  /* резервируем высоту хедера сверху, чтобы контент не лез под него */
   .page:has(> .m-page-header:first-child) {
     padding-top: calc(var(--m-header-height) + env(safe-area-inset-top) + var(--space-4));
   }
@@ -8681,13 +8448,9 @@ body:has(.item-drop-toast) .toast-viewport {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    /* Match the 40px hit target geometry of the right-side icon links so
-     * all four corners of the header have identical visual weight and
-     * sit at the same offset from the screen edge. */
+    /* 40px как у правых иконок - одинаковый вес во всех углах */
     height: 40px;
-    /* Pull-left so the mark icon's centre lines up with the right-side
-     * icon centres (both 40px buttons, so neg margin of (40 - 20)/2 = 10).
-     * Avoids the "left icon looks more flush than right" perception. */
+    /* сдвиг влево, чтобы центр иконки совпал с центрами правых кнопок */
     margin-left: -8px;
     padding: 0 4px;
     border-radius: var(--radius-1);
@@ -9119,7 +8882,7 @@ body:has(.item-drop-toast) .toast-viewport {
 @media (min-width: 881px) {
   .profile-layout {
     /* Drop the artificial max-width so the form + wishlist actually
-     * fill the page's content area instead of leaving 80–200px of
+     * fill the page's content area instead of leaving 80-200px of
      * dead space on the right at large viewports. */
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: var(--space-6);
@@ -9223,7 +8986,7 @@ body:has(.item-drop-toast) .toast-viewport {
 }
 
 /* The catalog grid drops the boxy multi-column layout in favor of a
- * single column of rows — matches the rest of the site's list patterns
+ * single column of rows - matches the rest of the site's list patterns
  * and stops the wishlist from looking like a separate widget. */
 .wishlist-editor__grid {
   display: flex;
@@ -9238,7 +9001,7 @@ body:has(.item-drop-toast) .toast-viewport {
 /* Wishlist editor: switch from bordered card to the site's panel
  * pattern (radius, subtle border, surface tint), and align the item
  * rows + catalog grid to the rest of the dashboard styling. No
- * margin-top — the editor sits flush with the top of its column so it
+ * margin-top - the editor sits flush with the top of its column so it
  * aligns with the form on the same row of the profile layout. */
 .wishlist-editor {
   margin-top: 0;
@@ -9291,6 +9054,6 @@ body:has(.item-drop-toast) .toast-viewport {
   border-color: var(--color-border);
 }
 
-/* Second-pass wishlist override removed for the same reason — it was
+/* Second-pass wishlist override removed for the same reason - it was
  * undoing the row-list pattern back to the bordered-tile grid. */
 

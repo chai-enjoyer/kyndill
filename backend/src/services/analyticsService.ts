@@ -27,7 +27,7 @@ export async function recordEvents(
   const consentOk = await hasResearchConsent(userId);
   if (!consentOk) {
     // Soft refusal: count as rejected so the client can throttle, but never
-    // 4xx — we don't want analytics misconfiguration to surface as errors.
+    // 4xx - we don't want analytics misconfiguration to surface as errors.
     return { accepted: 0, rejected: truncated.length };
   }
 
@@ -65,7 +65,7 @@ export async function recordEvents(
     return { accepted: 0, rejected };
   }
 
-  // Single multi-row INSERT — far cheaper than N round-trips.
+  // Single multi-row INSERT - far cheaper than N round-trips.
   const placeholders: string[] = [];
   const values: unknown[] = [];
   rows.forEach((row, idx) => {

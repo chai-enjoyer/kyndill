@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button } from '../components/common/Button';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { Modal } from '../components/common/Modal';
-import { PasswordRequirements } from '../components/common/PasswordRequirements';
+import { Button } from '../components/ui/Button';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { Modal } from '../components/ui/Modal';
+import { PasswordRequirements } from '../components/ui/PasswordRequirements';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import { useProfile } from '../hooks/useProfile';

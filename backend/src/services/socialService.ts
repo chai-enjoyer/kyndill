@@ -284,8 +284,7 @@ export async function cancelSentFriendRequest(
     throw new HttpError(409, 'ALREADY_RESPONDED', `Request was already ${row.status}`);
   }
 
-  // Drop the request and any unread notification the recipient may still have
-  // open for it, so the cancellation feels symmetric on both sides.
+  // удаляем и заявку, и непрочитанное уведомление у получателя
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -475,8 +474,7 @@ export async function sendGift(
     throw new HttpError(404, 'NOT_FRIENDS', 'You are not friends with this user');
   }
 
-  // Look up the item itself first so we know whether to validate from
-  // inventory (consumable) or from streaks.freeze_count (streak_freeze).
+  // сначала сам предмет: понять, проверять inventory (расходник) или streaks.freeze_count
   const { rows: itemRows } = await pool.query<{
     id: string;
     type: 'consumable' | 'streak_freeze' | 'cosmetic';
@@ -504,8 +502,7 @@ export async function sendGift(
     if (!streakRows[0] || streakRows[0].freeze_count < 1) {
       throw new HttpError(400, 'NO_FREEZE_TO_GIFT', 'You do not have a streak freeze to gift');
     }
-    // Friendly upfront check; the accept path also enforces the cap in case
-    // the recipient bought one in the interim.
+    // ранняя проверка для UX; на accept лимит проверяется ещё раз
     const { rows: recipRows } = await pool.query<{ freeze_count: number }>(
       `SELECT freeze_count FROM streaks WHERE user_id = $1`,
       [toUserId],
@@ -552,8 +549,7 @@ export async function sendGift(
     await client.query('BEGIN');
 
     if (itemInfo.type === 'streak_freeze') {
-      // Atomic check-and-decrement on the sender's freeze count so two
-      // simultaneous sends can't both succeed when only one freeze is held.
+      // атомарный check-and-decrement, чтобы два одновременных подарка не списали одну заморозку дважды
       const { rowCount } = await client.query(
         `UPDATE streaks SET freeze_count = freeze_count - 1
           WHERE user_id = $1 AND freeze_count >= 1`,
@@ -694,8 +690,7 @@ export async function acceptGift(userId: string, giftId: string): Promise<Accept
     await client.query('BEGIN');
 
     if (itemType === 'streak_freeze') {
-      // Guarded increment: if the recipient already filled their freeze slot
-      // since the gift was sent, refuse rather than silently dropping.
+      // инкремент с проверкой лимита: если слот уже занят - отказываем, а не теряем молча
       const { rowCount } = await client.query(
         `UPDATE streaks
             SET freeze_count = freeze_count + 1

@@ -1,11 +1,11 @@
 import { useMemo, useState, type DragEvent, type FormEvent } from 'react';
 import { AxiosError } from 'axios';
-import { AnimatedValue } from '../components/common/AnimatedValue';
-import { Button } from '../components/common/Button';
-import { FlameIcon } from '../components/common/FlameIcon';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
-import { Modal } from '../components/common/Modal';
-import { CategoryPill } from '../components/dashboard/CategoryPill';
+import { AnimatedValue } from '../components/ui/AnimatedValue';
+import { Button } from '../components/ui/Button';
+import { FlameIcon } from '../components/illustration/FlameIcon';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
+import { Modal } from '../components/ui/Modal';
+import { CategoryPill } from '../components/habits/CategoryPill';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { useToastContext } from '../context/ToastContext';
 import {

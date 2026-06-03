@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AnimatedValue } from '../../common/AnimatedValue';
+import { AnimatedValue } from '../../ui/AnimatedValue';
 
 interface MobileXpRowProps {
   level: number;

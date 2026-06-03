@@ -1,6 +1,6 @@
 import { type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
-import { StatIcon, type StatIconName } from '../../common/StatIcon';
+import { StatIcon, type StatIconName } from '../../pet/StatIcon';
 
 interface MobilePetCareProps {
   pet: {
@@ -14,14 +14,7 @@ interface MobilePetCareProps {
   onRevive: () => void;
 }
 
-/*
- * Compact pet care surface for the mobile dashboard. Lives directly
- * below the pet strip. Surfaces the four care stats not already shown
- * in the strip (happiness, hunger, energy, cleanliness) and exposes
- * Feed + Customize actions so the companion is actionable without
- * navigating to /pet first. Tap any stat tile to go to /pet for
- * detail. Health remains on the strip above.
- */
+// care-блок под pet-strip на мобилке: 4 стата + Feed/Customize. Тап по стату -> /pet
 export function MobilePetCare({ pet, onOpenFeed, onRevive }: MobilePetCareProps) {
   const stats: Array<{ icon: StatIconName; label: string; value: number }> = [
     { icon: 'happiness', label: 'Happy', value: pet.happiness },
@@ -35,11 +28,8 @@ export function MobilePetCare({ pet, onOpenFeed, onRevive }: MobilePetCareProps)
       <ul className="m-pet-care__stats" role="list">
         {stats.map((stat) => {
           const pct = Math.max(0, Math.min(100, stat.value));
-          // Inner content is rendered twice: a base layer (dark text on the
-          // tile) and an overlay layer (light text on the sage fill) that is
-          // clipped to the fill height. The clip line is exactly where the
-          // fill meets the background, so each label sits on whichever colour
-          // keeps it readable.
+          // рисуем контент дважды: тёмный слой снизу + светлый поверх заливки,
+          // обрезанный по высоте. Линия среза = граница заливки, текст всегда читаем.
           const content = (
             <>
               <span className="m-pet-care__stat-icon" aria-hidden="true">

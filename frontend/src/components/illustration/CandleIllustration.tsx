@@ -1,5 +1,4 @@
-// PLACEHOLDER: Replace with final candle hero artist asset when delivered.
-// Single candle with a warm halo, sized to feel intimate, not iconic.
+// одна свеча с тёплым ореолом
 
 import { useRef } from 'react';
 import { createFlameMotionStyle, type FlameMotionStyle } from '../../lib/flameMotion';

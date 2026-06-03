@@ -208,14 +208,8 @@ export async function getSummary(userId: string): Promise<ProgressSummary> {
     weekStart,
     today,
   );
-  /*
-   * 7-day completion is the ratio of completed habit instances to
-   * scheduled habit instances across the week — NOT the average of
-   * per-day rates. Averaging hid the user's actual progress: a week
-   * with one perfect day + several rest days would show 100%, even
-   * though the user only did one day's habits all week. The total
-   * ratio matches the intuition "20 of 24 habits done = 83%".
-   */
+  // 7-дневный процент = сделано / запланировано за неделю, а НЕ среднее по дням
+  // (среднее врало: один идеальный день среди выходных давал 100%)
   const weeklyScheduled = weekly.reduce((sum, day) => sum + day.target, 0);
   const weeklyCompleted = weekly.reduce((sum, day) => sum + day.completed, 0);
   const weeklyCompletionRate =
@@ -279,13 +273,8 @@ function buildWeeklySummary(
       if (!isHabitExpectedOnDate(habit, date)) return sum;
       return sum + habit.target_count;
     }, 0);
-    /*
-     * Only count completions for habits that were actually scheduled
-     * for this date. Previously we summed every completion on the date,
-     * which let completions of off-schedule habits (e.g. a Tue-only
-     * habit logged on a Monday) push the day's rate above 100%, which
-     * then poisoned the weekly average and the per-day display.
-     */
+    // считаем только привычки, которые реально были запланированы на эту дату,
+    // иначе внеплановые завершения задирали дневной процент выше 100
     const completed = (completionByDate.get(dateStr) ?? []).reduce(
       (sum, completion) => {
         const habit = habitsById.get(completion.habit_id);
@@ -294,7 +283,7 @@ function buildWeeklySummary(
       },
       0,
     );
-    /* Final safety clamp: rate can never exceed 100. */
+    // на всякий случай: процент не может быть выше 100
     const cappedCompleted = Math.min(completed, scheduledTarget);
     return {
       date: dateStr,
@@ -319,13 +308,8 @@ function findMostConsistentHabit(
 
   const habitsById = new Map(habits.map((habit) => [habit.id, habit]));
 
-  /*
-   * Bucket completed dates by habit, but only count dates the habit
-   * was actually scheduled to run. Without this filter, completing a
-   * weekly-only habit on extra days would inflate completed_days past
-   * expected_days, producing rates >100% (and a misleading "most
-   * consistent" winner).
-   */
+  // группируем даты по привычке, но только запланированные дни,
+  // иначе completed_days перевалит за expected_days и проценты > 100
   const completedDatesByHabit = new Map<string, Set<string>>();
   for (const completion of completions) {
     if (completion.completion_count < completion.target_count) continue;

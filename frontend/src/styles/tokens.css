@@ -128,7 +128,7 @@
 
   /*
    * Mobile-first role tokens (Phase 1, mobile only). These are additive
-   * — they don't replace the legacy --text-* scale used by desktop. The
+   * - they don't replace the legacy --text-* scale used by desktop. The
    * dashboard's mobile layout (≤880px) consumes them; everything else
    * keeps using the original scale, so desktop is unaffected.
    */

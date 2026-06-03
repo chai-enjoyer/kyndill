@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Button } from '../common/Button';
-import { Modal } from '../common/Modal';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
 interface MoodPingModalProps {
   onSubmit: (rating: number, note?: string) => Promise<void>;

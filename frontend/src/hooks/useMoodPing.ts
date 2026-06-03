@@ -7,8 +7,7 @@ interface MoodPingStatus {
   last_submitted_week: string | null;
 }
 
-// Once-per-session snooze: if the user dismisses without submitting, don't
-// pester them again until they reload or move to a new week.
+// снуз на сессию: закрыл без ответа - не дёргаем до перезагрузки или новой недели
 const SNOOZE_KEY = 'kyndill_mood_snooze_week';
 
 export function useMoodPing() {
@@ -24,7 +23,7 @@ export function useMoodPing() {
         setIsOpen(true);
       }
     } catch {
-      // Status check failure is silent — the prompt simply won't appear.
+      // Status check failure is silent - the prompt simply won't appear.
     }
   }, []);
 

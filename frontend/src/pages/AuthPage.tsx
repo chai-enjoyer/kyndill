@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type MouseEvent } from 'react';
 import { NavLink } from 'react-router-dom';
 import { AxiosError } from 'axios';
-import { Button } from '../components/common/Button';
-import { CandleIllustration } from '../components/common/CandleIllustration';
-import { PasswordRequirements } from '../components/common/PasswordRequirements';
-import { Spinner } from '../components/common/Spinner';
+import { Button } from '../components/ui/Button';
+import { CandleIllustration } from '../components/illustration/CandleIllustration';
+import { PasswordRequirements } from '../components/ui/PasswordRequirements';
+import { Spinner } from '../components/ui/Spinner';
 import { useAuthContext } from '../context/AuthContext';
 import { useToastContext } from '../context/ToastContext';
 import {

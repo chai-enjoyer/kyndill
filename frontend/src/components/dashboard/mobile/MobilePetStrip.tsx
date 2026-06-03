@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
-import { SpritePet } from '../../common/SpritePet';
-import { type PetSpecies } from '../../common/PlaceholderPet';
-import { FlameIcon } from '../../common/FlameIcon';
-import { AnimatedValue } from '../../common/AnimatedValue';
+import { SpritePet } from '../../pet/SpritePet';
+import { type PetSpecies } from '../../pet/PlaceholderPet';
+import { FlameIcon } from '../../illustration/FlameIcon';
+import { AnimatedValue } from '../../ui/AnimatedValue';
 import { deriveStreakHealth } from '../../../lib/utils';
 
 interface MobilePetStripProps {
@@ -20,12 +20,8 @@ interface MobilePetStripProps {
   streak: number;
 }
 
-/*
- * Pet summary strip — mobile-only. 80px tall full-width row, sprite left,
- * name + health bar center, streak count right. Tapping navigates to the
- * full companion page (/pet). The accordion that existed on the legacy
- * mobile pet panel is replaced by this affordance: simpler, one-tap.
- */
+// строка-сводка питомца (только мобилка): спрайт слева, имя + health по центру,
+// стрик справа. Тап ведёт на /pet.
 export function MobilePetStrip({ pet, streak }: MobilePetStripProps) {
   const petHealth = deriveStreakHealth(streak, pet);
   const mood = pet.is_fainted

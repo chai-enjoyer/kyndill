@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
-import { Modal } from '../common/Modal';
-import { Button } from '../common/Button';
+import { Modal } from '../ui/Modal';
+import { Button } from '../ui/Button';
 import { CategoryPill } from './CategoryPill';
-import { FlameIcon } from '../common/FlameIcon';
+import { FlameIcon } from '../illustration/FlameIcon';
 import type { HabitWithStatus } from '../../hooks/useHabits';
 
 interface HabitDetailsModalProps {

@@ -1,8 +1,8 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '../common/Button';
-import { Modal } from '../common/Modal';
-import { CategoryPill } from './CategoryPill';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
+import { CategoryPill } from '../habits/CategoryPill';
 import { extractMessage } from '../../hooks/useSocial';
 import { trackEvent } from '../../lib/analytics';
 import type { RecoveryPrompt, RecoveryReflectionInput } from '../../hooks/useRecovery';

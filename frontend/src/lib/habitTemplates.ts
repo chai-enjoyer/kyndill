@@ -498,7 +498,7 @@ export function pickStarterTemplates(answers: QuizAnswers): string[] {
       score += 2;
     }
     if (answers.blocker === 'forgetting' && time !== 'flexible') {
-      score += 1; // anchored to a time → easier to remember
+      score += 1; // anchored to a time -> easier to remember
     }
     if (answers.blocker === 'all-or-nothing' && (habit.target_count ?? 1) > 1) {
       score += 1; // partial counts as progress

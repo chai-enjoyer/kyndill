@@ -1,4 +1,4 @@
-import { AnimatedValue } from '../../common/AnimatedValue';
+import { AnimatedValue } from '../../ui/AnimatedValue';
 
 interface MobileStatsRowProps {
   completed: number;

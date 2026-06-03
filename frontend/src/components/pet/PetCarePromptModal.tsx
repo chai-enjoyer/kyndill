@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { AxiosError } from 'axios';
-import { Modal } from '../common/Modal';
-import { Button } from '../common/Button';
-import { SpritePet } from '../common/SpritePet';
-import { StatIcon, type StatIconName } from '../common/StatIcon';
+import { Modal } from '../ui/Modal';
+import { Button } from '../ui/Button';
+import { SpritePet } from './SpritePet';
+import { StatIcon, type StatIconName } from './StatIcon';
 import { useToastContext } from '../../context/ToastContext';
 import type { PetFullState } from '../../hooks/usePet';
 import snowflake from '../../assets/sprites/snowflake.svg';
 
-// Care stats at or below this read as "needs attention" and trigger the nudge.
+// стат <= этого порога считаем "пора покормить"
 export const LOW_STAT_THRESHOLD = 15;
 
 const CARE_STATS: Array<{ key: 'happiness' | 'hunger' | 'energy' | 'cleanliness'; label: string; icon: StatIconName }> = [
@@ -41,7 +41,7 @@ export function PetCarePromptModal({ pet, freezeCount, onFeed, onRevive, onClose
     setReviving(true);
     try {
       await onRevive();
-      // On success the pet is no longer fainted, so the parent unmounts us.
+      // после успеха питомец не fainted -> родитель сам нас размонтирует
     } catch (err) {
       showToast(extractMessage(err), 'error');
       setReviving(false);

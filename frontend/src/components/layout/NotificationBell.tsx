@@ -9,9 +9,7 @@ export function NotificationBell() {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Pin the menu just below the bell vertically; horizontally it anchors to
-  // the viewport's right edge via CSS so it never spills off-screen, even
-  // when the bell isn't the right-most item in its header.
+  // top берём от колокольчика, right прибит к краю экрана через CSS - чтобы меню не уезжало
   useLayoutEffect(() => {
     if (!open) return;
     function place() {

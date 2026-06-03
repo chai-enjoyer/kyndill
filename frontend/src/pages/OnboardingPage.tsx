@@ -1,12 +1,11 @@
 import { useId, useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
-import { Button } from '../components/common/Button';
-import { HabitCheckbox } from '../components/dashboard/HabitCheckbox';
-// PLACEHOLDER: Replace with final onboarding pet artist assets when delivered.
-import { type PetSpecies } from '../components/common/PlaceholderPet';
-import { SpritePet } from '../components/common/SpritePet';
-import { Spinner } from '../components/common/Spinner';
+import { Button } from '../components/ui/Button';
+import { HabitCheckbox } from '../components/habits/HabitCheckbox';
+import { type PetSpecies } from '../components/pet/PlaceholderPet';
+import { SpritePet } from '../components/pet/SpritePet';
+import { Spinner } from '../components/ui/Spinner';
 import { api } from '../lib/api';
 import {
   DEFAULT_TEMPLATE_IDS,
@@ -112,9 +111,7 @@ const BLOCKER_OPTIONS: { value: QuizBlocker; label: string; hint: string }[] = [
   { value: 'all-or-nothing', label: 'All-or-nothing brain', hint: 'Partial counts as progress.' },
 ];
 
-// Demographic buckets. Every option is broad enough that no row identifies an
-// individual on its own. "Prefer not to say" is always available and is the
-// implicit default (we don't pre-select anything).
+// демографические корзины - широкие, никого не идентифицируют. По умолчанию ничего не выбрано.
 const AGE_BAND_OPTIONS: { value: QuizAgeBand; label: string }[] = [
   { value: 'under_18', label: 'Under 18' },
   { value: '18_24', label: '18–24' },
@@ -211,8 +208,7 @@ export function OnboardingPage() {
     [quiz],
   );
 
-  // Group templates by category for a calmer scan in the habits step. Order
-  // matches the brand surface (wellness/health first, then productivity, etc).
+  // группируем шаблоны по категориям для шага с привычками
   const groupedTemplates = useMemo(() => {
     const groups: Record<HabitCategory, typeof HABIT_TEMPLATES> = {
       Health: [],
@@ -237,8 +233,7 @@ export function OnboardingPage() {
     setQuiz(answers);
     setSelectedStarterIds(pickStarterTemplates(answers));
     setStep('species');
-    // Best-effort persistence for research baseline. We don't await; a network
-    // failure here shouldn't block the user from continuing onboarding.
+    // best-effort, не ждём - сетевая ошибка не должна блокировать онбординг
     void api.post('/api/onboarding/quiz', answers).catch(() => undefined);
   }
 
@@ -275,8 +270,7 @@ export function OnboardingPage() {
     if (!species || !isNameValid || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      // 1) Pet init. ALREADY_INITIALIZED is fine — keep going so we still
-      // create habits for users coming back to a partially-finished onboard.
+      // 1) инициализация питомца. ALREADY_INITIALIZED не страшно - идём дальше
       try {
         await api.post('/api/pet/initialize', { species, name: trimmedName });
       } catch (err) {
@@ -291,15 +285,11 @@ export function OnboardingPage() {
         }
       }
 
-      // 2) Profile patch is best-effort. A schema mismatch here (e.g. an
-      // un-applied migration) used to abort the whole flow and leave the
-      // user with no habits. Keep going either way.
+      // 2) патч профиля best-effort - не валим весь флоу, если что-то не так
       void api
         .patch('/api/user/profile', {
           research_consent: researchConsent,
-          /* Single research toggle governs text sharing too — opting in
-           * shares the actual words alongside the rest of the anonymized
-           * data; opting out turns everything off. */
+          // один тумблер согласия управляет и шарингом текста
           share_text_consent: researchConsent,
           notification_prefs: {
             friendRequests: true,
@@ -310,14 +300,13 @@ export function OnboardingPage() {
           },
         })
         .then(() => {
-          // Flip the in-memory consent flag immediately so analytics start
-          // capturing the rest of this session without waiting for a reload.
+          // сразу выставляем флаг согласия в памяти - аналитика стартует без перезагрузки
           mergeUser({ research_consent: researchConsent });
         })
         .catch(() => undefined);
 
-      // 3) Habit creation: Promise.allSettled so one bad row doesn't sink
-      // every other habit.
+      // 3) привычки через allSettled - одна кривая строка не топит остальные
+
       const selectedStarters = HABIT_TEMPLATES.filter((habit) =>
         selectedStarterIds.includes(habit.id),
       );
@@ -786,9 +775,7 @@ function QuizStep({ initial, onBack, onSkip, onSubmit }: QuizStepProps) {
   const [times, setTimes] = useState<HabitTimeOfDay[]>(initial.times);
   const [energy, setEnergy] = useState<QuizEnergy>(initial.energy);
   const [blocker, setBlocker] = useState<QuizBlocker>(initial.blocker);
-  // Demographics are collapsed by default so the first impression of this
-  // step stays on the five "what fits me" questions that drive the habit
-  // recommender. Nothing in here is required.
+  // демография свёрнута по умолчанию - ничего тут не обязательно
   const [aboutOpen, setAboutOpen] = useState(false);
   const [ageBand, setAgeBand] = useState<QuizAgeBand | ''>(initial.age_band ?? '');
   const [occupation, setOccupation] = useState<QuizOccupation | ''>(initial.occupation ?? '');
@@ -1003,14 +990,7 @@ interface QuizQuestionProps {
 
 function QuizQuestion({ number, title, hint, children }: QuizQuestionProps) {
   const headingId = useId();
-  /*
-   * Using <div role="group"> + a labelled heading rather than
-   * <fieldset>/<legend>. The native legend renders in a special border-
-   * positioned box that ignores its parent's padding and routinely
-   * overflows when the parent uses flex/grid. role="group" +
-   * aria-labelledby gives screen readers the same grouping semantics
-   * without the layout pain.
-   */
+  // role="group" + aria-labelledby вместо fieldset/legend - у legend кривая раскладка во flex/grid
   return (
     <div className="quiz-question" role="group" aria-labelledby={headingId}>
       <h3 id={headingId} className="quiz-question__header">
@@ -1068,12 +1048,7 @@ function extractMessage(err: unknown): string {
   return 'Something went wrong setting up your companion. Please try again.';
 }
 
-/*
- * Single consent row: HabitCheckbox button + clickable text. The text
- * has its own onClick so mouse users can toggle by tapping the
- * description, and the button itself is keyboard-accessible. No parent
- * onClick — that would double-fire when the button's click bubbles up.
- */
+// строка согласия: чекбокс + кликабельный текст (у текста свой onClick, чтобы не было двойного срабатывания)
 function ConsentRow({
   checked,
   disabled,
@@ -1108,7 +1083,7 @@ function ConsentRow({
         className="consent-check__text"
         onClick={(event) => {
           if (disabled) return;
-          // Don't double-fire when the click originates inside the button.
+          // клик внутри кнопки не дублируем
           if ((event.target as HTMLElement).closest('button')) return;
           onToggle();
         }}

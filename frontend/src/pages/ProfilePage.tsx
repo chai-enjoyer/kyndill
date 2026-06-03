@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { AnimatedValue } from '../components/common/AnimatedValue';
-import { Button } from '../components/common/Button';
-import { FlameIcon } from '../components/common/FlameIcon';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { AnimatedValue } from '../components/ui/AnimatedValue';
+import { Button } from '../components/ui/Button';
+import { FlameIcon } from '../components/illustration/FlameIcon';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 import { JournalSection } from '../components/profile/JournalSection';
 import { WishlistEditor } from '../components/profile/WishlistEditor';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';

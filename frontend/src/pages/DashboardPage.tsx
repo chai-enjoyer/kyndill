@@ -12,9 +12,9 @@ import { useRecoveryPrompt } from '../hooks/useRecovery';
 import { useMoodPing } from '../hooks/useMoodPing';
 import { useShop } from '../hooks/useShop';
 import { DashboardSidebar } from '../components/dashboard/DashboardSidebar';
-import { HabitListItem } from '../components/dashboard/HabitListItem';
-import { HabitDetailsModal } from '../components/dashboard/HabitDetailsModal';
-import { PetPanel } from '../components/dashboard/PetPanel';
+import { HabitListItem } from '../components/habits/HabitListItem';
+import { HabitDetailsModal } from '../components/habits/HabitDetailsModal';
+import { PetPanel } from '../components/pet/PetPanel';
 import { ActivityFeed } from '../components/dashboard/ActivityFeed';
 import { MobilePageHeader } from '../components/layout/MobilePageHeader';
 import { MobilePetStrip } from '../components/dashboard/mobile/MobilePetStrip';
@@ -22,15 +22,15 @@ import { MobilePetCare } from '../components/dashboard/mobile/MobilePetCare';
 import { MobileStatsRow } from '../components/dashboard/mobile/MobileStatsRow';
 import { MobileXpRow } from '../components/dashboard/mobile/MobileXpRow';
 import { MobileHabitList } from '../components/dashboard/mobile/MobileHabitList';
-import { LevelUpModal } from '../components/dashboard/LevelUpModal';
-import { FeedModal } from '../components/dashboard/FeedModal';
-import { PetCarePromptModal, petNeedsCare } from '../components/dashboard/PetCarePromptModal';
-import { ItemDropToast } from '../components/dashboard/ItemDropToast';
-import { HabitFeedbackModal } from '../components/dashboard/HabitFeedbackModal';
-import { RecoveryReflectionModal } from '../components/dashboard/RecoveryReflectionModal';
-import { MoodPingModal } from '../components/dashboard/MoodPingModal';
-import { AnimatedValue } from '../components/common/AnimatedValue';
-import { LoadingSkeleton } from '../components/common/LoadingSkeleton';
+import { LevelUpModal } from '../components/overlays/LevelUpModal';
+import { FeedModal } from '../components/pet/FeedModal';
+import { PetCarePromptModal, petNeedsCare } from '../components/pet/PetCarePromptModal';
+import { ItemDropToast } from '../components/overlays/ItemDropToast';
+import { HabitFeedbackModal } from '../components/habits/HabitFeedbackModal';
+import { RecoveryReflectionModal } from '../components/overlays/RecoveryReflectionModal';
+import { MoodPingModal } from '../components/overlays/MoodPingModal';
+import { AnimatedValue } from '../components/ui/AnimatedValue';
+import { LoadingSkeleton } from '../components/ui/LoadingSkeleton';
 
 export function DashboardPage() {
   const { user, mergeUser } = useAuthContext();
@@ -175,9 +175,7 @@ export function DashboardPage() {
     setPullStart(null);
   }
 
-  // A fainted pet always warrants the prompt; otherwise nudge once care stats
-  // run critically low. Dismissing hides it until the condition clears and
-  // re-triggers, so it never nags in a loop.
+  // обморок - всегда показываем; иначе пинаем только когда статы совсем низко
   const careAlert: 'fainted' | 'low' | null = pet
     ? pet.is_fainted
       ? 'fainted'
@@ -232,8 +230,8 @@ export function DashboardPage() {
 
       {/*
        * Mobile dashboard tree. Hidden on desktop via CSS (@media min-width: 881px).
-       * Renders the brief's mobile-first stack: brand-header → greeting+date →
-       * pet strip → quick stats → "TODAY" habit list → activity feed.
+       * Renders the brief's mobile-first stack: brand-header -> greeting+date ->
+       * pet strip -> quick stats -> "TODAY" habit list -> activity feed.
        */}
       <div className="m-dashboard">
         <MobilePageHeader />

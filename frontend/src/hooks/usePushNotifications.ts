@@ -11,9 +11,7 @@ type BrowserPermission = NotificationPermission | 'unsupported';
 
 const SW_URL = '/kyndill-push-sw.js';
 
-// The VAPID public key never changes during a session — caching it skips a
-// network round-trip on every Settings nav. Subscription state can change
-// (re-enable, browser rotation), so we only cache the value, not the result.
+// VAPID-ключ за сессию не меняется, кэшируем его (но не состояние подписки)
 let cachedPushConfig: PushPublicKeyResponse | null = null;
 let inflightPushConfig: Promise<PushPublicKeyResponse> | null = null;
 
@@ -41,7 +39,7 @@ function hasPushSupport(): boolean {
   );
 }
 
-// iOS Safari only supports Web Push for installed PWAs (added to Home Screen).
+// на iOS Safari Web Push работает только для установленной PWA
 function isIosNonPwa(): boolean {
   if (typeof window === 'undefined') return false;
   const ua = window.navigator.userAgent;
@@ -67,9 +65,7 @@ export function usePushNotifications() {
   const [error, setError] = useState<string | null>(null);
   const resyncedRef = useRef(false);
 
-  // Ensure subscription on server matches what the browser still has. If the
-  // backend dropped a stale subscription (410 Gone) but the browser still has
-  // one, re-POST it. If the browser lost the subscription, mark unsubscribed.
+  // синхроним подписку на сервере с тем, что реально есть в браузере
   const reconcileSubscription = useCallback(async () => {
     if (!supported) return;
     try {
@@ -122,9 +118,7 @@ export function usePushNotifications() {
     void refresh();
   }, [refresh]);
 
-  // If the SW was previously installed, keep it warm and updated on every
-  // app load. We deliberately do NOT request notification permission here —
-  // that only happens on explicit enable().
+  // если SW уже стоял - просто обновляем его. Разрешение тут НЕ просим (только в enable())
   useEffect(() => {
     if (!supported) return;
     let cancelled = false;
@@ -135,8 +129,7 @@ export function usePushNotifications() {
           await existing.update().catch(() => undefined);
           return;
         }
-        // Only register if a subscription exists from a prior session — avoids
-        // adding a SW for users who never enabled push.
+        // регистрируем только если подписка осталась с прошлой сессии
         const fallback = await navigator.serviceWorker.getRegistration();
         if (fallback?.active?.scriptURL.endsWith('kyndill-push-sw.js')) {
           if (!cancelled) await fallback.update().catch(() => undefined);
@@ -150,8 +143,7 @@ export function usePushNotifications() {
     };
   }, [supported]);
 
-  // The SW broadcasts when the subscription is rotated by the browser
-  // (pushsubscriptionchange). We re-fetch to reflect the new state in the UI.
+  // браузер шлёт pushsubscriptionchange при ротации подписки - перечитываем состояние
   useEffect(() => {
     if (!supported) return;
     function handle(event: MessageEvent) {
@@ -190,8 +182,7 @@ export function usePushNotifications() {
       const registration = await navigator.serviceWorker.register(SW_URL, { updateViaCache: 'none' });
       await registration.update().catch(() => undefined);
 
-      // Wait briefly for the SW to be active before subscribing — fresh
-      // installs can race subscribe() against an installing worker.
+      // ждём активный SW перед подпиской - иначе гонка с installing worker
       await waitForActiveWorker(registration);
 
       const existing = await registration.pushManager.getSubscription();
