@@ -131,6 +131,16 @@ export function getStoredTheme(): Theme {
   return 'system';
 }
 
+// Whether the given theme currently resolves to a dark appearance. For
+// `system` this depends on the OS preference, so a new user on a dark OS sees
+// a dark UI even though no explicit `dark` was ever chosen.
+export function isDarkActive(theme: Theme): boolean {
+  if (typeof window === 'undefined') return false;
+  if (theme === 'dark') return true;
+  if (theme === 'light') return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
 export function applyTheme(theme: Theme): void {
   if (typeof window === 'undefined') return;
   window.localStorage.setItem(THEME_STORAGE_KEY, theme);

@@ -99,6 +99,10 @@ b {
 
 a {
   color: var(--color-accent);
+  /* Links are distinguished by accent color, not a default underline -
+   * component links (cards, nav, pills) kept picking up a stray underline.
+   * Genuine inline prose links opt back in via `.link-underline`. */
+  text-decoration: none;
   text-decoration-color: var(--color-accent-subtle);
   text-decoration-thickness: 1.5px;
   text-underline-offset: 0.2em;
@@ -108,6 +112,13 @@ a {
 
 a:hover {
   color: var(--color-accent-strong);
+}
+
+.link-underline {
+  text-decoration: underline;
+}
+
+.link-underline:hover {
   text-decoration-color: currentColor;
 }
 

@@ -296,7 +296,7 @@ function HealthBreakdown({ pet, streak }: { pet: PetFullState; streak: number })
   const carePoints = Math.round(breakdown.careAverage * breakdown.weights.care);
   const streakPoints = Math.round(breakdown.streakScore * breakdown.weights.streak);
   return (
-    <details className="health-breakdown" open>
+    <details className="health-breakdown">
       <summary>
         <span>How health adds up</span>
         <strong>{breakdown.health}/100</strong>
@@ -304,34 +304,21 @@ function HealthBreakdown({ pet, streak }: { pet: PetFullState; streak: number })
       <ul className="health-breakdown__rows">
         <li>
           <span>Care average</span>
-          <span className="health-breakdown__sub">
-            ({pet.happiness}+{pet.hunger}+{pet.energy}+{pet.cleanliness}) ÷ 4 ={' '}
-            {breakdown.careAverage}
-          </span>
           <strong>+{carePoints}</strong>
         </li>
         <li>
           <span>Streak momentum</span>
-          <span className="health-breakdown__sub">
-            {streak} day{streak === 1 ? '' : 's'} × 12, capped at 100
-          </span>
           <strong>+{streakPoints}</strong>
         </li>
         <li>
           <span>Consistency bonus</span>
-          <span className="health-breakdown__sub">2 per streak day, capped at 12</span>
           <strong>+{breakdown.consistencyBonus}</strong>
         </li>
         <li className="health-breakdown__total">
           <span>Health</span>
-          <span className="health-breakdown__sub">capped at 100</span>
           <strong>{breakdown.health}</strong>
         </li>
       </ul>
-      <p className="health-breakdown__note text-muted">
-        Care stats drift down between visits (hunger and energy fastest, cleanliness and
-        happiness slower). Completing habits and feeding consumables push them back up.
-      </p>
     </details>
   );
 }

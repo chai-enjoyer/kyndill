@@ -173,17 +173,18 @@ export async function updateProfile(
   if (input.research_consent !== undefined) {
     sets.push(`research_consent = $${i++}`);
     values.push(input.research_consent);
-    // Text sharing implicitly turns off when the user opts out of research at
-    // all - there is no scenario in which "no research data" + "share my text"
-    // makes sense, and forgetting this would silently strand stale consent.
-    if (input.research_consent === false) {
-      sets.push(`share_text_consent = $${i++}`);
-      values.push(false);
-    }
   }
-  if (input.share_text_consent !== undefined) {
+  // Text sharing implicitly turns off when the user opts out of research at
+  // all - there is no scenario in which "no research data" + "share my text"
+  // makes sense, and forgetting this would silently strand stale consent.
+  // Resolve to a single value first: opting out of research forces it false,
+  // otherwise honor the explicit flag. Assigning the column twice in one
+  // UPDATE (e.g. opt-out sends both flags false) is a Postgres error.
+  const shareTextConsent =
+    input.research_consent === false ? false : input.share_text_consent;
+  if (shareTextConsent !== undefined) {
     sets.push(`share_text_consent = $${i++}`);
-    values.push(input.share_text_consent);
+    values.push(shareTextConsent);
   }
   if (input.reminder_hour !== undefined) {
     sets.push(`reminder_hour = $${i++}`);

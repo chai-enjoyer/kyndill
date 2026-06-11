@@ -327,6 +327,8 @@ function HabitCard({
       onDragOver={handleDragOver}
       onDrop={onDrop}
     >
+      {/* Native HTML5 drag doesn't fire on touch, so the reorder handle is
+          desktop-only (hidden on mobile via .habit-card__handle). */}
       <span className="habit-card__handle" aria-label="Drag to reorder" title="Drag to reorder">
         <svg viewBox="0 0 20 20" width="18" height="18" fill="currentColor" aria-hidden="true">
           <circle cx="7" cy="5" r="1.4" />
@@ -360,12 +362,14 @@ function HabitCard({
           <span className="switch__track" aria-hidden="true" />
           <span className="switch__label">{habit.is_active ? 'Active' : 'Inactive'}</span>
         </label>
-        <Button variant="secondary" size="sm" onClick={onEdit}>
-          Edit
-        </Button>
-        <Button variant="ghost" size="sm" onClick={onDelete}>
-          Delete
-        </Button>
+        <div className="habit-card__buttons">
+          <Button variant="secondary" size="sm" onClick={onEdit}>
+            Edit
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDelete}>
+            Delete
+          </Button>
+        </div>
       </div>
     </li>
   );

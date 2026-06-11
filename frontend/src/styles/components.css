@@ -316,6 +316,9 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* Only the body scrolls vertically; never let content pan sideways
+   * (wide grids / inputs were letting the dialog slide horizontally). */
+  overflow-x: hidden;
   overscroll-behavior: contain;
   /* гасим паддинг контента, чтобы скроллбар был у края, и возвращаем внутри */
   margin: 0 calc(-1 * var(--space-6));
@@ -913,7 +916,17 @@ body:has(.item-drop-toast) .toast-viewport {
   font-size: var(--text-xs);
   height: 100%;
   min-width: 0;
+  /* `manipulation` drops the ~300ms double-tap wait that made quick taps
+   * feel ignored; the rest just removes the grey flash on touch. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
   transition: color var(--duration-fast) var(--ease-out);
+}
+
+.bottom-nav__link:active {
+  color: var(--color-text);
 }
 
 .bottom-nav__icon {
@@ -2708,6 +2721,12 @@ body:has(.item-drop-toast) .toast-viewport {
   gap: var(--space-2);
 }
 
+.habit-card__buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .switch {
   display: inline-flex;
   align-items: center;
@@ -3792,14 +3811,28 @@ body:has(.item-drop-toast) .toast-viewport {
     align-items: stretch;
   }
 
+  /* Drop the (touch-useless) drag handle and give the content the full
+   * width; the action row becomes a footer split between the Active
+   * toggle and the Edit/Delete buttons. */
   .habit-card {
-    grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    min-height: 0;
+  }
+
+  .habit-card__handle {
+    display: none;
   }
 
   .habit-card__actions {
-    grid-column: 2;
-    flex-wrap: wrap;
-    justify-content: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .habit-card__buttons {
+    flex: none;
   }
 
   .habit-form__grid,
@@ -5982,6 +6015,14 @@ body:has(.item-drop-toast) .toast-viewport {
     flex-wrap: wrap;
   }
 
+  /* Suggested / search results: drop the action button onto its own
+   * full-width row instead of letting it squeeze under the avatar. */
+  .search-results li > .btn {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    margin-top: var(--space-1);
+  }
+
   .leaderboard-row {
     grid-template-columns: 54px minmax(0, 1fr) 64px 80px;
     gap: var(--space-2);
@@ -7317,9 +7358,7 @@ body:has(.item-drop-toast) .toast-viewport {
   color: var(--color-text-muted);
   font: inherit;
   font-size: var(--text-sm);
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 3px;
+  font-weight: var(--weight-medium);
   cursor: pointer;
 }
 

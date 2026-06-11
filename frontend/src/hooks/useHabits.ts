@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AxiosError } from 'axios';
 import { api } from '../lib/api';
 
@@ -76,15 +76,20 @@ export function useHabits(options: UseHabitsOptions = {}) {
   const [habits, setHabits] = useState<HabitWithStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
+  // Only the first load shows the skeleton. Background refetches after a
+  // toggle/edit/delete update the list in place, so the page doesn't flash a
+  // full-screen skeleton (which read as a whole-page reload on mobile).
   const refetch = useCallback(async () => {
-    setIsLoading(true);
+    if (!loadedRef.current) setIsLoading(true);
     try {
       const { data } = await api.get<{ habits: HabitWithStatus[] }>('/api/habits', {
         params: scope === 'all' ? { scope: 'all' } : undefined,
       });
       setHabits(data.habits);
       setError(null);
+      loadedRef.current = true;
     } catch (err) {
       setError(extractMessage(err));
     } finally {

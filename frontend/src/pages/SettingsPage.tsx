@@ -10,7 +10,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications';
 import { extractMessage } from '../hooks/useSocial';
 import { api } from '../lib/api';
 import { getPasswordValidationMessage, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../lib/credentials';
-import { applyTheme, getStoredTheme, type Theme } from '../lib/utils';
+import { applyTheme, getStoredTheme, isDarkActive, type Theme } from '../lib/utils';
 
 type NotificationPrefs = {
   friendRequests: boolean;
@@ -377,7 +377,7 @@ export function SettingsPage() {
           <section className="settings-card">
             <h2>Appearance</h2>
             <label className="switch settings-switch">
-              <input type="checkbox" checked={theme === 'dark'} onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')} />
+              <input type="checkbox" checked={isDarkActive(theme)} onChange={(e) => setTheme(e.target.checked ? 'dark' : 'light')} />
               <span className="switch__track" aria-hidden="true" />
               <span className="switch__label">Dark mode</span>
             </label>
@@ -488,9 +488,11 @@ function formatHourLabel(hour: number): string {
 }
 
 function pushStatus(push: ReturnType<typeof usePushNotifications>): string {
-  if (!push.supported) return 'This browser does not support Web Push notifications.';
+  // iOS Safari only exposes the push APIs inside an installed PWA, so the
+  // generic "not supported" message would mislead - surface the real fix first.
   if (push.requiresPwa)
     return 'On iOS, add Kyndill to your Home Screen first to receive push notifications.';
+  if (!push.supported) return 'This browser does not support Web Push notifications.';
   if (!push.isConfigured) return 'Server push keys are not configured yet.';
   if (push.permission === 'denied') return 'Notifications are blocked in browser settings.';
   if (push.isSubscribed) return 'Enabled for this browser.';
